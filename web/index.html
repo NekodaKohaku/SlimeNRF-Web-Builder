@@ -85,12 +85,11 @@
 </div>
 
 <script>
-// ⚠️ 部署後改成你的 Cloudflare Worker 網址（結尾不要加斜線）
 const WORKER_URL = "https://slimenrf-web-builder.你的名稱.workers.dev";
 
 let MODULES = [];
 
-function parsePin(p) { // "P0.06" -> {port:0, pin:6}
+function parsePin(p) {
   const m = /^P(\d)\.(\d+)$/.exec(p);
   return m ? { port: +m[1], pin: +m[2] } : null;
 }
@@ -207,7 +206,6 @@ function drawBoard(pins) {
     const t = svgEl("text", { x: 260, y: 280, "text-anchor": "middle", fill: "#7f8794", "font-size": "13" });
     t.textContent = "此模組尚無接線圖"; svg.appendChild(t); return;
   }
-  // gpio -> {label,color}  依目前指定的腳
   const g2f = {};
   for (const key in (pins || {})) { if (FUNC_META[key] && pins[key]) g2f[pins[key]] = FUNC_META[key]; }
 
