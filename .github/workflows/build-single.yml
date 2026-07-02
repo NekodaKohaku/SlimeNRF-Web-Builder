@@ -179,3 +179,4 @@ jobs:
           TAG="fw-${BUILD_ID}"
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 && \
             gh release edit "$TAG" --notes "STATUS:FAILED" --repo "$GITHUB_REPOSITORY" || true
+            
