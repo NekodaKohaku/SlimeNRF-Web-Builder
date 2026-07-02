@@ -1,0 +1,22 @@
+name = "slimenrf-web-builder"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+# 一般設定（非機密，可直接寫在這）
+[vars]
+GITHUB_APP_ID = "123456"                        # 你的 GitHub App ID（數字）
+GITHUB_INSTALLATION_ID = "12345678"             # App 安裝到 repo 後的 Installation ID
+GITHUB_REPO = "你的帳號/你的repo"                 # 例如 "myname/slimenrf-web-builder"
+WORKFLOW_FILE = "build-single.yml"
+GIT_REF = "main"
+ALLOWED_ORIGIN = "https://你的帳號.github.io"      # 你的 GitHub Pages 網址
+
+# rate limit 用的 KV（選用）。要啟用的話：
+#   1. npx wrangler kv namespace create RATE_LIMIT
+#   2. 把回傳的 id 填到下面並取消註解
+# [[kv_namespaces]]
+# binding = "RATE_LIMIT"
+# id = "在這裡填 wrangler 給你的 id"
+
+# 機密的 App 私鑰不要寫在這裡！用指令設定（貼上轉成 PKCS#8 的 PEM 全文）：
+#   npx wrangler secret put GITHUB_APP_PRIVATE_KEY
