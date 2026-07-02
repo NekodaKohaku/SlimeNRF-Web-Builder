@@ -1,0 +1,181 @@
+name: Build Single Firmware
+
+on:
+  workflow_dispatch:
+    inputs:
+      config:
+        required: true
+        type: string
+      build_id:
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.event.inputs.build_id }}
+  cancel-in-progress: false
+
+env:
+  BUILD_ID: ${{ github.event.inputs.build_id }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate build_id
+        run: |
+          echo "$BUILD_ID" | grep -Eq '^[a-f0-9]{6,40}$' || { echo "invalid build_id"; exit 1; }
+
+      - name: Parse config
+        id: cfg
+        env:
+          CONFIG_JSON: ${{ github.event.inputs.config }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "$CONFIG_JSON" | jq . > /dev/null
+          get() { echo "$CONFIG_JSON" | jq -r "$1"; }
+          {
+            echo "type=$(get '.type')"
+            echo "board_target=$(get '.board_target')"
+            echo "repository_url=$(get '.repository_url')"
+            echo "repository_revision=$(get '.repository_revision')"
+            echo "sdk_url=$(get '.sdk_url')"
+            echo "sdk_revision=$(get '.sdk_revision')"
+            echo "zephyr_sdk_version=$(get '.zephyr_sdk_version')"
+            echo "fileformat=$(get '.fileformat')"
+            echo "filename=$(get '.filename')"
+            echo "magnetometer=$(get '.options.magnetometer // "unset"')"
+            echo "sleep=$(get '.options.sleep // "unset"')"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create placeholder release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="fw-${BUILD_ID}"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" --notes "STATUS:BUILDING" --prerelease
+
+      - name: Install apt dependencies
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: >-
+            git cmake ninja-build gperf ccache dfu-util device-tree-compiler wget
+            python3-dev python3-pip python3-setuptools python3-tk python3-wheel python3-venv
+            xz-utils file make gcc gcc-multilib g++-multilib libsdl2-dev libmagic1
+          version: 1.0
+
+      - name: Install Zephyr SDK
+        run: |
+          VER="${{ steps.cfg.outputs.zephyr_sdk_version }}"
+          wget -q -O zephyr-sdk.tar.xz \
+            "https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v${VER}/zephyr-sdk-${VER}_linux-x86_64_minimal.tar.xz"
+          tar xf zephyr-sdk.tar.xz -C ~/
+          rm -rf ~/zephyr-sdk && mv ~/zephyr-sdk-*/ ~/zephyr-sdk
+          ~/zephyr-sdk/setup.sh -c -t arm-zephyr-eabi
+
+      - name: Setup Python venv + west
+        run: |
+          python3 -m venv ~/.venv
+          ~/.venv/bin/pip install --quiet west ninja
+
+      - name: Initialise Zephyr workspace
+        run: |
+          export PATH="$HOME/.venv/bin:$PATH"
+          mkdir -p zephyr-workspace/manifest
+          cat > zephyr-workspace/manifest/west.yml <<YAML
+          manifest:
+            version: "0.10"
+            projects:
+              - name: sdk-nrf
+                path: nrf
+                url: ${{ steps.cfg.outputs.sdk_url }}
+                revision: ${{ steps.cfg.outputs.sdk_revision }}
+                import: true
+          YAML
+          cd zephyr-workspace
+          west init -l manifest
+          west update --narrow -o=--depth=1
+          west zephyr-export
+          ~/.venv/bin/pip install --quiet -r zephyr/scripts/requirements.txt
+
+      - name: Clone firmware source
+        run: |
+          cd zephyr-workspace
+          git clone --filter=blob:none "${{ steps.cfg.outputs.repository_url }}" SlimeVR-Tracker-nRF
+          git -C SlimeVR-Tracker-nRF checkout "${{ steps.cfg.outputs.repository_revision }}"
+          git -C SlimeVR-Tracker-nRF submodule update --init --recursive --depth 1
+
+      - name: Generate board overlay from pins
+        id: overlay
+        if: ${{ steps.cfg.outputs.type == 'tracker' }}
+        env:
+          CONFIG_JSON: ${{ github.event.inputs.config }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/gen_overlay.py" "$CONFIG_JSON" > "$OUT"
+          cat "$OUT"
+          echo "overlay_path=$OUT" >> "$GITHUB_OUTPUT"
+
+      - name: Apply firmware options
+        if: ${{ steps.cfg.outputs.type == 'tracker' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd zephyr-workspace/SlimeVR-Tracker-nRF
+          append() { printf "\n\n%s" "$1" >> prj.conf; }
+          MAG='${{ steps.cfg.outputs.magnetometer }}'
+          SLEEP='${{ steps.cfg.outputs.sleep }}'
+          [ "$MAG" = "enabled" ]  && append 'CONFIG_SENSOR_USE_MAG=y'
+          [ "$MAG" = "disabled" ] && append 'CONFIG_SENSOR_USE_MAG=n'
+          if [ "$SLEEP" = "enabled" ]; then
+            append 'CONFIG_USE_IMU_WAKE_UP=y'; append 'CONFIG_USE_ACTIVE_TIMEOUT=y'
+          elif [ "$SLEEP" = "disabled" ]; then
+            append 'CONFIG_USE_IMU_WAKE_UP=n'; append 'CONFIG_USE_ACTIVE_TIMEOUT=n'
+          fi
+          tail -n 8 prj.conf
+
+      - name: west build
+        id: build
+        run: |
+          export PATH="$HOME/.venv/bin:$PATH"
+          cd zephyr-workspace
+          mkdir -p out
+          EXTRA=""
+          if [ "${{ steps.cfg.outputs.type }}" = "tracker" ]; then
+            EXTRA="-DEXTRA_DTC_OVERLAY_FILE=${{ steps.overlay.outputs.overlay_path }}"
+          fi
+          west build \
+            --board "${{ steps.cfg.outputs.board_target }}" \
+            --pristine=always SlimeVR-Tracker-nRF \
+            --build-dir SlimeVR-Tracker-nRF/build \
+            -- -DNCS_TOOLCHAIN_VERSION=NONE -DBOARD_ROOT=../SlimeVR-Tracker-nRF $EXTRA
+
+          FMT="${{ steps.cfg.outputs.fileformat }}"; NAME="${{ steps.cfg.outputs.filename }}"
+          SRC="SlimeVR-Tracker-nRF/build/SlimeVR-Tracker-nRF/zephyr/zephyr.$FMT"
+          [ -f "$SRC" ] || { echo "missing build output $SRC" >&2; exit 1; }
+          cp "$SRC" "out/${NAME}.${FMT}"
+          echo "artifact=zephyr-workspace/out/${NAME}.${FMT}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload firmware to release
+        if: ${{ success() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="fw-${BUILD_ID}"
+          gh release upload "$TAG" "${{ steps.build.outputs.artifact }}" --clobber --repo "$GITHUB_REPOSITORY"
+          gh release edit  "$TAG" --notes "STATUS:DONE" --repo "$GITHUB_REPOSITORY"
+
+      - name: Mark release as failed
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="fw-${BUILD_ID}"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 && \
+            gh release edit "$TAG" --notes "STATUS:FAILED" --repo "$GITHUB_REPOSITORY" || true
