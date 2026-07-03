@@ -206,7 +206,7 @@ jobs:
         run: |
           TAG="fw-${BUILD_ID}"
           gh release upload "$TAG" "${{ steps.build.outputs.artifact }}" "${{ steps.build.outputs.pinout }}" --clobber --repo "$GITHUB_REPOSITORY"
-          gh release edit  "$TAG" --notes "STATUS:DONE | fw ${{ steps.clone.outputs.fw_sha }}" --repo "$GITHUB_REPOSITORY"
+          gh release edit  "$TAG" --notes "STATUS:DONE BUILT:${{ steps.clone.outputs.fw_sha }}" --repo "$GITHUB_REPOSITORY"
 
       - name: Mark release as failed
         if: ${{ failure() }}
