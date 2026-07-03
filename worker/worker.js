@@ -114,13 +114,9 @@ async function handleStatus(url, env) {
   if (!resp.ok) return json({ error: `查詢狀態失敗 (${resp.status})` }, 502);
 
   const release = await resp.json();
-  const body = release.body || "";
   const asset = (release.assets || []).find(a => /\.(hex|uf2)$/i.test(a.name));
-
-  if (asset) {
-    return json({ status: "done", filename: asset.name, download_url: asset.browser_download_url });
-  }
-  if (body.includes("STATUS:FAILED")) return json({ status: "failed" });
+  if (asset) return json({ status: "done", filename: asset.name, download_url: asset.browser_download_url });
+  if ((release.body || "").includes("STATUS:FAILED")) return json({ status: "failed" });
   return json({ status: "building" });
 }
 
