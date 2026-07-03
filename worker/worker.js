@@ -63,19 +63,21 @@ async function handleBuild(request, env) {
     }
   }
 
+  const buildId = await configHash(cfg);
+
+  let curSha = null;
   if (cfg.repository_url && cfg.repository_revision) {
     const sha = await resolveRef(env, cfg.repository_url, cfg.repository_revision);
-    if (sha) cfg.repository_revision = sha;
+    if (sha) { curSha = sha.slice(0, 7); cfg.repository_revision = sha; }
   }
-
-  const buildId = await configHash(cfg);
 
   if (!cfg.force) {
     const rel = await gh(env, `/repos/${env.GITHUB_REPO}/releases/tags/fw-${buildId}`);
     if (rel.ok) {
       const r = await rel.json();
       const asset = (r.assets || []).find(a => /\.(hex|uf2)$/i.test(a.name));
-      if (asset) {
+      const versionOk = !curSha || (r.body || "").includes("BUILT:" + curSha);
+      if (asset && versionOk) {
         return json({ build_id: buildId, status: "done", cached: true, filename: asset.name, download_url: asset.browser_download_url });
       }
     }
@@ -209,7 +211,8 @@ function canonicalize(v) {
   return JSON.stringify(v);
 }
 async function configHash(cfg) {
-  const c = { ...cfg }; delete c.force; delete c.filename;
+  const c = { ...cfg };
+  delete c.force; delete c.filename; delete c.repository_revision; delete c.sdk_revision;
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonicalize(c)));
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 12);
 }
