@@ -35,7 +35,8 @@
     },
     {
       "id": "ME54BS01",
-      "label": "ME54BS01 (nRF54L15 · 實驗性)",
+      "label": "ME54BS01 (nRF54L15)",
+      "experimental": true,
       "supported": true,
       "mcu": "nrf54l15",
       "has_usb": false,
@@ -44,7 +45,7 @@
       "repository_url": "https://github.com/SlimeVR/SlimeVR-Tracker-nRF.git",
       "repository_revision": "main",
       "sdk_url": "https://github.com/nrfconnect/sdk-nrf.git",
-      "sdk_revision": "main",
+      "sdk_revision": "v3.1-branch",
       "zephyr_sdk_version": "0.17.4",
       "note": "實驗性：使用官方 test54l 板 + nRF54L 專用 overlay。此晶片走 SWD 燒 .hex。首次可能需 1-2 次實測微調（NFC-as-GPIO、LED 等細節）；失敗時看 Actions log 貼給我即可。",
       "pins": [

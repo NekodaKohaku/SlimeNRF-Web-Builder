@@ -50,8 +50,8 @@
 
   <div class="card">
     <div class="grid">
-      <div><label for="mod" data-i18n="module"></label><select id="mod"></select></div>
       <div><label for="type" data-i18n="type"></label><select id="type"><option value="tracker"></option><option value="receiver"></option></select></div>
+      <div><label for="mod" data-i18n="module"></label><select id="mod"></select></div>
     </div>
 
     <div id="trackerOpts">
@@ -144,7 +144,7 @@ const I18N = {
     buildHint:"（約 5–10 分鐘，請保持頁面開啟）", done:"完成！", download:"下載",
     failed:"編譯失敗，請查看 GitHub Actions 紀錄。", timeout:"編譯逾時，請稍後到 Releases 查看或重試。",
     errINT:"請至少指定 IMU INT 腳。", errI2C:"I2C 需指定 SDA 與 SCL。", errSPI:"SPI 需指定 SCK/MOSI/MISO/CS。", errDup:"腳位重複指定。",
-    advanced:"進階模式（有警告仍可生成）", confirmTitle:"確認以下設定？", confirmYes:"確認生成", confirmNo:"取消", forceRebuild:"強制重新編譯（忽略快取）", advNote:"進階模式：仍可生成，但請自行確認。", cached:"已有相同版本固件，直接提供下載（略過編譯）。", viewLog:"查看完整即時 log ↗",
+    advanced:"進階模式（有警告仍可生成）", confirmTitle:"確認以下設定？", confirmYes:"確認生成", confirmNo:"取消", forceRebuild:"強制重新編譯（忽略快取）", advNote:"進階模式：仍可生成，但請自行確認。", cached:"已有相同版本固件，直接提供下載（略過編譯）。", viewLog:"查看完整即時 log ↗", experimentalTag:"實驗性",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK（選填）", pinLED:"LED", pinSW0:"按鈕 SW0（選填）", pinVCC:"感測器電源（選填）"
   },
@@ -162,7 +162,7 @@ const I18N = {
     buildHint:"(about 5–10 min, keep this page open)", done:"Done!", download:"Download",
     failed:"Build failed — check the GitHub Actions log.", timeout:"Build timed out — check Releases later or retry.",
     errINT:"Please assign the IMU INT pin.", errI2C:"I2C needs SDA and SCL.", errSPI:"SPI needs SCK/MOSI/MISO/CS.", errDup:"Duplicate pin assignment.",
-    advanced:"Advanced mode (build despite warnings)", confirmTitle:"Confirm these settings?", confirmYes:"Confirm build", confirmNo:"Cancel", forceRebuild:"Force rebuild (ignore cache)", advNote:"Advanced mode: you can still build, verify yourself.", cached:"Same firmware already built — download ready (build skipped).", viewLog:"View full live log ↗",
+    advanced:"Advanced mode (build despite warnings)", confirmTitle:"Confirm these settings?", confirmYes:"Confirm build", confirmNo:"Cancel", forceRebuild:"Force rebuild (ignore cache)", advNote:"Advanced mode: you can still build, verify yourself.", cached:"Same firmware already built — download ready (build skipped).", viewLog:"View full live log ↗", experimentalTag:"Experimental",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK (optional)", pinLED:"LED", pinSW0:"Button SW0 (optional)", pinVCC:"Sensor power (optional)"
   },
@@ -180,7 +180,7 @@ const I18N = {
     buildHint:"（約5〜10分、このページは開いたままに）", done:"完了！", download:"ダウンロード",
     failed:"ビルド失敗 — GitHub Actions のログを確認してください。", timeout:"タイムアウト — Releases を確認するか再試行してください。",
     errINT:"IMU INT ピンを割り当ててください。", errI2C:"I2C には SDA と SCL が必要です。", errSPI:"SPI には SCK/MOSI/MISO/CS が必要です。", errDup:"ピンの重複割り当て。",
-    advanced:"詳細モード（警告があってもビルド可）", confirmTitle:"以下の設定でよろしいですか？", confirmYes:"生成を確認", confirmNo:"キャンセル", forceRebuild:"強制再ビルド（キャッシュ無視）", advNote:"詳細モード：ビルド可能ですが自己確認を。", cached:"同一ファームが既にあります — ダウンロード可能（ビルド省略）。", viewLog:"完全なライブログを見る ↗",
+    advanced:"詳細モード（警告があってもビルド可）", confirmTitle:"以下の設定でよろしいですか？", confirmYes:"生成を確認", confirmNo:"キャンセル", forceRebuild:"強制再ビルド（キャッシュ無視）", advNote:"詳細モード：ビルド可能ですが自己確認を。", cached:"同一ファームが既にあります — ダウンロード可能（ビルド省略）。", viewLog:"完全なライブログを見る ↗", experimentalTag:"実験的",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK（任意）", pinLED:"LED", pinSW0:"ボタン SW0（任意）", pinVCC:"センサー電源（任意）"
   }
@@ -207,6 +207,7 @@ function applyLang() {
   setOpt("sleep", "enabled", x.enabled); setOpt("sleep", "disabled", x.disabled);
   setOpt("output", "hex", x.outputHex); setOpt("output", "uf2", x.outputUf2);
   document.querySelectorAll(".langbar button").forEach(b => b.classList.toggle("on", b.dataset.lang === LANG));
+  populateModules();
   onChange();
 }
 
@@ -219,15 +220,28 @@ function parsePin(p) {
 
 async function init() {
   MODULES = (await (await fetch("modules.json")).json()).modules;
-  const modSel = document.getElementById("mod");
-  MODULES.forEach(m => { const o = document.createElement("option"); o.value = m.id; o.textContent = m.label; modSel.appendChild(o); });
-  ["type","imu","mag","bus","sleep","output"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); onChange(); }));
-  modSel.addEventListener("change", () => { markDirty(); onChange(); });
+  ["imu","mag","bus","sleep","output"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); onChange(); }));
+  document.getElementById("type").addEventListener("change", () => { markDirty(); populateModules(); onChange(); });
+  document.getElementById("mod").addEventListener("change", () => { markDirty(); onChange(); });
   document.querySelectorAll(".langbar button").forEach(b => b.addEventListener("click", () => {
     LANG = b.dataset.lang; try { localStorage.setItem("lang", LANG); } catch (e) {}
     applyLang();
   }));
   applyLang();
+}
+
+function populateModules() {
+  const type = document.getElementById("type").value;
+  const modSel = document.getElementById("mod");
+  const prev = modSel.value;
+  modSel.innerHTML = "";
+  MODULES.filter(m => type === "receiver" ? !!m.receiver : true).forEach(m => {
+    const o = document.createElement("option");
+    o.value = m.id;
+    o.textContent = m.label + (m.experimental ? " · " + t().experimentalTag : "");
+    modSel.appendChild(o);
+  });
+  if ([...modSel.options].some(o => o.value === prev)) modSel.value = prev;
 }
 
 function currentModule() { return MODULES.find(m => m.id === document.getElementById("mod").value); }
