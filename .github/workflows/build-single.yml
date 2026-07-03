@@ -24,6 +24,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Validate build_id
         run: |
           echo "$BUILD_ID" | grep -Eq '^[a-f0-9]{6,40}$' || { echo "invalid build_id"; exit 1; }
@@ -179,4 +182,3 @@ jobs:
           TAG="fw-${BUILD_ID}"
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 && \
             gh release edit "$TAG" --notes "STATUS:FAILED" --repo "$GITHUB_REPOSITORY" || true
-            
