@@ -1,29 +1,5 @@
-/**
- * Cloudflare Worker —— 中間的「後台員工」（GitHub App 版）
- *
- * 職責：
- *   1. 用 GitHub App 私鑰即時簽出短效的 installation token（絕不外流到瀏覽器）
- *   2. 收到網站送來的板子設定 → 觸發 GitHub Actions 編譯
- *   3. 讓網站查詢編譯狀態 / 取得下載連結
- *   4. 用 KV 做簡單 rate limit，防止有人狂觸發燒掉你的額度
- *
- * 為什麼用 App 而不是 PAT：App 的權限只綁在你指定的 repo、
- * 換出來的 token 一小時就過期，就算外洩傷害也很有限。
- *
- * 需要在 Cloudflare 設定的環境變數 / 綁定（見 wrangler.toml 與 README）：
- *   GITHUB_APP_ID          (Var)    App 的 App ID（數字）
- *   GITHUB_INSTALLATION_ID (Var)    App 安裝到你 repo 後的 Installation ID（數字）
- *   GITHUB_APP_PRIVATE_KEY (Secret) App 私鑰，需先轉成 PKCS#8 PEM（見 README）
- *   GITHUB_REPO            (Var)    "你的帳號/你的repo"
- *   WORKFLOW_FILE          (Var)    workflow 檔名，預設 "build-single.yml"
- *   GIT_REF                (Var)    要觸發的分支，預設 "main"
- *   ALLOWED_ORIGIN         (Var)    允許呼叫的網站網址，例如 "https://myname.github.io"
- *   RATE_LIMIT             (KV, 選用) 綁定後才會啟用 rate limit
- */
-
 const GITHUB_API = "https://api.github.com";
 
-// installation token 的暫存（同一個 Worker 執行個體會沿用，避免每次都重簽）
 let tokenCache = { token: null, exp: 0 };
 
 export default {
@@ -48,12 +24,7 @@ export default {
   },
 };
 
-// ---------------------------------------------------------------------------
-// 路由處理
-// ---------------------------------------------------------------------------
-
 async function handleBuild(request, env) {
-  // 1) rate limit（每個 IP 每分鐘最多 3 次；需綁定 KV 才啟用）
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   if (env.RATE_LIMIT) {
     const key = `rl:${ip}`;
@@ -62,7 +33,6 @@ async function handleBuild(request, env) {
     await env.RATE_LIMIT.put(key, String(count + 1), { expirationTtl: 60 });
   }
 
-  // 2) 讀取並驗證設定
   const cfg = await request.json();
   const required = [
     "type", "board_target", "repository_url", "repository_revision",
@@ -71,7 +41,6 @@ async function handleBuild(request, env) {
   for (const k of required) {
     if (!cfg[k]) return json({ error: `缺少欄位: ${k}` }, 400);
   }
-  // 白名單：只允許已知來源網域，避免被拿去編任意 repo
   const allowedHosts = ["github.com"];
   for (const u of [cfg.repository_url, cfg.sdk_url]) {
     try {
@@ -82,7 +51,6 @@ async function handleBuild(request, env) {
       return json({ error: `無效的網址: ${u}` }, 400);
     }
   }
-  // tracker：驗證腳位格式與必填腳
   if (cfg.type === "tracker") {
     const pins = cfg.pins || {};
     for (const [k, v] of Object.entries(pins)) {
@@ -95,8 +63,23 @@ async function handleBuild(request, env) {
     }
   }
 
-  // 3) 產生唯一編號並觸發 workflow
-  const buildId = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+  if (cfg.repository_url && cfg.repository_revision) {
+    const sha = await resolveRef(env, cfg.repository_url, cfg.repository_revision);
+    if (sha) cfg.repository_revision = sha;
+  }
+
+  const buildId = await configHash(cfg);
+
+  if (!cfg.force) {
+    const rel = await gh(env, `/repos/${env.GITHUB_REPO}/releases/tags/fw-${buildId}`);
+    if (rel.ok) {
+      const r = await rel.json();
+      const asset = (r.assets || []).find(a => /\.(hex|uf2)$/i.test(a.name));
+      if (asset) {
+        return json({ build_id: buildId, status: "done", cached: true, filename: asset.name, download_url: asset.browser_download_url });
+      }
+    }
+  }
 
   const resp = await gh(
     env,
@@ -132,7 +115,7 @@ async function handleStatus(url, env) {
 
   const release = await resp.json();
   const body = release.body || "";
-  const asset = (release.assets || [])[0];
+  const asset = (release.assets || []).find(a => /\.(hex|uf2)$/i.test(a.name));
 
   if (asset) {
     return json({ status: "done", filename: asset.name, download_url: asset.browser_download_url });
@@ -140,10 +123,6 @@ async function handleStatus(url, env) {
   if (body.includes("STATUS:FAILED")) return json({ status: "failed" });
   return json({ status: "building" });
 }
-
-// ---------------------------------------------------------------------------
-// GitHub App 認證：JWT → installation token
-// ---------------------------------------------------------------------------
 
 async function getInstallationToken(env) {
   const now = Math.floor(Date.now() / 1000);
@@ -205,10 +184,6 @@ async function importPkcs8(pem) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// 小工具
-// ---------------------------------------------------------------------------
-
 async function gh(env, path, init = {}) {
   const token = await getInstallationToken(env);
   return fetch(`${GITHUB_API}${path}`, {
@@ -221,6 +196,26 @@ async function gh(env, path, init = {}) {
       ...(init.headers || {}),
     },
   });
+}
+
+async function resolveRef(env, repoUrl, ref) {
+  const m = /github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/.exec(repoUrl);
+  if (!m) return null;
+  const res = await gh(env, `/repos/${m[1]}/${m[2]}/commits/${encodeURIComponent(ref)}`);
+  if (!res.ok) return null;
+  const d = await res.json();
+  return d && d.sha ? d.sha : null;
+}
+
+function canonicalize(v) {
+  if (Array.isArray(v)) return "[" + v.map(canonicalize).join(",") + "]";
+  if (v && typeof v === "object") return "{" + Object.keys(v).sort().map(k => JSON.stringify(k) + ":" + canonicalize(v[k])).join(",") + "}";
+  return JSON.stringify(v);
+}
+async function configHash(cfg) {
+  const c = { ...cfg }; delete c.force; delete c.filename;
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonicalize(c)));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 12);
 }
 
 function b64url(bytes) {
