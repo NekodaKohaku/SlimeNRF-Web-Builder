@@ -100,6 +100,22 @@
       <svg id="board" viewBox="0 0 520 360" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto; max-height:360px;" role="img"><title>wiring</title></svg>
     </div>
 
+    <label style="display:flex; align-items:center; gap:7px; margin-top:16px; font-size:13px; color:var(--muted); cursor:pointer;">
+      <input type="checkbox" id="adv" style="width:auto; margin:0;"> <span data-i18n="advanced"></span>
+    </label>
+
+    <div id="confirmPanel" style="display:none; margin-top:14px; border:1px solid var(--line); border-radius:9px; padding:14px; background:var(--sub);">
+      <div style="font-size:13px; color:var(--muted); margin-bottom:8px;" data-i18n="confirmTitle"></div>
+      <div id="confirmSummary" style="font-size:13px; line-height:1.7; font-family:ui-monospace,monospace; color:#cdd3dd;"></div>
+      <label style="display:flex; align-items:center; gap:7px; margin-top:10px; font-size:13px; color:var(--muted); cursor:pointer;">
+        <input type="checkbox" id="force" style="width:auto; margin:0;"> <span data-i18n="forceRebuild"></span>
+      </label>
+      <div style="display:flex; gap:10px; margin-top:12px;">
+        <button id="confirmYes" style="margin:0;" data-i18n="confirmYes"></button>
+        <button id="confirmNo" style="margin:0; background:transparent; color:var(--muted); border:1px solid var(--line);" data-i18n="confirmNo"></button>
+      </div>
+    </div>
+
     <button id="go"></button>
     <div id="progress"><div id="progressBar"></div></div>
     <div id="status"></div>
@@ -123,7 +139,8 @@ const I18N = {
     sending:"正在送出編譯要求…", queued:"排隊 / 準備環境中", building:"編譯中",
     buildHint:"（約 5–10 分鐘，請保持頁面開啟）", done:"完成！", download:"下載",
     failed:"編譯失敗，請查看 GitHub Actions 紀錄。", timeout:"編譯逾時，請稍後到 Releases 查看或重試。",
-    errINT:"請至少指定 IMU INT 腳。", errI2C:"I2C 需指定 SDA 與 SCL。", errSPI:"SPI 需指定 SCK/MOSI/MISO/CS。", errDup:"請先解決腳位重複。",
+    errINT:"請至少指定 IMU INT 腳。", errI2C:"I2C 需指定 SDA 與 SCL。", errSPI:"SPI 需指定 SCK/MOSI/MISO/CS。", errDup:"腳位重複指定。",
+    advanced:"進階模式（有警告仍可生成）", confirmTitle:"確認以下設定？", confirmYes:"確認生成", confirmNo:"取消", forceRebuild:"強制重新編譯（忽略快取）", advNote:"進階模式：仍可生成，但請自行確認。", cached:"已有相同版本固件，直接提供下載（略過編譯）。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK（選填）", pinLED:"LED", pinSW0:"按鈕 SW0（選填）", pinVCC:"感測器電源（選填）"
   },
@@ -140,7 +157,8 @@ const I18N = {
     sending:"Sending build request…", queued:"Queued / preparing", building:"Building",
     buildHint:"(about 5–10 min, keep this page open)", done:"Done!", download:"Download",
     failed:"Build failed — check the GitHub Actions log.", timeout:"Build timed out — check Releases later or retry.",
-    errINT:"Please assign the IMU INT pin.", errI2C:"I2C needs SDA and SCL.", errSPI:"SPI needs SCK/MOSI/MISO/CS.", errDup:"Fix duplicate pins first.",
+    errINT:"Please assign the IMU INT pin.", errI2C:"I2C needs SDA and SCL.", errSPI:"SPI needs SCK/MOSI/MISO/CS.", errDup:"Duplicate pin assignment.",
+    advanced:"Advanced mode (build despite warnings)", confirmTitle:"Confirm these settings?", confirmYes:"Confirm build", confirmNo:"Cancel", forceRebuild:"Force rebuild (ignore cache)", advNote:"Advanced mode: you can still build, verify yourself.", cached:"Same firmware already built — download ready (build skipped).",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK (optional)", pinLED:"LED", pinSW0:"Button SW0 (optional)", pinVCC:"Sensor power (optional)"
   },
@@ -157,7 +175,8 @@ const I18N = {
     sending:"ビルド要求を送信中…", queued:"順番待ち / 準備中", building:"ビルド中",
     buildHint:"（約5〜10分、このページは開いたままに）", done:"完了！", download:"ダウンロード",
     failed:"ビルド失敗 — GitHub Actions のログを確認してください。", timeout:"タイムアウト — Releases を確認するか再試行してください。",
-    errINT:"IMU INT ピンを割り当ててください。", errI2C:"I2C には SDA と SCL が必要です。", errSPI:"SPI には SCK/MOSI/MISO/CS が必要です。", errDup:"重複ピンを先に修正してください。",
+    errINT:"IMU INT ピンを割り当ててください。", errI2C:"I2C には SDA と SCL が必要です。", errSPI:"SPI には SCK/MOSI/MISO/CS が必要です。", errDup:"ピンの重複割り当て。",
+    advanced:"詳細モード（警告があってもビルド可）", confirmTitle:"以下の設定でよろしいですか？", confirmYes:"生成を確認", confirmNo:"キャンセル", forceRebuild:"強制再ビルド（キャッシュ無視）", advNote:"詳細モード：ビルド可能ですが自己確認を。", cached:"同一ファームが既にあります — ダウンロード可能（ビルド省略）。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK（任意）", pinLED:"LED", pinSW0:"ボタン SW0（任意）", pinVCC:"センサー電源（任意）"
   }
@@ -198,8 +217,8 @@ async function init() {
   MODULES = (await (await fetch("modules.json")).json()).modules;
   const modSel = document.getElementById("mod");
   MODULES.forEach(m => { const o = document.createElement("option"); o.value = m.id; o.textContent = m.label; modSel.appendChild(o); });
-  ["type","imu","mag","bus","sleep","output"].forEach(id => document.getElementById(id).addEventListener("change", onChange));
-  modSel.addEventListener("change", onChange);
+  ["type","imu","mag","bus","sleep","output"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); onChange(); }));
+  modSel.addEventListener("change", () => { markDirty(); onChange(); });
   document.querySelectorAll(".langbar button").forEach(b => b.addEventListener("click", () => {
     LANG = b.dataset.lang; try { localStorage.setItem("lang", LANG); } catch (e) {}
     applyLang();
@@ -229,7 +248,7 @@ function buildPins() {
     const none = document.createElement("option"); none.value = ""; none.textContent = "—"; s.appendChild(none);
     (mod.pins || []).forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = p; s.appendChild(o); });
     if (defs[key]) s.value = defs[key];
-    s.addEventListener("change", render);
+    s.addEventListener("change", () => { markDirty(); render(); });
     wrap.appendChild(l); wrap.appendChild(s); host.appendChild(wrap);
   });
 }
@@ -274,6 +293,7 @@ function renderOverlay(pins, bus, imu, mag) {
 }
 
 function onChange() {
+  const cp = document.getElementById("confirmPanel"); if (cp) cp.style.display = "none";
   const mod = currentModule();
   const type = document.getElementById("type").value;
   const isRecv = type === "receiver";
@@ -286,8 +306,7 @@ function onChange() {
   if (!supported) { un.style.display = ""; un.textContent = (mod && mod.note) || x.unsupportedBtn; }
   else un.style.display = "none";
 
-  document.getElementById("go").disabled = !supported;
-  document.getElementById("go").textContent = supported ? x.build : x.unsupportedBtn;
+  updateButton();
 
   if (supported && !isRecv) buildPins();
   render();
@@ -351,15 +370,15 @@ function drawBoard(pins) {
 
 function render() {
   const type = document.getElementById("type").value;
-  if (type === "receiver") { document.getElementById("dts").textContent = ""; drawBoard({}); return; }
-  const used = {}; let dup = false;
-  document.querySelectorAll("#pins select").forEach(s => { s.style.outline = ""; if (s.value) { if (used[s.value]) dup = true; used[s.value] = (used[s.value]||0)+1; } });
+  if (type === "receiver") { document.getElementById("dts").textContent = ""; drawBoard({}); refreshValidation(); return; }
+  const used = {};
+  document.querySelectorAll("#pins select").forEach(s => { s.style.outline = ""; if (s.value) { used[s.value] = (used[s.value]||0)+1; } });
   document.querySelectorAll("#pins select").forEach(s => { if (s.value && used[s.value] > 1) s.style.outline = "2px solid var(--err)"; });
-  document.getElementById("warn").textContent = dup ? t().warnDup : "";
   const pins = collectPins();
   drawBoard(pins);
   document.getElementById("dts").textContent = renderOverlay(pins, document.getElementById("bus").value,
     document.getElementById("imu").value, document.getElementById("mag").value);
+  refreshValidation();
 }
 
 function collectConfig() {
@@ -402,28 +421,105 @@ function setStatus(html, cls="") { statusEl.className = cls; statusEl.innerHTML 
 function setProg(pct, color) { progWrap.style.display = "block"; progBar.style.width = Math.max(0, Math.min(100, pct)) + "%"; progBar.style.background = color || "var(--accent)"; }
 function hideProg() { progWrap.style.display = "none"; progBar.style.width = "0%"; }
 
-async function build() {
-  const x = t();
-  const type = document.getElementById("type").value;
-  if (type === "tracker") {
-    const pins = collectPins();
-    const bus = document.getElementById("bus").value;
-    if (!pins.int) { setStatus("❌ " + x.errINT, "err"); return; }
-    if (bus === "i2c" && (!pins.sda || !pins.scl)) { setStatus("❌ " + x.errI2C, "err"); return; }
-    if (bus === "spi" && (!pins.sck || !pins.mosi || !pins.miso || !pins.cs)) { setStatus("❌ " + x.errSPI, "err"); return; }
-    if (document.getElementById("warn").textContent) { setStatus("❌ " + x.errDup, "err"); return; }
+let buildMode = "build";
+let dlUrl = "", dlName = "";
+
+function updateButton() {
+  const mod = currentModule();
+  const supported = mod && mod.supported;
+  if (buildMode === "download") {
+    goBtn.textContent = "⬇ " + t().download + (dlName ? " " + dlName : "");
+    goBtn.style.background = "var(--ok)";
+    goBtn.disabled = false;
+  } else if (buildMode === "building") {
+    goBtn.textContent = t().building + " …";
+    goBtn.style.background = "var(--accent)";
+    goBtn.disabled = true;
+  } else {
+    goBtn.textContent = supported ? t().build : t().unsupportedBtn;
+    goBtn.style.background = "var(--accent)";
+    goBtn.disabled = !supported || validationBlocked;
   }
-  goBtn.disabled = true;
+}
+
+function markDirty() {
+  if (buildMode === "download") {
+    buildMode = "build";
+    dlUrl = ""; dlName = "";
+    hideProg(); setStatus("");
+    updateButton();
+  }
+}
+
+let validationBlocked = false;
+function validate() {
+  const errors = [];
+  if (document.getElementById("type").value !== "tracker") return errors;
+  const mod = currentModule();
+  if (!mod || !mod.supported) return errors;
+  const pins = collectPins();
+  const bus = document.getElementById("bus").value;
+  const counts = {};
+  Object.values(pins).forEach(v => counts[v] = (counts[v] || 0) + 1);
+  if (Object.values(counts).some(c => c > 1)) errors.push(t().errDup);
+  if (!pins.int) errors.push(t().errINT);
+  if (bus === "i2c" && (!pins.sda || !pins.scl)) errors.push(t().errI2C);
+  if (bus === "spi" && (!pins.sck || !pins.mosi || !pins.miso || !pins.cs)) errors.push(t().errSPI);
+  return errors;
+}
+function refreshValidation() {
+  const advEl = document.getElementById("adv");
+  const adv = advEl && advEl.checked;
+  const errors = validate();
+  const warnEl = document.getElementById("warn");
+  if (errors.length) {
+    validationBlocked = !adv;
+    warnEl.textContent = (adv ? "⚠ " : "❌ ") + errors.join("；") + (adv ? " " + t().advNote : "");
+    warnEl.style.color = adv ? "var(--accent)" : "var(--err)";
+  } else {
+    validationBlocked = false;
+    warnEl.textContent = "";
+  }
+  if (buildMode === "build") updateButton();
+}
+
+function showConfirm() {
+  const cfg = collectConfig();
+  const rows = [["Module", cfg.module], ["Type", cfg.type]];
+  if (cfg.type === "tracker") {
+    rows.push(["IMU", cfg.imu]);
+    if (cfg.mag !== "none") rows.push(["Mag", cfg.mag]);
+    rows.push(["Bus", cfg.bus.toUpperCase()]);
+    Object.keys(cfg.pins).forEach(k => rows.push([k.toUpperCase(), cfg.pins[k]]));
+  }
+  rows.push(["Output", cfg.fileformat]);
+  document.getElementById("confirmSummary").innerHTML =
+    rows.map(r => '<div>' + r[0] + ': <span style="color:#e7e9ee">' + r[1] + '</span></div>').join("");
+  document.getElementById("force").checked = false;
+  document.getElementById("confirmPanel").style.display = "block";
+}
+
+async function doBuild(force) {
+  const x = t();
+  document.getElementById("confirmPanel").style.display = "none";
+  buildMode = "building"; updateButton();
   setStatus('<span class="spinner"></span>' + x.sending);
   setProg(8);
   try {
+    const body = collectConfig(); body.force = !!force;
     const res = await fetch(WORKER_URL + "/build", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(collectConfig())
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "error");
+    if (data.status === "done" && data.download_url) {
+      setProg(100, "var(--ok)");
+      buildMode = "download"; dlUrl = data.download_url; dlName = data.filename; updateButton();
+      setStatus("♻ " + x.cached, "");
+      return;
+    }
     poll(data.build_id);
-  } catch (e) { setStatus("❌ " + e.message, "err"); hideProg(); goBtn.disabled = false; }
+  } catch (e) { setStatus("❌ " + e.message, "err"); hideProg(); buildMode = "build"; updateButton(); }
 }
 
 async function poll(buildId) {
@@ -431,18 +527,20 @@ async function poll(buildId) {
   const tick = async () => {
     const x = t();
     const elapsed = Date.now() - started;
-    if (elapsed > TIMEOUT) { setStatus("⌛ " + x.timeout, "err"); goBtn.disabled = false; return; }
+    if (elapsed > TIMEOUT) { setStatus("⌛ " + x.timeout, "err"); buildMode = "build"; updateButton(); return; }
     try {
       const data = await (await fetch(WORKER_URL + "/status?build_id=" + buildId)).json();
       if (data.status === "done") {
         setProg(100, "var(--ok)");
-        setStatus('✅ ' + x.done + '<br><a class="dl" href="' + data.download_url + '">⬇ ' + x.download + ' ' + data.filename + '</a>', "");
-        goBtn.disabled = false; return;
+        buildMode = "download"; dlUrl = data.download_url; dlName = data.filename;
+        updateButton();
+        setStatus("✅ " + x.done, "");
+        return;
       }
       if (data.status === "failed") {
         setProg(100, "var(--err)");
         setStatus("❌ " + x.failed, "err");
-        goBtn.disabled = false; return;
+        buildMode = "build"; updateButton(); return;
       }
       if (data.status === "queued") { setProg(15); setStatus('<span class="spinner"></span>' + x.queued + " …"); }
       else { setProg(Math.min(92, 20 + (elapsed / EXPECTED) * 72)); setStatus('<span class="spinner"></span>' + x.building + " … " + x.buildHint); }
@@ -452,7 +550,14 @@ async function poll(buildId) {
   tick();
 }
 
-goBtn.addEventListener("click", build);
+goBtn.addEventListener("click", () => {
+  if (buildMode === "download" && dlUrl) { window.open(dlUrl, "_blank"); return; }
+  if (buildMode === "building") return;
+  showConfirm();
+});
+document.getElementById("confirmYes").addEventListener("click", () => doBuild(document.getElementById("force").checked));
+document.getElementById("confirmNo").addEventListener("click", () => { document.getElementById("confirmPanel").style.display = "none"; });
+document.getElementById("adv").addEventListener("change", refreshValidation);
 init();
 </script>
 </body>
