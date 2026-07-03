@@ -104,21 +104,25 @@
       <input type="checkbox" id="adv" style="width:auto; margin:0;"> <span data-i18n="advanced"></span>
     </label>
 
-    <div id="confirmPanel" style="display:none; margin-top:14px; border:1px solid var(--line); border-radius:9px; padding:14px; background:var(--sub);">
-      <div style="font-size:13px; color:var(--muted); margin-bottom:8px;" data-i18n="confirmTitle"></div>
-      <div id="confirmSummary" style="font-size:13px; line-height:1.7; font-family:ui-monospace,monospace; color:#cdd3dd;"></div>
-      <label style="display:flex; align-items:center; gap:7px; margin-top:10px; font-size:13px; color:var(--muted); cursor:pointer;">
-        <input type="checkbox" id="force" style="width:auto; margin:0;"> <span data-i18n="forceRebuild"></span>
-      </label>
-      <div style="display:flex; gap:10px; margin-top:12px;">
-        <button id="confirmYes" style="margin:0;" data-i18n="confirmYes"></button>
-        <button id="confirmNo" style="margin:0; background:transparent; color:var(--muted); border:1px solid var(--line);" data-i18n="confirmNo"></button>
-      </div>
-    </div>
-
     <button id="go"></button>
     <div id="progress"><div id="progressBar"></div></div>
     <div id="status"></div>
+    <div id="logBox" style="display:none; margin-top:12px; font-family:ui-monospace,monospace; font-size:12px; line-height:1.8; background:#0b0e13; border:1px solid var(--line); border-radius:9px; padding:12px; color:#cdd3dd; max-height:220px; overflow:auto;"></div>
+    <div id="logLink" style="display:none; margin-top:8px; font-size:13px;"></div>
+  </div>
+</div>
+
+<div id="confirmOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; width:100%; max-width:460px; max-height:85vh; overflow:auto;">
+    <div style="font-size:15px; font-weight:600; margin-bottom:12px;" data-i18n="confirmTitle"></div>
+    <div id="confirmSummary" style="font-size:13px; line-height:1.7; font-family:ui-monospace,monospace; color:#cdd3dd; background:var(--sub); border:1px solid var(--line); border-radius:9px; padding:12px;"></div>
+    <label style="display:flex; align-items:center; gap:7px; margin-top:12px; font-size:13px; color:var(--muted); cursor:pointer;">
+      <input type="checkbox" id="force" style="width:auto; margin:0;"> <span data-i18n="forceRebuild"></span>
+    </label>
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      <button id="confirmYes" style="margin:0;" data-i18n="confirmYes"></button>
+      <button id="confirmNo" style="margin:0; background:transparent; color:var(--muted); border:1px solid var(--line);" data-i18n="confirmNo"></button>
+    </div>
   </div>
 </div>
 
@@ -140,7 +144,7 @@ const I18N = {
     buildHint:"（約 5–10 分鐘，請保持頁面開啟）", done:"完成！", download:"下載",
     failed:"編譯失敗，請查看 GitHub Actions 紀錄。", timeout:"編譯逾時，請稍後到 Releases 查看或重試。",
     errINT:"請至少指定 IMU INT 腳。", errI2C:"I2C 需指定 SDA 與 SCL。", errSPI:"SPI 需指定 SCK/MOSI/MISO/CS。", errDup:"腳位重複指定。",
-    advanced:"進階模式（有警告仍可生成）", confirmTitle:"確認以下設定？", confirmYes:"確認生成", confirmNo:"取消", forceRebuild:"強制重新編譯（忽略快取）", advNote:"進階模式：仍可生成，但請自行確認。", cached:"已有相同版本固件，直接提供下載（略過編譯）。",
+    advanced:"進階模式（有警告仍可生成）", confirmTitle:"確認以下設定？", confirmYes:"確認生成", confirmNo:"取消", forceRebuild:"強制重新編譯（忽略快取）", advNote:"進階模式：仍可生成，但請自行確認。", cached:"已有相同版本固件，直接提供下載（略過編譯）。", viewLog:"查看完整即時 log ↗",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK（選填）", pinLED:"LED", pinSW0:"按鈕 SW0（選填）", pinVCC:"感測器電源（選填）"
   },
@@ -158,7 +162,7 @@ const I18N = {
     buildHint:"(about 5–10 min, keep this page open)", done:"Done!", download:"Download",
     failed:"Build failed — check the GitHub Actions log.", timeout:"Build timed out — check Releases later or retry.",
     errINT:"Please assign the IMU INT pin.", errI2C:"I2C needs SDA and SCL.", errSPI:"SPI needs SCK/MOSI/MISO/CS.", errDup:"Duplicate pin assignment.",
-    advanced:"Advanced mode (build despite warnings)", confirmTitle:"Confirm these settings?", confirmYes:"Confirm build", confirmNo:"Cancel", forceRebuild:"Force rebuild (ignore cache)", advNote:"Advanced mode: you can still build, verify yourself.", cached:"Same firmware already built — download ready (build skipped).",
+    advanced:"Advanced mode (build despite warnings)", confirmTitle:"Confirm these settings?", confirmYes:"Confirm build", confirmNo:"Cancel", forceRebuild:"Force rebuild (ignore cache)", advNote:"Advanced mode: you can still build, verify yourself.", cached:"Same firmware already built — download ready (build skipped).", viewLog:"View full live log ↗",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK (optional)", pinLED:"LED", pinSW0:"Button SW0 (optional)", pinVCC:"Sensor power (optional)"
   },
@@ -176,7 +180,7 @@ const I18N = {
     buildHint:"（約5〜10分、このページは開いたままに）", done:"完了！", download:"ダウンロード",
     failed:"ビルド失敗 — GitHub Actions のログを確認してください。", timeout:"タイムアウト — Releases を確認するか再試行してください。",
     errINT:"IMU INT ピンを割り当ててください。", errI2C:"I2C には SDA と SCL が必要です。", errSPI:"SPI には SCK/MOSI/MISO/CS が必要です。", errDup:"ピンの重複割り当て。",
-    advanced:"詳細モード（警告があってもビルド可）", confirmTitle:"以下の設定でよろしいですか？", confirmYes:"生成を確認", confirmNo:"キャンセル", forceRebuild:"強制再ビルド（キャッシュ無視）", advNote:"詳細モード：ビルド可能ですが自己確認を。", cached:"同一ファームが既にあります — ダウンロード可能（ビルド省略）。",
+    advanced:"詳細モード（警告があってもビルド可）", confirmTitle:"以下の設定でよろしいですか？", confirmYes:"生成を確認", confirmNo:"キャンセル", forceRebuild:"強制再ビルド（キャッシュ無視）", advNote:"詳細モード：ビルド可能ですが自己確認を。", cached:"同一ファームが既にあります — ダウンロード可能（ビルド省略）。", viewLog:"完全なライブログを見る ↗",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK（任意）", pinLED:"LED", pinSW0:"ボタン SW0（任意）", pinVCC:"センサー電源（任意）"
   }
@@ -293,7 +297,7 @@ function renderOverlay(pins, bus, imu, mag) {
 }
 
 function onChange() {
-  const cp = document.getElementById("confirmPanel"); if (cp) cp.style.display = "none";
+  const cp = document.getElementById("confirmOverlay"); if (cp) cp.style.display = "none";
   const mod = currentModule();
   const type = document.getElementById("type").value;
   const isRecv = type === "receiver";
@@ -388,12 +392,14 @@ function collectConfig() {
   const imu = document.getElementById("imu").value;
   const mag = document.getElementById("mag").value;
   const isRecv = type === "receiver";
-  const src = isRecv ? mod.receiver : mod;
-  const board_target = isRecv ? mod.base_board : (mod.base_board + "/" + bus);
+  const src = isRecv ? (mod.receiver || mod) : mod;
+  const noBusVariant = mod.mcu === "nrf54l15";
+  const board_target = (isRecv || noBusVariant) ? mod.base_board : (mod.base_board + "/" + bus);
   const parts = ["SlimeNRF", mod.id, isRecv ? "Receiver" : "Tracker"];
   if (!isRecv) { parts.push(imu); parts.push(bus.toUpperCase()); if (mag !== "none") parts.push("Mag"); }
   return {
     module: mod.id,
+    mcu: mod.mcu,
     type: isRecv ? "receiver" : "tracker",
     base_board: mod.base_board,
     board_target,
@@ -420,6 +426,25 @@ const progBar = document.getElementById("progressBar");
 function setStatus(html, cls="") { statusEl.className = cls; statusEl.innerHTML = html; }
 function setProg(pct, color) { progWrap.style.display = "block"; progBar.style.width = Math.max(0, Math.min(100, pct)) + "%"; progBar.style.background = color || "var(--accent)"; }
 function hideProg() { progWrap.style.display = "none"; progBar.style.width = "0%"; }
+function esc(s) { return String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+function stepIcon(s) {
+  if (s.status === "completed") return s.conclusion === "success" ? "✓" : (s.conclusion === "skipped" ? "·" : "✗");
+  if (s.status === "in_progress") return "⏳";
+  return "·";
+}
+function renderLog(steps, runUrl) {
+  const box = document.getElementById("logBox"), link = document.getElementById("logLink");
+  if (steps && steps.length) {
+    box.style.display = "block";
+    box.innerHTML = steps.map(s => stepIcon(s) + " " + esc(s.name)).join("<br>");
+    box.scrollTop = box.scrollHeight;
+  }
+  if (runUrl) {
+    link.style.display = "block";
+    link.innerHTML = '<a href="' + runUrl + '" target="_blank" rel="noopener" style="color:var(--accent);">' + t().viewLog + '</a>';
+  }
+}
+function hideLog() { const b = document.getElementById("logBox"), l = document.getElementById("logLink"); b.style.display = "none"; b.innerHTML = ""; l.style.display = "none"; l.innerHTML = ""; }
 
 let buildMode = "build";
 let dlUrl = "", dlName = "";
@@ -496,15 +521,15 @@ function showConfirm() {
   document.getElementById("confirmSummary").innerHTML =
     rows.map(r => '<div>' + r[0] + ': <span style="color:#e7e9ee">' + r[1] + '</span></div>').join("");
   document.getElementById("force").checked = false;
-  document.getElementById("confirmPanel").style.display = "block";
+  document.getElementById("confirmOverlay").style.display = "flex";
 }
 
 async function doBuild(force) {
   const x = t();
-  document.getElementById("confirmPanel").style.display = "none";
+  document.getElementById("confirmOverlay").style.display = "none";
   buildMode = "building"; updateButton();
   setStatus('<span class="spinner"></span>' + x.sending);
-  setProg(8);
+  setProg(8); hideLog();
   try {
     const body = collectConfig(); body.force = !!force;
     const res = await fetch(WORKER_URL + "/build", {
@@ -516,6 +541,7 @@ async function doBuild(force) {
       setProg(100, "var(--ok)");
       buildMode = "download"; dlUrl = data.download_url; dlName = data.filename; updateButton();
       setStatus("♻ " + x.cached, "");
+      hideLog();
       return;
     }
     poll(data.build_id);
@@ -535,15 +561,18 @@ async function poll(buildId) {
         buildMode = "download"; dlUrl = data.download_url; dlName = data.filename;
         updateButton();
         setStatus("✅ " + x.done, "");
+        hideLog();
         return;
       }
       if (data.status === "failed") {
         setProg(100, "var(--err)");
         setStatus("❌ " + x.failed, "err");
+        renderLog(data.steps, data.run_url);
         buildMode = "build"; updateButton(); return;
       }
       if (data.status === "queued") { setProg(15); setStatus('<span class="spinner"></span>' + x.queued + " …"); }
       else { setProg(Math.min(92, 20 + (elapsed / EXPECTED) * 72)); setStatus('<span class="spinner"></span>' + x.building + " … " + x.buildHint); }
+      renderLog(data.steps, data.run_url);
       setTimeout(tick, 6000);
     } catch (e) { setTimeout(tick, 6000); }
   };
@@ -556,7 +585,8 @@ goBtn.addEventListener("click", () => {
   showConfirm();
 });
 document.getElementById("confirmYes").addEventListener("click", () => doBuild(document.getElementById("force").checked));
-document.getElementById("confirmNo").addEventListener("click", () => { document.getElementById("confirmPanel").style.display = "none"; });
+document.getElementById("confirmNo").addEventListener("click", () => { document.getElementById("confirmOverlay").style.display = "none"; });
+document.getElementById("confirmOverlay").addEventListener("click", (e) => { if (e.target.id === "confirmOverlay") e.currentTarget.style.display = "none"; });
 document.getElementById("adv").addEventListener("change", refreshValidation);
 init();
 </script>
