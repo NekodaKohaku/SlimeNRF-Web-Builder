@@ -59,8 +59,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="fw-${BUILD_ID}"
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            for a in $(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name'); do
+              gh release delete-asset "$TAG" "$a" -y --repo "$GITHUB_REPOSITORY" || true
+            done
+            gh release edit "$TAG" --notes "STATUS:BUILDING" --repo "$GITHUB_REPOSITORY"
+          else
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" --notes "STATUS:BUILDING" --prerelease
+          fi
 
       - name: Install apt dependencies
         uses: awalsh128/cache-apt-pkgs-action@latest
@@ -106,11 +112,13 @@ jobs:
           ~/.venv/bin/pip install --quiet -r zephyr/scripts/requirements.txt
 
       - name: Clone firmware source
+        id: clone
         run: |
           cd zephyr-workspace
           git clone --filter=blob:none "${{ steps.cfg.outputs.repository_url }}" SlimeVR-Tracker-nRF
           git -C SlimeVR-Tracker-nRF checkout "${{ steps.cfg.outputs.repository_revision }}"
           git -C SlimeVR-Tracker-nRF submodule update --init --recursive --depth 1
+          echo "fw_sha=$(git -C SlimeVR-Tracker-nRF rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Generate board overlay from pins
         id: overlay
@@ -145,13 +153,16 @@ jobs:
 
       - name: west build
         id: build
+        env:
+          CONFIG_JSON: ${{ github.event.inputs.config }}
         run: |
           export PATH="$HOME/.venv/bin:$PATH"
           cd zephyr-workspace
           mkdir -p out
-          EXTRA=""
+          EXTRA=""; OVL=""
           if [ "${{ steps.cfg.outputs.type }}" = "tracker" ]; then
-            EXTRA="-DEXTRA_DTC_OVERLAY_FILE=${{ steps.overlay.outputs.overlay_path }}"
+            OVL="${{ steps.overlay.outputs.overlay_path }}"
+            EXTRA="-DEXTRA_DTC_OVERLAY_FILE=$OVL"
           fi
           west build \
             --board "${{ steps.cfg.outputs.board_target }}" \
@@ -159,11 +170,34 @@ jobs:
             --build-dir SlimeVR-Tracker-nRF/build \
             -- -DNCS_TOOLCHAIN_VERSION=NONE -DBOARD_ROOT=../SlimeVR-Tracker-nRF $EXTRA
 
-          FMT="${{ steps.cfg.outputs.fileformat }}"; NAME="${{ steps.cfg.outputs.filename }}"
+          FMT="${{ steps.cfg.outputs.fileformat }}"
+          SHA="${{ steps.clone.outputs.fw_sha }}"; DATE="$(date -u +%Y%m%d)"
+          NAME="${{ steps.cfg.outputs.filename }}_g${SHA}_${DATE}"
           SRC="SlimeVR-Tracker-nRF/build/SlimeVR-Tracker-nRF/zephyr/zephyr.$FMT"
           [ -f "$SRC" ] || { echo "missing build output $SRC" >&2; exit 1; }
           cp "$SRC" "out/${NAME}.${FMT}"
+
+          PIN="out/${NAME}.pinout.txt"
+          {
+            echo "SlimeNRF firmware"
+            echo "built:    $(date -u +'%Y-%m-%d %H:%M UTC')"
+            echo "firmware: ${{ steps.cfg.outputs.repository_url }}@${{ steps.cfg.outputs.repository_revision }} (commit ${SHA})"
+            echo "sdk:      ${{ steps.cfg.outputs.sdk_url }}@${{ steps.cfg.outputs.sdk_revision }}"
+            echo "board:    ${{ steps.cfg.outputs.board_target }}"
+            echo "output:   ${NAME}.${FMT}"
+            echo ""
+            echo "== settings =="
+            echo "$CONFIG_JSON" | jq -r '"module: \(.module)\ntype:   \(.type)\nIMU:    \(.imu // "-")\nmag:    \(.mag // "-")\nbus:    \(.bus // "-")"'
+            echo ""
+            echo "== pin assignment =="
+            echo "$CONFIG_JSON" | jq -r '.pins // {} | to_entries[] | "  \(.key | ascii_upcase): \(.value)"'
+            if [ -n "$OVL" ] && [ -f "$OVL" ]; then
+              echo ""; echo "== generated overlay =="; cat "$OVL"
+            fi
+          } > "$PIN"
+
           echo "artifact=zephyr-workspace/out/${NAME}.${FMT}" >> "$GITHUB_OUTPUT"
+          echo "pinout=zephyr-workspace/out/${NAME}.pinout.txt" >> "$GITHUB_OUTPUT"
 
       - name: Upload firmware to release
         if: ${{ success() }}
@@ -171,8 +205,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="fw-${BUILD_ID}"
-          gh release upload "$TAG" "${{ steps.build.outputs.artifact }}" --clobber --repo "$GITHUB_REPOSITORY"
-          gh release edit  "$TAG" --notes "STATUS:DONE" --repo "$GITHUB_REPOSITORY"
+          gh release upload "$TAG" "${{ steps.build.outputs.artifact }}" "${{ steps.build.outputs.pinout }}" --clobber --repo "$GITHUB_REPOSITORY"
+          gh release edit  "$TAG" --notes "STATUS:DONE | fw ${{ steps.clone.outputs.fw_sha }}" --repo "$GITHUB_REPOSITORY"
 
       - name: Mark release as failed
         if: ${{ failure() }}
