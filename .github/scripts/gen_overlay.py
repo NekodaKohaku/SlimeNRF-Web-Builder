@@ -122,8 +122,11 @@ def build_nrf54l(bus, pins, opts):
         q = parse_pin(pins.get(key))
         if q:
             ports.add(q[0])
+    gpiote_for = {0: 30, 1: 20, 2: 20}
     for p in sorted(ports):
         L.append(f'&gpio{p} {{ status = "okay"; }};')
+    for g in sorted({gpiote_for.get(p, 20) for p in ports}):
+        L.append(f'&gpiote{g} {{ status = "okay"; }};')
     L.append("/ {")
     L.append("\tzephyr,user {")
     L.append(f"\t\tint0-gpios = {gpio(pins['int'], '0')};")
