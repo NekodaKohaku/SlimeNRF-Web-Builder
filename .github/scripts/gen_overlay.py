@@ -117,6 +117,13 @@ def build_nrf54l(bus, pins, opts):
         need(pins, "cs", "IMU CS")
         L.append(f"&spi20 {{ cs-gpios = {gpio(pins['cs'], 'GPIO_ACTIVE_LOW')}; }};")
     need(pins, "int", "IMU INT")
+    ports = set()
+    for key in ("int", "cs"):
+        q = parse_pin(pins.get(key))
+        if q:
+            ports.add(q[0])
+    for p in sorted(ports):
+        L.append(f'&gpio{p} {{ status = "okay"; }};')
     L.append("/ {")
     L.append("\tzephyr,user {")
     L.append(f"\t\tint0-gpios = {gpio(pins['int'], '0')};")
