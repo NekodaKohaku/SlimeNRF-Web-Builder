@@ -4,12 +4,12 @@ compatibility_date = "2025-01-01"
 
 # 一般設定（非機密，可直接寫在這）
 [vars]
-GITHUB_APP_ID = "4201273"                        # 你的 GitHub App ID（數字）
-GITHUB_INSTALLATION_ID = "143994286"             # App 安裝到 repo 後的 Installation ID
-GITHUB_REPO = "NekodaKohaku/SlimeNRF-Web-Builder"                 # 例如 "myname/slimenrf-web-builder"
+GITHUB_APP_ID = "123456"                        # 你的 GitHub App ID（數字）
+GITHUB_INSTALLATION_ID = "12345678"             # App 安裝到 repo 後的 Installation ID
+GITHUB_REPO = "你的帳號/你的repo"                 # 例如 "myname/slimenrf-web-builder"
 WORKFLOW_FILE = "build-single.yml"
 GIT_REF = "main"
-ALLOWED_ORIGIN = "*"      # 你的 GitHub Pages 網址
+ALLOWED_ORIGIN = "https://你的帳號.github.io"      # 你的 GitHub Pages 網址
 
 # rate limit 用的 KV（選用）。要啟用的話：
 #   1. npx wrangler kv namespace create RATE_LIMIT
