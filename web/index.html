@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>SlimeNRF 固件產生器</title>
+<title>SlimeNRF Firmware Builder</title>
 <style>
   :root { --bg:#0f1115; --card:#1a1d24; --sub:#12151b; --line:#2a2f3a; --fg:#e7e9ee; --muted:#9aa3b2; --accent:#6ea8fe; --ok:#4ade80; --err:#f87171; }
   * { box-sizing: border-box; }
-  body { margin:0; font-family: system-ui, "Noto Sans TC", sans-serif; background:var(--bg); color:var(--fg); }
-  .wrap { max-width: 640px; margin: 0 auto; padding: 32px 20px 64px; }
+  body { margin:0; font-family: system-ui, "Noto Sans TC", "Noto Sans JP", sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 28px 20px 64px; }
   h1 { font-size: 22px; margin: 0 0 4px; }
-  p.sub { color: var(--muted); margin: 0 0 24px; font-size: 14px; }
+  p.sub { color: var(--muted); margin: 0 0 22px; font-size: 14px; }
   .card { background: var(--card); border:1px solid var(--line); border-radius: 14px; padding: 20px; }
   .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:12px; }
   label { display:block; font-size: 13px; color: var(--muted); margin: 14px 0 6px; }
   .grid label { margin-top: 0; }
-  select { width:100%; padding: 10px 12px; background:#0f1218; color:var(--fg); border:1px solid var(--line); border-radius: 9px; font-size: 15px; }
+  select, input[type="number"] { width:100%; padding: 10px 12px; background:#0f1218; color:var(--fg); border:1px solid var(--line); border-radius: 9px; font-size: 15px; }
   select:disabled { opacity:.5; }
   .section-title { font-size: 13px; color: var(--muted); margin: 18px 0 8px; }
   .pins { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:10px; }
@@ -24,68 +24,232 @@
   pre { font-family: ui-monospace, monospace; font-size: 12px; line-height:1.6; background:var(--sub); border:1px solid var(--line); border-radius: 9px; padding: 12px; white-space: pre-wrap; margin:8px 0 0; color:#cdd3dd; }
   button { width:100%; margin-top: 20px; padding: 13px; font-size: 15px; font-weight: 600; background: var(--accent); color:#08111f; border:none; border-radius: 10px; cursor:pointer; }
   button:disabled { opacity:.5; cursor: not-allowed; }
-  #status { margin-top: 18px; font-size: 14px; min-height: 20px; }
+  #status { margin-top: 16px; font-size: 14px; min-height: 20px; }
+  #progress { display:none; height:8px; background:var(--line); border-radius:5px; overflow:hidden; margin-top:12px; }
+  #progressBar { height:100%; width:0%; background:var(--accent); transition: width .5s ease, background .3s; }
   .spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--muted); border-top-color: var(--accent); border-radius:50%; animation: spin .8s linear infinite; vertical-align:-2px; margin-right:8px; }
   @keyframes spin { to { transform: rotate(360deg); } }
   a.dl { display:inline-block; margin-top: 6px; color: var(--ok); font-weight:600; text-decoration: none; }
   .err { color: var(--err); }
   .note { background:var(--sub); border:1px solid var(--line); border-radius:9px; padding:12px; font-size:14px; color:var(--muted); margin-top:14px; }
+  .langbar { display:flex; gap:6px; justify-content:flex-end; margin-bottom:8px; }
+  .langbar button { width:auto; margin:0; padding:4px 10px; font-size:12px; font-weight:500; background:transparent; color:var(--muted); border:1px solid var(--line); border-radius:7px; }
+  .langbar button.on { background:var(--accent); color:#08111f; border-color:var(--accent); }
+  .help { display:inline-flex; width:15px; height:15px; border:1px solid var(--line); border-radius:50%; font-size:11px; line-height:1; align-items:center; justify-content:center; margin-left:6px; color:var(--muted); cursor:help; vertical-align:middle; }
+  .sec { font-size:12px; font-weight:600; letter-spacing:.03em; color:var(--muted); margin:22px 0 10px; padding-top:16px; border-top:1px solid var(--line); }
+  details { margin-top:18px; border-top:1px solid var(--line); padding-top:14px; }
+  details summary::-webkit-details-marker { color:var(--muted); }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>SlimeNRF 固件產生器</h1>
-  <p class="sub">選模組、指定你板子上每支腳接什麼，按下產生就會編出專屬固件。</p>
+  <div class="langbar">
+    <button data-lang="zh">中文</button>
+    <button data-lang="en">EN</button>
+    <button data-lang="ja">日本語</button>
+  </div>
+
+  <h1 data-i18n="title">SlimeNRF Firmware Builder</h1>
+  <p class="sub" data-i18n="subtitle"></p>
 
   <div class="card">
     <div class="grid">
-      <div><label for="mod">模組</label><select id="mod"></select></div>
-      <div><label for="type">類型</label><select id="type"><option value="tracker">Tracker（追蹤器）</option><option value="receiver">Dongle（接收器）</option></select></div>
+      <div><label for="type" data-i18n="type"></label><select id="type"><option value="tracker"></option><option value="receiver"></option></select></div>
+      <div><label for="mod" data-i18n="module"></label><select id="mod"></select></div>
     </div>
 
     <div id="trackerOpts">
-      <div class="grid" style="margin-top:14px;">
-        <div><label for="imu">IMU 感測器</label><select id="imu">
+      <div class="sec" data-i18n="secSensor"></div>
+      <div class="grid">
+        <div><label for="imu"><span data-i18n="imu"></span><span class="help" data-help="helpIMU">?</span></label><select id="imu">
           <option value="ICM42688">ICM-42688-P</option>
           <option value="ICM45686">ICM-45686</option>
-          <option value="LSM6DSV" selected>LSM6DSV16X</option>
+          <option value="LSM6DSV" selected>LSM6DSV</option>
+          <option value="LSM6DSO">LSM6DSO</option>
+          <option value="LSM6DSM">LSM6DSM</option>
+          <option value="ISM330BX">ISM330BX</option>
           <option value="BMI270">BMI270</option>
         </select></div>
-        <div><label for="mag">磁力計</label><select id="mag">
-          <option value="none">無</option>
+        <div><label for="mag"><span data-i18n="mag"></span><span class="help" data-help="helpMag">?</span></label><select id="mag">
+          <option value="none"></option>
           <option value="MMC5983">MMC5983MA</option>
           <option value="QMC6309">QMC6309</option>
+          <option value="AK09940">AK09940</option>
+          <option value="BMM150">BMM150</option>
+          <option value="BMM350">BMM350</option>
+          <option value="IST8306">IST8306</option>
+          <option value="IST8308">IST8308</option>
+          <option value="LIS2MDL">LIS2MDL</option>
+          <option value="LIS3MDL">LIS3MDL</option>
         </select></div>
-        <div><label for="bus">匯流排</label><select id="bus"><option value="spi">SPI</option><option value="i2c">I2C</option></select></div>
-      </div>
-      <div class="grid" style="margin-top:12px;">
-        <div><label for="sleep">睡眠喚醒</label><select id="sleep"><option value="enabled">啟用</option><option value="disabled">停用</option></select></div>
-        <div><label for="output">輸出 / 燒錄</label><select id="output"><option value="hex">SWD (.hex)</option><option value="uf2">USB bootloader (.uf2)</option></select></div>
+        <div><label for="bus"><span data-i18n="bus"></span><span class="help" data-help="helpBus">?</span></label><select id="bus"><option value="spi">SPI</option><option value="i2c">I2C</option></select></div>
       </div>
 
-      <div class="section-title">腳位指定（從模組拉出的腳選）</div>
+      <div class="sec" data-i18n="secPower"></div>
+      <div class="grid">
+        <div><label for="battery"><span data-i18n="battery"></span><span class="help" data-help="helpBattery">?</span></label><select id="battery"><option value="liion"></option><option value="nimh"></option></select></div>
+        <div><label for="adc"><span data-i18n="adc"></span><span class="help" data-help="helpADC">?</span></label><select id="adc"><option value="external"></option><option value="internal"></option></select></div>
+      </div>
+      <div id="adcFields" class="grid" style="margin-top:12px;">
+        <div><label for="adcPin"><span data-i18n="adcPin"></span></label><select id="adcPin"></select></div>
+        <div><label for="adcR1"><span data-i18n="adcR1"></span></label><input id="adcR1" type="number" min="0" value="0"></div>
+        <div><label for="adcR2"><span data-i18n="adcR2"></span></label><input id="adcR2" type="number" min="0" value="0"></div>
+      </div>
+
+      <div class="sec" data-i18n="secBehavior"></div>
+      <div class="grid">
+        <div><label for="sleep"><span data-i18n="sleep"></span><span class="help" data-help="helpSleep">?</span></label><select id="sleep"><option value="disabled"></option><option value="enabled"></option></select></div>
+        <div><label for="output"><span data-i18n="output"></span><span class="help" data-help="helpOutput">?</span></label><select id="output"><option value="hex"></option><option value="uf2"></option></select></div>
+        <div><label for="ledpol"><span data-i18n="ledPol"></span><span class="help" data-help="helpLedPol">?</span></label><select id="ledpol"><option value="high"></option><option value="low"></option></select></div>
+      </div>
+
+      <div class="sec" data-i18n="secPins"></div>
       <div id="pins" class="pins"></div>
       <div id="warn" class="warn"></div>
 
-      <div class="section-title">產生的 board overlay 預覽</div>
-      <pre id="dts"></pre>
+      <div class="sec" data-i18n="secDiagram"></div>
+      <div id="boardWrap" style="background:var(--sub); border:1px solid var(--line); border-radius:9px; padding:10px;">
+        <svg id="board" viewBox="0 0 520 360" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto; max-height:360px;" role="img"><title>wiring</title></svg>
+      </div>
+
+      <details style="margin-top:18px;">
+        <summary style="cursor:pointer; font-size:13px; color:var(--muted); user-select:none;" data-i18n="secAdvanced"></summary>
+        <label style="display:flex; align-items:center; gap:7px; margin:12px 0; font-size:13px; color:var(--muted); cursor:pointer;">
+          <input type="checkbox" id="adv" style="width:auto; margin:0;"> <span data-i18n="advanced"></span>
+        </label>
+        <div class="section-title" data-i18n="overlayTitle"></div>
+        <pre id="dts"></pre>
+      </details>
     </div>
 
-    <div id="recvNote" class="note" style="display:none;">接收器不需接 IMU，選好模組即可編譯（dongle 韌體，SWD 燒錄 .hex）。</div>
+    <div id="recvNote" class="note" style="display:none;" data-i18n="recvNote"></div>
     <div id="unsupported" class="note" style="display:none;"></div>
 
-    <div class="section-title">接線示意圖</div>
-    <div id="boardWrap" style="background:var(--sub); border:1px solid var(--line); border-radius:9px; padding:10px;">
-      <svg id="board" viewBox="0 0 520 560" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto; max-height:420px;" role="img"><title>模組接線示意圖</title></svg>
-    </div>
-
-    <button id="go">產生固件</button>
+    <button id="go"></button>
+    <div id="progress"><div id="progressBar"></div></div>
     <div id="status"></div>
+    <div id="logBox" style="display:none; margin-top:12px; font-family:ui-monospace,monospace; font-size:12px; line-height:1.8; background:#0b0e13; border:1px solid var(--line); border-radius:9px; padding:12px; color:#cdd3dd; max-height:220px; overflow:auto;"></div>
+    <div id="logLink" style="display:none; margin-top:8px; font-size:13px;"></div>
+  </div>
+</div>
+
+<div id="confirmOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; width:100%; max-width:460px; max-height:85vh; overflow:auto;">
+    <div style="font-size:15px; font-weight:600; margin-bottom:12px;" data-i18n="confirmTitle"></div>
+    <div id="confirmSummary" style="font-size:13px; line-height:1.7; font-family:ui-monospace,monospace; color:#cdd3dd; background:var(--sub); border:1px solid var(--line); border-radius:9px; padding:12px;"></div>
+    <label style="display:flex; align-items:center; gap:7px; margin-top:12px; font-size:13px; color:var(--muted); cursor:pointer;">
+      <input type="checkbox" id="force" style="width:auto; margin:0;"> <span data-i18n="forceRebuild"></span>
+    </label>
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      <button id="confirmYes" style="margin:0;" data-i18n="confirmYes"></button>
+      <button id="confirmNo" style="margin:0; background:transparent; color:var(--muted); border:1px solid var(--line);" data-i18n="confirmNo"></button>
+    </div>
   </div>
 </div>
 
 <script>
 const WORKER_URL = "https://slimenrf-web-builder.nekoda.workers.dev";
+
+const I18N = {
+  zh: {
+    title:"SlimeNRF 固件產生器", subtitle:"選模組、指定每支腳接什麼，按下產生就會編出專屬固件。",
+    module:"模組", type:"類型", typeTracker:"Tracker（追蹤器）", typeReceiver:"Dongle（接收器）",
+    imu:"IMU 感測器", mag:"磁力計", magNone:"無", bus:"匯流排",
+    sleep:"睡眠喚醒", enabled:"啟用", disabled:"停用",
+    output:"輸出 / 燒錄", outputHex:"SWD (.hex)", outputUf2:"USB bootloader (.uf2)",
+    pinsTitle:"腳位指定", diagramTitle:"接線示意圖", overlayTitle:"board overlay 預覽",
+    build:"產生固件", unsupportedBtn:"此模組尚未支援",
+    recvNote:"接收器不需接 IMU，選好模組即可編譯（SWD 燒錄 .hex）。",
+    noDiagram:"此模組尚無接線圖", warnDup:"有腳位重複指定，請調整。",
+    sending:"正在送出編譯要求…", queued:"排隊 / 準備環境中", building:"編譯中",
+    buildHint:"（約 5–10 分鐘，請保持頁面開啟）", done:"完成！", download:"下載",
+    failed:"編譯失敗，請查看 GitHub Actions 紀錄。", timeout:"編譯逾時，請稍後到 Releases 查看或重試。",
+    errINT:"請至少指定 IMU INT 腳。", errI2C:"I2C 需指定 SDA 與 SCL。", errSPI:"SPI 需指定 SCK/MOSI/MISO/CS。", errDup:"腳位重複指定。",
+    advanced:"進階模式（有警告仍可生成）", confirmTitle:"確認以下設定？", confirmYes:"確認生成", confirmNo:"取消", forceRebuild:"強制重新編譯（忽略快取）", advNote:"進階模式：仍可生成，但請自行確認。", cached:"已有相同版本固件，直接提供下載（略過編譯）。", viewLog:"查看完整即時 log ↗", experimentalTag:"實驗性",
+    battery:"電池類型", batteryLiion:"鋰電池", batteryNimh:"鎳氫 NiMH",
+    secSensor:"感測器", secPower:"電源與電池", secBehavior:"行為 / 輸出", secPins:"腳位指定", secDiagram:"接線圖", secAdvanced:"進階 / overlay 預覽",
+    helpIMU:"你板子上用的慣性感測器晶片。", helpMag:"磁力計晶片，沒有就選無。", helpBus:"IMU 走 SPI 或 I2C，依你的接線。", helpSleep:"啟用後靜止進低功耗、動作喚醒，較省電。", helpOutput:"SWD (.hex)：無 bootloader、從 0x0 起的完整映像，可直接 SWD 燒到裸晶片。USB bootloader (.uf2)：給有 Adafruit bootloader 的板子拖曳燒錄。", helpBattery:"鋰電池用原廠曲線；選鎳氫 NiMH 時，編譯前會自動幫官方原始碼套用 NiMH 電量曲線補丁。",
+    adc:"電池量測", adcExternal:"外部 AIN 腳", adcInternal:"內建 VDDHDIV5", adcPin:"ADC 腳（AIN）", adcR1:"上臂電阻 R1 (kΩ)", adcR2:"下臂電阻 R2 (kΩ)", helpADC:"電池電壓量測來源。外部 AIN 腳可搭配分壓量測鋰電；電壓直接進 ADC（無分壓）兩個電阻留 0。內建 VDDHDIV5 是晶片內部量測。",
+    ledPol:"LED 極性", ledPolHigh:"接地（一般）", ledPolLow:"接 VCC（反向）", helpLedPol:"LED 接法：GPIO→電阻→LED→地 選「接地」；GPIO→LED→電阻→VCC 選「接 VCC」（反向點亮）。",
+    pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
+    pinINT:"IMU INT", pinCLK:"IMU CLK（選填）", pinLED:"LED", pinSW0:"按鈕 SW0（選填）", pinVCC:"感測器電源（選填）", pinTX:"UART TX（選填）", pinRX:"UART RX（選填）", pinPWR:"電源自鎖（選填）"
+  },
+  en: {
+    title:"SlimeNRF Firmware Builder", subtitle:"Pick a module, map each pin, then build to get custom firmware.",
+    module:"Module", type:"Type", typeTracker:"Tracker", typeReceiver:"Dongle (Receiver)",
+    imu:"IMU sensor", mag:"Magnetometer", magNone:"None", bus:"Bus",
+    sleep:"Sleep / wake", enabled:"Enabled", disabled:"Disabled",
+    output:"Output / flashing", outputHex:"SWD (.hex)", outputUf2:"USB bootloader (.uf2)",
+    pinsTitle:"Pin assignment", diagramTitle:"Wiring diagram", overlayTitle:"Board overlay preview",
+    build:"Build firmware", unsupportedBtn:"Module not supported yet",
+    recvNote:"A receiver needs no IMU — just pick the module and build (SWD .hex).",
+    noDiagram:"No wiring diagram for this module yet", warnDup:"A pin is assigned twice — please fix.",
+    sending:"Sending build request…", queued:"Queued / preparing", building:"Building",
+    buildHint:"(about 5–10 min, keep this page open)", done:"Done!", download:"Download",
+    failed:"Build failed — check the GitHub Actions log.", timeout:"Build timed out — check Releases later or retry.",
+    errINT:"Please assign the IMU INT pin.", errI2C:"I2C needs SDA and SCL.", errSPI:"SPI needs SCK/MOSI/MISO/CS.", errDup:"Duplicate pin assignment.",
+    advanced:"Advanced mode (build despite warnings)", confirmTitle:"Confirm these settings?", confirmYes:"Confirm build", confirmNo:"Cancel", forceRebuild:"Force rebuild (ignore cache)", advNote:"Advanced mode: you can still build, verify yourself.", cached:"Same firmware already built — download ready (build skipped).", viewLog:"View full live log ↗", experimentalTag:"Experimental",
+    battery:"Battery type", batteryLiion:"Li-ion", batteryNimh:"NiMH",
+    secSensor:"Sensors", secPower:"Power & battery", secBehavior:"Behavior / output", secPins:"Pin assignment", secDiagram:"Wiring diagram", secAdvanced:"Advanced / overlay preview",
+    helpIMU:"The IMU chip on your board.", helpMag:"Magnetometer chip, or None.", helpBus:"IMU on SPI or I2C, per your wiring.", helpSleep:"Low-power when idle, wake on motion — saves battery.", helpOutput:"SWD (.hex): standalone image from 0x0, no bootloader — flash straight to a bare chip via SWD. USB bootloader (.uf2): drag-drop for boards with the Adafruit bootloader.", helpBattery:"Li-ion uses the factory curve; choosing NiMH patches the official source with a NiMH curve at build time.",
+    adc:"Battery sense", adcExternal:"External AIN pin", adcInternal:"Internal VDDHDIV5", adcPin:"ADC pin (AIN)", adcR1:"R1 top (kΩ)", adcR2:"R2 bottom (kΩ)", helpADC:"Battery voltage source. External AIN pin can use a divider for Li-ion; leave both resistors 0 if voltage goes straight to ADC. Internal VDDHDIV5 uses the chip's internal measurement.",
+    ledPol:"LED polarity", ledPolHigh:"To GND (normal)", ledPolLow:"To VCC (inverted)", helpLedPol:"LED wiring: GPIO->R->LED->GND pick To GND; GPIO->LED->R->VCC pick To VCC (inverted).",
+    pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
+    pinINT:"IMU INT", pinCLK:"IMU CLK (optional)", pinLED:"LED", pinSW0:"Button SW0 (optional)", pinVCC:"Sensor power (optional)", pinTX:"UART TX (optional)", pinRX:"UART RX (optional)", pinPWR:"Power hold (optional)"
+  },
+  ja: {
+    title:"SlimeNRF ファームウェアビルダー", subtitle:"モジュールを選び各ピンを割り当て、ビルドを押すと専用ファームができます。",
+    module:"モジュール", type:"種類", typeTracker:"トラッカー", typeReceiver:"ドングル（レシーバー）",
+    imu:"IMU センサー", mag:"磁気センサー", magNone:"なし", bus:"バス",
+    sleep:"スリープ / 復帰", enabled:"有効", disabled:"無効",
+    output:"出力 / 書き込み", outputHex:"SWD (.hex)", outputUf2:"USB bootloader (.uf2)",
+    pinsTitle:"ピン割り当て", diagramTitle:"配線図", overlayTitle:"ボード overlay プレビュー",
+    build:"ファームを生成", unsupportedBtn:"このモジュールは未対応",
+    recvNote:"レシーバーは IMU 不要。モジュールを選んでビルドするだけ（SWD .hex）。",
+    noDiagram:"このモジュールの配線図はまだありません", warnDup:"ピンが重複しています。修正してください。",
+    sending:"ビルド要求を送信中…", queued:"順番待ち / 準備中", building:"ビルド中",
+    buildHint:"（約5〜10分、このページは開いたままに）", done:"完了！", download:"ダウンロード",
+    failed:"ビルド失敗 — GitHub Actions のログを確認してください。", timeout:"タイムアウト — Releases を確認するか再試行してください。",
+    errINT:"IMU INT ピンを割り当ててください。", errI2C:"I2C には SDA と SCL が必要です。", errSPI:"SPI には SCK/MOSI/MISO/CS が必要です。", errDup:"ピンの重複割り当て。",
+    advanced:"詳細モード（警告があってもビルド可）", confirmTitle:"以下の設定でよろしいですか？", confirmYes:"生成を確認", confirmNo:"キャンセル", forceRebuild:"強制再ビルド（キャッシュ無視）", advNote:"詳細モード：ビルド可能ですが自己確認を。", cached:"同一ファームが既にあります — ダウンロード可能（ビルド省略）。", viewLog:"完全なライブログを見る ↗", experimentalTag:"実験的",
+    battery:"電池タイプ", batteryLiion:"Li-ion", batteryNimh:"NiMH",
+    secSensor:"センサー", secPower:"電源・電池", secBehavior:"動作 / 出力", secPins:"ピン割り当て", secDiagram:"配線図", secAdvanced:"詳細 / overlay プレビュー",
+    helpIMU:"基板の IMU チップ。", helpMag:"磁気センサー、なければ「なし」。", helpBus:"配線に応じて SPI か I2C。", helpSleep:"静止時は低消費、動作で復帰し省電力。", helpOutput:"SWD (.hex)：0x0 からの単体イメージ（bootloader なし）、SWD で直接書き込み。USB bootloader (.uf2)：Adafruit bootloader 搭載基板用。", helpBattery:"Li-ion は既定カーブ。NiMH を選ぶとビルド時に公式ソースへ NiMH カーブのパッチを適用。",
+    adc:"電池計測", adcExternal:"外部 AIN ピン", adcInternal:"内蔵 VDDHDIV5", adcPin:"ADC ピン (AIN)", adcR1:"R1 上側 (kΩ)", adcR2:"R2 下側 (kΩ)", helpADC:"電池電圧の計測元。外部 AIN ピンは分圧で Li-ion 計測可。分圧なし（直接 ADC）は両抵抗を 0。内蔵 VDDHDIV5 はチップ内部計測。",
+    ledPol:"LED 極性", ledPolHigh:"GND 側（通常）", ledPolLow:"VCC 側（反転）", helpLedPol:"LED 配線：GPIO→R→LED→GND は「GND 側」、GPIO→LED→R→VCC は「VCC 側」（反転点灯）。",
+    pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
+    pinINT:"IMU INT", pinCLK:"IMU CLK（任意）", pinLED:"LED", pinSW0:"ボタン SW0（任意）", pinVCC:"センサー電源（任意）", pinTX:"UART TX（任意）", pinRX:"UART RX（任意）", pinPWR:"電源保持（任意）"
+  }
+};
+
+function detectLang() {
+  try { const s = localStorage.getItem("lang"); if (s && I18N[s]) return s; } catch (e) {}
+  const l = (navigator.language || "en").toLowerCase();
+  if (l.indexOf("zh") === 0) return "zh";
+  if (l.indexOf("ja") === 0) return "ja";
+  return "en";
+}
+let LANG = detectLang();
+function t() { return I18N[LANG]; }
+
+function setOpt(sel, val, text) { const o = document.querySelector('#' + sel + ' option[value="' + val + '"]'); if (o) o.textContent = text; }
+
+function applyLang() {
+  const x = t();
+  document.documentElement.lang = LANG === "zh" ? "zh-Hant" : LANG;
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = x[el.dataset.i18n]; });
+  document.querySelectorAll("[data-help]").forEach(el => { el.title = x[el.dataset.help] || ""; });
+  setOpt("type", "tracker", x.typeTracker); setOpt("type", "receiver", x.typeReceiver);
+  setOpt("mag", "none", x.magNone);
+  setOpt("sleep", "enabled", x.enabled); setOpt("sleep", "disabled", x.disabled);
+  setOpt("output", "hex", x.outputHex); setOpt("output", "uf2", x.outputUf2);
+  setOpt("battery", "liion", x.batteryLiion); setOpt("battery", "nimh", x.batteryNimh);
+  setOpt("adc", "external", x.adcExternal); setOpt("adc", "internal", x.adcInternal);
+  setOpt("ledpol", "high", x.ledPolHigh); setOpt("ledpol", "low", x.ledPolLow);
+  document.querySelectorAll(".langbar button").forEach(b => b.classList.toggle("on", b.dataset.lang === LANG));
+  populateModules();
+  onChange();
+}
 
 let MODULES = [];
 
@@ -96,19 +260,39 @@ function parsePin(p) {
 
 async function init() {
   MODULES = (await (await fetch("modules.json")).json()).modules;
+  ["imu","mag","sleep","output","battery","ledpol"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
+  document.getElementById("bus").addEventListener("change", () => { markDirty(); onChange(); });
+  document.getElementById("adc").addEventListener("change", () => { markDirty(); updateAdc(); render(); });
+  ["adcPin","adcR1","adcR2"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
+  document.getElementById("type").addEventListener("change", () => { markDirty(); populateModules(); onChange(); });
+  document.getElementById("mod").addEventListener("change", () => { markDirty(); onChange(); });
+  document.querySelectorAll(".langbar button").forEach(b => b.addEventListener("click", () => {
+    LANG = b.dataset.lang; try { localStorage.setItem("lang", LANG); } catch (e) {}
+    applyLang();
+  }));
+  applyLang();
+}
+
+function populateModules() {
+  const type = document.getElementById("type").value;
   const modSel = document.getElementById("mod");
-  MODULES.forEach(m => { const o = document.createElement("option"); o.value = m.id; o.textContent = m.label; modSel.appendChild(o); });
-  ["type","imu","mag","bus","sleep","output"].forEach(id => document.getElementById(id).addEventListener("change", onChange));
-  modSel.addEventListener("change", onChange);
-  onChange();
+  const prev = modSel.value;
+  modSel.innerHTML = "";
+  MODULES.filter(m => type === "receiver" ? !!m.receiver : true).forEach(m => {
+    const o = document.createElement("option");
+    o.value = m.id;
+    o.textContent = m.label + (m.experimental ? " · " + t().experimentalTag : "");
+    modSel.appendChild(o);
+  });
+  if ([...modSel.options].some(o => o.value === prev)) modSel.value = prev;
 }
 
 function currentModule() { return MODULES.find(m => m.id === document.getElementById("mod").value); }
 
 function pinFields(bus) {
-  const base = bus === "i2c" ? [["sda","IMU SDA"],["scl","IMU SCL"]]
-                             : [["sck","IMU SCK"],["mosi","IMU MOSI"],["miso","IMU MISO"],["cs","IMU CS"]];
-  return base.concat([["int","IMU INT"],["clk","IMU CLK（選填）"],["led","LED"],["sw0","按鈕 SW0（選填）"],["vcc","感測器電源 VCC（選填）"]]);
+  const base = bus === "i2c" ? [["sda","pinSDA"],["scl","pinSCL"]]
+                             : [["sck","pinSCK"],["mosi","pinMOSI"],["miso","pinMISO"],["cs","pinCS"]];
+  return base.concat([["int","pinINT"],["clk","pinCLK"],["led","pinLED"],["sw0","pinSW0"],["vcc","pinVCC"],["tx","pinTX"],["rx","pinRX"],["pwr","pinPWR"]]);
 }
 
 function buildPins() {
@@ -117,16 +301,34 @@ function buildPins() {
   const host = document.getElementById("pins");
   host.innerHTML = "";
   const defs = (mod.defaults && mod.defaults[bus]) || {};
-  pinFields(bus).forEach(([key, lbl]) => {
+  const x = t();
+  pinFields(bus).forEach(([key, i18nKey]) => {
     const wrap = document.createElement("div");
-    const l = document.createElement("label"); l.textContent = lbl;
+    const l = document.createElement("label"); l.textContent = x[i18nKey];
     const s = document.createElement("select"); s.id = "pin_" + key; s.dataset.key = key;
     const none = document.createElement("option"); none.value = ""; none.textContent = "—"; s.appendChild(none);
     (mod.pins || []).forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = p; s.appendChild(o); });
     if (defs[key]) s.value = defs[key];
-    s.addEventListener("change", render);
+    s.addEventListener("change", () => { markDirty(); render(); });
     wrap.appendChild(l); wrap.appendChild(s); host.appendChild(wrap);
   });
+}
+
+function updateAdc() {
+  const mod = currentModule();
+  const ains = (mod && mod.analog_pins) || [];
+  const adcSel = document.getElementById("adc");
+  const extOpt = adcSel.querySelector('option[value="external"]');
+  const pinSel = document.getElementById("adcPin");
+  const prev = pinSel.value;
+  pinSel.innerHTML = "";
+  ains.forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = p; pinSel.appendChild(o); });
+  if (mod && mod.adc_default && ains.indexOf(mod.adc_default) >= 0) pinSel.value = mod.adc_default;
+  else if ([...pinSel.options].some(o => o.value === prev)) pinSel.value = prev;
+  if (ains.length === 0) { extOpt.disabled = true; if (adcSel.value === "external") adcSel.value = "internal"; }
+  else { extOpt.disabled = false; }
+  const ext = adcSel.value === "external" && ains.length > 0;
+  document.getElementById("adcFields").style.display = ext ? "" : "none";
 }
 
 function collectPins() {
@@ -164,26 +366,27 @@ function renderOverlay(pins, bus, imu, mag) {
   L.push("    };");
   if (pins.sw0) L.push("    aliases { sw0 = &button0; };");
   L.push("};");
-  L.push(`/* IMU: ${imu}${mag !== "none" ? " | Mag: " + mag : ""} | 電池: 內部 VDDHDIV5 */`);
+  L.push(`/* IMU: ${imu}${mag !== "none" ? " | Mag: " + mag : ""} */`);
   return L.join("\n");
 }
 
 function onChange() {
+  const cp = document.getElementById("confirmOverlay"); if (cp) cp.style.display = "none";
   const mod = currentModule();
   const type = document.getElementById("type").value;
   const isRecv = type === "receiver";
   const supported = mod && mod.supported;
+  const x = t();
 
   document.getElementById("trackerOpts").style.display = (!supported || isRecv) ? "none" : "";
   document.getElementById("recvNote").style.display = (supported && isRecv) ? "" : "none";
   const un = document.getElementById("unsupported");
-  if (!supported) { un.style.display = ""; un.textContent = (mod && mod.note) || "此模組尚未支援。"; }
+  if (!supported) { un.style.display = ""; un.textContent = (mod && mod.note) || x.unsupportedBtn; }
   else un.style.display = "none";
 
-  document.getElementById("go").disabled = !supported;
-  document.getElementById("go").textContent = supported ? "產生固件" : "此模組尚未支援";
+  updateButton();
 
-  if (supported && !isRecv) buildPins();
+  if (supported && !isRecv) { buildPins(); updateAdc(); }
   render();
 }
 
@@ -192,7 +395,8 @@ const FUNC_META = {
   sck:{label:"SCK",color:"#e0902a"}, mosi:{label:"MOSI",color:"#2f9e44"},
   miso:{label:"MISO",color:"#3b82c4"}, cs:{label:"CS",color:"#9c5a2a"},
   int:{label:"INT",color:"#4bb543"}, clk:{label:"CLK",color:"#17a2a2"},
-  led:{label:"LED",color:"#d4537e"}, sw0:{label:"SW0",color:"#b0952a"}, vcc:{label:"VCC",color:"#c0398f"}
+  led:{label:"LED",color:"#d4537e"}, sw0:{label:"SW0",color:"#b0952a"}, vcc:{label:"VCC",color:"#c0398f"},
+  tx:{label:"TX",color:"#6d6df0"}, rx:{label:"RX",color:"#8a63d2"}, pwr:{label:"PWR",color:"#c0392b"}
 };
 const SVGNS = "http://www.w3.org/2000/svg";
 function svgEl(n, a) { const e = document.createElementNS(SVGNS, n); for (const k in a) e.setAttribute(k, a[k]); return e; }
@@ -203,36 +407,38 @@ function drawBoard(pins) {
   const mod = currentModule();
   const layout = mod && mod.layout;
   if (!layout) {
-    const t = svgEl("text", { x: 260, y: 280, "text-anchor": "middle", fill: "#7f8794", "font-size": "13" });
-    t.textContent = "此模組尚無接線圖"; svg.appendChild(t); return;
+    const tx = svgEl("text", { x: 260, y: 280, "text-anchor": "middle", fill: "#7f8794", "font-size": "13" });
+    tx.textContent = t().noDiagram; svg.appendChild(tx); return;
   }
   const g2f = {};
   for (const key in (pins || {})) { if (FUNC_META[key] && pins[key]) g2f[pins[key]] = FUNC_META[key]; }
 
-  const BX = 185, BW = 150, BY = 40, BH = 490;
-  svg.appendChild(svgEl("rect", { x: BX, y: BY, width: BW, height: BH, rx: 10, fill: "#161616" }));
-  const ant = "M" + (BX + 18) + " " + (BY + 95) + " L" + (BX + 18) + " " + (BY + 40) + " L" + (BW + BX - 18) + " " + (BY + 40) + " L" + (BW + BX - 18) + " " + (BY + 80) + " L" + (BX + 52) + " " + (BY + 80) + " L" + (BX + 52) + " " + (BY + 62) + " L" + (BW + BX - 40) + " " + (BY + 62);
-  svg.appendChild(svgEl("path", { d: ant, fill: "none", stroke: "#d9a441", "stroke-width": "9" }));
-  svg.appendChild(svgEl("rect", { x: BX + 16, y: BY + 120, width: BW - 32, height: 340, rx: 6, fill: "#dfe1e4", stroke: "#a9adb4", "stroke-width": "1.5" }));
-  svg.appendChild(svgEl("circle", { cx: BX + 30, cy: BY + 140, r: 5, fill: "#161616" }));
-  const lbl = svgEl("text", { x: BX + BW / 2, y: BY + 300, "text-anchor": "middle", fill: "#6a6e75", "font-size": "12", "font-family": "monospace" });
+  const BX = 150, BW = 220, BY = 24, BH = 306;
+  const a = (dx, dy) => (BX + dx) + " " + (BY + dy);
+  svg.appendChild(svgEl("rect", { x: BX, y: BY, width: BW, height: BH, rx: 12, fill: "#161616" }));
+  const ant = "M" + a(18, 54) + " L" + a(18, 26) + " L" + a(BW - 18, 26) + " L" + a(BW - 18, 50) + " L" + a(48, 50) + " L" + a(48, 38) + " L" + a(BW - 34, 38);
+  svg.appendChild(svgEl("path", { d: ant, fill: "none", stroke: "#d9a441", "stroke-width": "8" }));
+  svg.appendChild(svgEl("rect", { x: BX + 14, y: BY + 66, width: BW - 28, height: BH - 84, rx: 8, fill: "#dfe1e4", stroke: "#a9adb4", "stroke-width": "1.5" }));
+  svg.appendChild(svgEl("circle", { cx: BX + 30, cy: BY + 82, r: 5, fill: "#161616" }));
+  const lbl = svgEl("text", { x: BX + BW / 2, y: BY + BH / 2 + 4, "text-anchor": "middle", fill: "#6a6e75", "font-size": "13", "font-family": "monospace" });
   lbl.textContent = mod.id; svg.appendChild(lbl);
 
+  const padTop = BY + 72, padBot = BY + BH - 16, step = (padBot - padTop) / 13;
   function side(list, isL) {
     list.forEach(function (item, i) {
-      const name = item[1], y = BY + 128 + i * 24, edgeX = isL ? BX : BX + BW;
+      const name = item[1], y = padTop + i * step, edgeX = isL ? BX : BX + BW;
       const isGpio = /^P\d\.\d+$/.test(name);
       const f = isGpio ? g2f[name] : null;
       const padFill = f ? f.color : (isGpio ? "#e6b73c" : "#7a7f88");
-      svg.appendChild(svgEl("rect", { x: edgeX - 9, y: y - 7, width: 18, height: 14, rx: 3, fill: padFill, stroke: "#0e0e0e", "stroke-width": "1" }));
-      const gx = isL ? edgeX + 16 : edgeX - 16;
-      const gt = svgEl("text", { x: gx, y: y + 4, "text-anchor": isL ? "start" : "end", fill: "#9aa0ab", "font-size": "10", "font-family": "monospace" });
+      svg.appendChild(svgEl("rect", { x: edgeX - 9, y: y - 6, width: 18, height: 12, rx: 3, fill: padFill, stroke: "#0e0e0e", "stroke-width": "1" }));
+      const gx = isL ? edgeX + 14 : edgeX - 14;
+      const gt = svgEl("text", { x: gx, y: y + 3.5, "text-anchor": isL ? "start" : "end", fill: "#9aa0ab", "font-size": "10", "font-family": "monospace" });
       gt.textContent = name; svg.appendChild(gt);
       if (f) {
-        const lineX = isL ? edgeX - 9 : edgeX + 9, endX = isL ? 92 : BX + BW + 83;
+        const lineX = isL ? edgeX - 9 : edgeX + 9, endX = isL ? 92 : BX + BW + 82;
         svg.appendChild(svgEl("line", { x1: lineX, y1: y, x2: endX, y2: y, stroke: f.color, "stroke-width": "2.5" }));
         const w = f.label.length * 8 + 16, pxp = isL ? endX - w : endX;
-        svg.appendChild(svgEl("rect", { x: pxp, y: y - 11, width: w, height: 22, rx: 11, fill: f.color }));
+        svg.appendChild(svgEl("rect", { x: pxp, y: y - 10, width: w, height: 20, rx: 10, fill: f.color }));
         const ft = svgEl("text", { x: pxp + w / 2, y: y + 4, "text-anchor": "middle", fill: "#0e1116", "font-size": "12", "font-weight": "600" });
         ft.textContent = f.label; svg.appendChild(ft);
       }
@@ -243,15 +449,15 @@ function drawBoard(pins) {
 
 function render() {
   const type = document.getElementById("type").value;
-  if (type === "receiver") { document.getElementById("dts").textContent = ""; drawBoard({}); return; }
-  const used = {}; let dup = false;
-  document.querySelectorAll("#pins select").forEach(s => { s.style.outline = ""; if (s.value) { if (used[s.value]) dup = true; used[s.value] = (used[s.value]||0)+1; } });
+  if (type === "receiver") { document.getElementById("dts").textContent = ""; drawBoard({}); refreshValidation(); return; }
+  const used = {};
+  document.querySelectorAll("#pins select").forEach(s => { s.style.outline = ""; if (s.value) { used[s.value] = (used[s.value]||0)+1; } });
   document.querySelectorAll("#pins select").forEach(s => { if (s.value && used[s.value] > 1) s.style.outline = "2px solid var(--err)"; });
-  document.getElementById("warn").textContent = dup ? "有腳位重複指定，請調整。" : "";
   const pins = collectPins();
   drawBoard(pins);
   document.getElementById("dts").textContent = renderOverlay(pins, document.getElementById("bus").value,
     document.getElementById("imu").value, document.getElementById("mag").value);
+  refreshValidation();
 }
 
 function collectConfig() {
@@ -261,12 +467,14 @@ function collectConfig() {
   const imu = document.getElementById("imu").value;
   const mag = document.getElementById("mag").value;
   const isRecv = type === "receiver";
-  const src = isRecv ? mod.receiver : mod;
-  const board_target = isRecv ? mod.base_board : (mod.base_board + "/" + bus);
+  const src = isRecv ? (mod.receiver || mod) : mod;
+  const noBusVariant = mod.mcu === "nrf54l15";
+  const board_target = (isRecv || noBusVariant) ? mod.base_board : (mod.base_board + "/" + bus);
   const parts = ["SlimeNRF", mod.id, isRecv ? "Receiver" : "Tracker"];
   if (!isRecv) { parts.push(imu); parts.push(bus.toUpperCase()); if (mag !== "none") parts.push("Mag"); }
   return {
     module: mod.id,
+    mcu: mod.mcu,
     type: isRecv ? "receiver" : "tracker",
     base_board: mod.base_board,
     board_target,
@@ -281,53 +489,188 @@ function collectConfig() {
     pins: isRecv ? {} : collectPins(),
     options: {
       magnetometer: (!isRecv && mag !== "none") ? "enabled" : "disabled",
-      sleep: document.getElementById("sleep").value
+      sleep: document.getElementById("sleep").value,
+      battery: document.getElementById("battery").value,
+      adc: (!isRecv && document.getElementById("adc").value === "external" && ((mod.analog_pins || []).length > 0)) ? "external" : "internal",
+      adc_pin: document.getElementById("adcPin").value,
+      adc_r1: parseInt(document.getElementById("adcR1").value || "0", 10) || 0,
+      adc_r2: parseInt(document.getElementById("adcR2").value || "0", 10) || 0,
+      led_polarity: document.getElementById("ledpol").value
     }
   };
 }
 
 const statusEl = document.getElementById("status");
 const goBtn = document.getElementById("go");
+const progWrap = document.getElementById("progress");
+const progBar = document.getElementById("progressBar");
 function setStatus(html, cls="") { statusEl.className = cls; statusEl.innerHTML = html; }
-
-async function build() {
-  const type = document.getElementById("type").value;
-  if (type === "tracker") {
-    const pins = collectPins();
-    if (!pins.int) { setStatus("❌ 請至少指定 IMU INT 腳。", "err"); return; }
-    if (document.getElementById("bus").value === "i2c" && (!pins.sda || !pins.scl)) { setStatus("❌ I2C 需指定 SDA 與 SCL。", "err"); return; }
-    if (document.getElementById("bus").value === "spi" && (!pins.sck || !pins.mosi || !pins.miso || !pins.cs)) { setStatus("❌ SPI 需指定 SCK/MOSI/MISO/CS。", "err"); return; }
-    if (document.getElementById("warn").textContent) { setStatus("❌ 請先解決腳位重複。", "err"); return; }
+function setProg(pct, color) { progWrap.style.display = "block"; progBar.style.width = Math.max(0, Math.min(100, pct)) + "%"; progBar.style.background = color || "var(--accent)"; }
+function hideProg() { progWrap.style.display = "none"; progBar.style.width = "0%"; }
+function esc(s) { return String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+function stepIcon(s) {
+  if (s.status === "completed") return s.conclusion === "success" ? "✓" : (s.conclusion === "skipped" ? "·" : "✗");
+  if (s.status === "in_progress") return "⏳";
+  return "·";
+}
+function renderLog(steps, runUrl) {
+  const box = document.getElementById("logBox"), link = document.getElementById("logLink");
+  if (steps && steps.length) {
+    box.style.display = "block";
+    box.innerHTML = steps.map(s => stepIcon(s) + " " + esc(s.name)).join("<br>");
+    box.scrollTop = box.scrollHeight;
   }
-  goBtn.disabled = true;
-  setStatus('<span class="spinner"></span>正在送出編譯要求…');
+  if (runUrl) {
+    link.style.display = "block";
+    link.innerHTML = '<a href="' + runUrl + '" target="_blank" rel="noopener" style="color:var(--accent);">' + t().viewLog + '</a>';
+  }
+}
+function hideLog() { const b = document.getElementById("logBox"), l = document.getElementById("logLink"); b.style.display = "none"; b.innerHTML = ""; l.style.display = "none"; l.innerHTML = ""; }
+
+let buildMode = "build";
+let dlUrl = "", dlName = "";
+
+function updateButton() {
+  const mod = currentModule();
+  const supported = mod && mod.supported;
+  if (buildMode === "download") {
+    goBtn.textContent = "⬇ " + t().download + (dlName ? " " + dlName : "");
+    goBtn.style.background = "var(--ok)";
+    goBtn.disabled = false;
+  } else if (buildMode === "building") {
+    goBtn.textContent = t().building + " …";
+    goBtn.style.background = "var(--accent)";
+    goBtn.disabled = true;
+  } else {
+    goBtn.textContent = supported ? t().build : t().unsupportedBtn;
+    goBtn.style.background = "var(--accent)";
+    goBtn.disabled = !supported || validationBlocked;
+  }
+}
+
+function markDirty() {
+  if (buildMode === "download") {
+    buildMode = "build";
+    dlUrl = ""; dlName = "";
+    hideProg(); setStatus("");
+    updateButton();
+  }
+}
+
+let validationBlocked = false;
+function validate() {
+  const errors = [];
+  if (document.getElementById("type").value !== "tracker") return errors;
+  const mod = currentModule();
+  if (!mod || !mod.supported) return errors;
+  const pins = collectPins();
+  const bus = document.getElementById("bus").value;
+  const counts = {};
+  Object.values(pins).forEach(v => counts[v] = (counts[v] || 0) + 1);
+  if (Object.values(counts).some(c => c > 1)) errors.push(t().errDup);
+  if (!pins.int) errors.push(t().errINT);
+  if (bus === "i2c" && (!pins.sda || !pins.scl)) errors.push(t().errI2C);
+  if (bus === "spi" && (!pins.sck || !pins.mosi || !pins.miso || !pins.cs)) errors.push(t().errSPI);
+  return errors;
+}
+function refreshValidation() {
+  const advEl = document.getElementById("adv");
+  const adv = advEl && advEl.checked;
+  const errors = validate();
+  const warnEl = document.getElementById("warn");
+  if (errors.length) {
+    validationBlocked = !adv;
+    warnEl.textContent = (adv ? "⚠ " : "❌ ") + errors.join("；") + (adv ? " " + t().advNote : "");
+    warnEl.style.color = adv ? "var(--accent)" : "var(--err)";
+  } else {
+    validationBlocked = false;
+    warnEl.textContent = "";
+  }
+  if (buildMode === "build") updateButton();
+}
+
+function showConfirm() {
+  const cfg = collectConfig();
+  const rows = [["Module", cfg.module], ["Type", cfg.type]];
+  if (cfg.type === "tracker") {
+    rows.push(["IMU", cfg.imu]);
+    if (cfg.mag !== "none") rows.push(["Mag", cfg.mag]);
+    rows.push(["Bus", cfg.bus.toUpperCase()]);
+    rows.push(["Battery", cfg.options.battery]);
+    rows.push(["ADC", cfg.options.adc === "external" ? cfg.options.adc_pin + " (R1 " + cfg.options.adc_r1 + "k / R2 " + cfg.options.adc_r2 + "k)" : "VDDHDIV5"]);
+    Object.keys(cfg.pins).forEach(k => rows.push([k.toUpperCase(), cfg.pins[k]]));
+  }
+  rows.push(["Output", cfg.fileformat]);
+  document.getElementById("confirmSummary").innerHTML =
+    rows.map(r => '<div>' + r[0] + ': <span style="color:#e7e9ee">' + r[1] + '</span></div>').join("");
+  document.getElementById("force").checked = false;
+  document.getElementById("confirmOverlay").style.display = "flex";
+}
+
+async function doBuild(force) {
+  const x = t();
+  document.getElementById("confirmOverlay").style.display = "none";
+  buildMode = "building"; updateButton();
+  setStatus('<span class="spinner"></span>' + x.sending);
+  setProg(8); hideLog();
   try {
+    const body = collectConfig(); body.force = !!force;
     const res = await fetch(WORKER_URL + "/build", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(collectConfig())
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "送出失敗");
+    if (!res.ok) throw new Error(data.error || "error");
+    if (data.status === "done" && data.download_url) {
+      setProg(100, "var(--ok)");
+      buildMode = "download"; dlUrl = data.download_url; dlName = data.filename; updateButton();
+      setStatus("♻ " + x.cached, "");
+      hideLog();
+      return;
+    }
     poll(data.build_id);
-  } catch (e) { setStatus("❌ " + e.message, "err"); goBtn.disabled = false; }
+  } catch (e) { setStatus("❌ " + e.message, "err"); hideProg(); buildMode = "build"; updateButton(); }
 }
 
 async function poll(buildId) {
-  const started = Date.now(), TIMEOUT = 20 * 60 * 1000;
+  const started = Date.now(), TIMEOUT = 20 * 60 * 1000, EXPECTED = 8 * 60 * 1000;
   const tick = async () => {
-    if (Date.now() - started > TIMEOUT) { setStatus("⌛ 編譯逾時，請到 GitHub Releases 查看或重試。", "err"); goBtn.disabled = false; return; }
+    const x = t();
+    const elapsed = Date.now() - started;
+    if (elapsed > TIMEOUT) { setStatus("⌛ " + x.timeout, "err"); buildMode = "build"; updateButton(); return; }
     try {
       const data = await (await fetch(WORKER_URL + "/status?build_id=" + buildId)).json();
-      if (data.status === "done") { setStatus(`✅ 完成！<br><a class="dl" href="${data.download_url}">⬇ 下載 ${data.filename}</a>`, ""); goBtn.disabled = false; return; }
-      if (data.status === "failed") { setStatus("❌ 編譯失敗，請到 GitHub Actions 看紀錄（多半是腳位設定需微調）。", "err"); goBtn.disabled = false; return; }
-      const label = data.status === "queued" ? "排隊 / 準備環境中" : "編譯中";
-      setStatus(`<span class="spinner"></span>${label}…（約 3–8 分鐘，請保持頁面開啟）`);
+      if (data.status === "done") {
+        setProg(100, "var(--ok)");
+        buildMode = "download"; dlUrl = data.download_url; dlName = data.filename;
+        updateButton();
+        setStatus("✅ " + x.done, "");
+        hideLog();
+        return;
+      }
+      if (data.status === "failed") {
+        setProg(100, "var(--err)");
+        setStatus("❌ " + x.failed, "err");
+        renderLog(data.steps, data.run_url);
+        buildMode = "build"; updateButton(); return;
+      }
+      if (data.status === "queued") { setProg(15); setStatus('<span class="spinner"></span>' + x.queued + " …"); }
+      else { setProg(Math.min(92, 20 + (elapsed / EXPECTED) * 72)); setStatus('<span class="spinner"></span>' + x.building + " … " + x.buildHint); }
+      renderLog(data.steps, data.run_url);
       setTimeout(tick, 6000);
     } catch (e) { setTimeout(tick, 6000); }
   };
   tick();
 }
 
-goBtn.addEventListener("click", build);
+goBtn.addEventListener("click", () => {
+  if (buildMode === "download" && dlUrl) { window.open(dlUrl, "_blank"); return; }
+  if (buildMode === "building") return;
+  showConfirm();
+});
+document.getElementById("confirmYes").addEventListener("click", () => doBuild(document.getElementById("force").checked));
+document.getElementById("confirmNo").addEventListener("click", () => { document.getElementById("confirmOverlay").style.display = "none"; });
+document.getElementById("confirmOverlay").addEventListener("click", (e) => { if (e.target.id === "confirmOverlay") e.currentTarget.style.display = "none"; });
+document.getElementById("adv").addEventListener("change", refreshValidation);
 init();
 </script>
 </body>

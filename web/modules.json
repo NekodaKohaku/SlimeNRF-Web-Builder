@@ -1,5 +1,4 @@
 {
-  "_comment": "模組目錄。網站讀這個檔產生模組選單與『可指定的腳位池』。base_board 用官方相近板當基底，workflow 會依使用者選的腳生成 overlay 套上去。analog_pins 是可做 ADC 的腳（AIN），供電池量測用。",
   "modules": [
     {
       "id": "MS88SF2",
@@ -25,23 +24,31 @@
         "P1.00", "P1.09", "P1.13", "P1.15"
       ],
       "analog_pins": ["P0.02", "P0.04", "P0.29", "P0.31"],
+      "adc_default": "P0.04",
       "layout": {
         "left":  [["1","GND"],["2","P1.13"],["3","P1.15"],["4","P0.02"],["5","P0.29"],["6","P0.31"],["7","P0.26"],["8","P0.04"],["9","P0.06"],["10","P0.08"],["11","P1.09"],["12","P0.12"],["13","GND"],["14","VDD"]],
         "right": [["28","P0.10"],["27","P0.09"],["26","SWCLK"],["25","SWDIO"],["24","P1.00"],["23","P0.24"],["22","P0.22"],["21","P0.20"],["20","P0.18"],["19","P0.15"],["18","P0.13"],["17","D+"],["16","D-"],["15","VDDH"]]
       },
       "defaults": {
-        "spi": { "sck": "P0.12", "mosi": "P1.09", "miso": "P0.08", "cs": "P0.24", "int": "P1.00", "clk": "", "led": "P0.06", "sw0": "P1.15", "vcc": "" },
-        "i2c": { "sda": "P0.08", "scl": "P0.12", "int": "P1.00", "clk": "", "led": "P0.06", "sw0": "P1.15", "vcc": "" }
+        "spi": { "sck": "P0.12", "mosi": "P1.09", "miso": "P0.08", "cs": "P0.24", "int": "P1.00", "clk": "", "led": "P0.06", "sw0": "P1.15", "vcc": "", "tx": "P0.26", "rx": "P0.31", "pwr": "P1.13" },
+        "i2c": { "sda": "P0.08", "scl": "P0.12", "int": "P1.00", "clk": "", "led": "P0.06", "sw0": "P1.15", "vcc": "", "tx": "P0.26", "rx": "P0.31", "pwr": "P1.13" }
       }
     },
     {
       "id": "ME54BS01",
-      "label": "ME54BS01 (nRF54L15 — 編譯尚未支援)",
-      "supported": false,
+      "label": "ME54BS01 (nRF54L15)",
+      "experimental": true,
+      "supported": true,
       "mcu": "nrf54l15",
       "has_usb": false,
       "fileformat": "hex",
-      "note": "介面已就緒（腳位/接線圖可看）。但官方 SlimeNRF 目前還沒有 nRF54L15 的 board 定義（prj.conf 已有 nRF54L 相關註解，代表進行中）。此晶片無 USB，靠 SWD 燒錄。等官方發佈支援後即可開啟編譯。",
+      "base_board": "test54l/nrf54l15/cpuapp",
+      "repository_url": "https://github.com/SlimeVR/SlimeVR-Tracker-nRF.git",
+      "repository_revision": "main",
+      "sdk_url": "https://github.com/nrfconnect/sdk-nrf.git",
+      "sdk_revision": "v3.1-branch",
+      "zephyr_sdk_version": "0.17.4",
+      "note": "實驗性：使用官方 test54l 板 + nRF54L 專用 overlay。此晶片走 SWD 燒 .hex。首次可能需 1-2 次實測微調（NFC-as-GPIO、LED 等細節）；失敗時看 Actions log 貼給我即可。",
       "pins": [
         "P0.00", "P0.01", "P0.02", "P0.03",
         "P1.02", "P1.03", "P1.04", "P1.05", "P1.06", "P1.09", "P1.10", "P1.11", "P1.12", "P1.13", "P1.14",
@@ -53,7 +60,7 @@
         "right": [["28","P0.03"],["27","P0.02"],["26","SWDCLK"],["25","SWDIO"],["24","P0.01"],["23","P0.00"],["22","P2.10"],["21","P2.09"],["20","NRESET"],["19","P2.07"],["18","P2.06"],["17","NC"],["16","NC"],["15","NC"]]
       },
       "defaults": {
-        "spi": { "sck": "P1.04", "mosi": "P1.03", "miso": "P1.02", "cs": "P0.00", "int": "P0.01", "clk": "", "led": "P1.05", "sw0": "P1.10", "vcc": "" }
+        "spi": { "sck": "P1.04", "mosi": "P1.03", "miso": "P1.02", "cs": "P0.00", "int": "P0.01", "clk": "", "led": "P1.05", "sw0": "P1.10", "vcc": "", "tx": "P1.14", "rx": "P1.13", "pwr": "P1.09" }
       }
     }
   ]
