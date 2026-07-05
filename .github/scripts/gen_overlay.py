@@ -3,6 +3,9 @@ import json
 import re
 import sys
 
+AIN_NRF52 = {"P0.02": 0, "P0.03": 1, "P0.04": 2, "P0.05": 3,
+             "P0.28": 4, "P0.29": 5, "P0.30": 6, "P0.31": 7}
+
 
 def parse_pin(p):
     m = re.fullmatch(r"P(\d)\.(\d+)", (p or "").strip())
@@ -24,7 +27,29 @@ def need(pins, key, human):
         sys.exit(f"missing or invalid pin: {human} ({key}) = {pins.get(key)!r}")
 
 
-def build_nrf52(bus, pins):
+def battery_divider_nrf52(opts):
+    if (opts or {}).get("adc") != "external":
+        return []
+    pin = opts.get("adc_pin")
+    if pin not in AIN_NRF52:
+        return []
+    ain = AIN_NRF52[pin]
+    r1 = int(opts.get("adc_r1", 0) or 0) * 1000
+    r2 = int(opts.get("adc_r2", 0) or 0) * 1000
+    if r2 > 0:
+        output, full = r2, r1 + r2
+    else:
+        output, full = 1, 1
+    return [
+        "\tbattery-divider {",
+        f"\t\tio-channels = <&adc {ain}>;",
+        f"\t\toutput-ohms = <{output}>;",
+        f"\t\tfull-ohms = <{full}>;",
+        "\t};",
+    ]
+
+
+def build_nrf52(bus, pins, opts):
     L = ["&pinctrl {"]
     if bus == "i2c":
         need(pins, "sda", "IMU SDA"); need(pins, "scl", "IMU SCL")
@@ -61,6 +86,7 @@ def build_nrf52(bus, pins):
     L.append("\t};")
     if pins.get("sw0") and parse_pin(pins["sw0"]):
         L.append("\taliases { sw0 = &button0; };")
+    L += battery_divider_nrf52(opts)
     L.append("};")
     if pins.get("sw0") and parse_pin(pins["sw0"]):
         q = parse_pin(pins["sw0"])
@@ -68,7 +94,7 @@ def build_nrf52(bus, pins):
     return L
 
 
-def build_nrf54l(bus, pins):
+def build_nrf54l(bus, pins, opts):
     L = ["&pinctrl {"]
     if bus == "i2c":
         need(pins, "sda", "IMU SDA"); need(pins, "scl", "IMU SCL")
@@ -101,10 +127,11 @@ def main():
     mcu = cfg.get("mcu", "nrf52840")
     bus = cfg.get("bus", "spi")
     pins = cfg.get("pins", {}) or {}
+    opts = cfg.get("options", {}) or {}
     if mcu == "nrf54l15":
-        L = build_nrf54l(bus, pins)
+        L = build_nrf54l(bus, pins, opts)
     else:
-        L = build_nrf52(bus, pins)
+        L = build_nrf52(bus, pins, opts)
     print("\n".join(L))
 
 
