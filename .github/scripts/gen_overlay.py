@@ -78,7 +78,8 @@ def build_nrf52(bus, pins, opts):
     L.append("\tzephyr,user {")
     L.append(f"\t\tint0-gpios = {gpio(pins['int'], '0')};")
     if pins.get("led"):
-        L.append(f"\t\tled-gpios = {gpio(pins['led'], 'GPIO_OPEN_SOURCE')};")
+        led_flag = "GPIO_OPEN_DRAIN" if (opts or {}).get("led_polarity") == "low" else "GPIO_OPEN_SOURCE"
+        L.append(f"\t\tled-gpios = {gpio(pins['led'], led_flag)};")
     if pins.get("clk"):
         L.append(f"\t\tclk-gpios = {gpio(pins['clk'], 'GPIO_OPEN_DRAIN')};")
     if pins.get("vcc"):
@@ -91,6 +92,8 @@ def build_nrf52(bus, pins, opts):
     if pins.get("sw0") and parse_pin(pins["sw0"]):
         q = parse_pin(pins["sw0"])
         L.append(f"&button0 {{ gpios = <&gpio{q[0]} {q[1]} (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>; }};")
+    if pins.get("led") and (opts or {}).get("led_polarity") == "low":
+        L.append("&pwm_led0 { pwms = <&pwm0 0 PWM_MSEC(1) PWM_POLARITY_INVERTED>; };")
     return L
 
 
