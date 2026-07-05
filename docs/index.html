@@ -36,6 +36,9 @@
   .langbar button { width:auto; margin:0; padding:4px 10px; font-size:12px; font-weight:500; background:transparent; color:var(--muted); border:1px solid var(--line); border-radius:7px; }
   .langbar button.on { background:var(--accent); color:#08111f; border-color:var(--accent); }
   .help { display:inline-flex; width:15px; height:15px; border:1px solid var(--line); border-radius:50%; font-size:11px; line-height:1; align-items:center; justify-content:center; margin-left:6px; color:var(--muted); cursor:help; vertical-align:middle; }
+  .sec { font-size:12px; font-weight:600; letter-spacing:.03em; color:var(--muted); margin:22px 0 10px; padding-top:16px; border-top:1px solid var(--line); }
+  details { margin-top:18px; border-top:1px solid var(--line); padding-top:14px; }
+  details summary::-webkit-details-marker { color:var(--muted); }
 </style>
 </head>
 <body>
@@ -56,7 +59,8 @@
     </div>
 
     <div id="trackerOpts">
-      <div class="grid" style="margin-top:14px;">
+      <div class="sec" data-i18n="secSensor"></div>
+      <div class="grid">
         <div><label for="imu"><span data-i18n="imu"></span><span class="help" data-help="helpIMU">?</span></label><select id="imu">
           <option value="ICM42688">ICM-42688-P</option>
           <option value="ICM45686">ICM-45686</option>
@@ -80,39 +84,46 @@
         </select></div>
         <div><label for="bus"><span data-i18n="bus"></span><span class="help" data-help="helpBus">?</span></label><select id="bus"><option value="spi">SPI</option><option value="i2c">I2C</option></select></div>
       </div>
-      <div class="grid" style="margin-top:12px;">
-        <div><label for="sleep"><span data-i18n="sleep"></span><span class="help" data-help="helpSleep">?</span></label><select id="sleep"><option value="disabled"></option><option value="enabled"></option></select></div>
-        <div><label for="output"><span data-i18n="output"></span><span class="help" data-help="helpOutput">?</span></label><select id="output"><option value="hex"></option><option value="uf2"></option></select></div>
+
+      <div class="sec" data-i18n="secPower"></div>
+      <div class="grid">
         <div><label for="battery"><span data-i18n="battery"></span><span class="help" data-help="helpBattery">?</span></label><select id="battery"><option value="liion"></option><option value="nimh"></option></select></div>
-      </div>
-      <div class="grid" style="margin-top:12px;">
         <div><label for="adc"><span data-i18n="adc"></span><span class="help" data-help="helpADC">?</span></label><select id="adc"><option value="external"></option><option value="internal"></option></select></div>
-        <div id="adcPinWrap"><label for="adcPin"><span data-i18n="adcPin"></span></label><select id="adcPin"></select></div>
       </div>
-      <div id="adcRes" class="grid" style="margin-top:10px;">
+      <div id="adcFields" class="grid" style="margin-top:12px;">
+        <div><label for="adcPin"><span data-i18n="adcPin"></span></label><select id="adcPin"></select></div>
         <div><label for="adcR1"><span data-i18n="adcR1"></span></label><input id="adcR1" type="number" min="0" value="0"></div>
         <div><label for="adcR2"><span data-i18n="adcR2"></span></label><input id="adcR2" type="number" min="0" value="0"></div>
       </div>
 
-      <div class="section-title" data-i18n="pinsTitle"></div>
+      <div class="sec" data-i18n="secBehavior"></div>
+      <div class="grid">
+        <div><label for="sleep"><span data-i18n="sleep"></span><span class="help" data-help="helpSleep">?</span></label><select id="sleep"><option value="disabled"></option><option value="enabled"></option></select></div>
+        <div><label for="output"><span data-i18n="output"></span><span class="help" data-help="helpOutput">?</span></label><select id="output"><option value="hex"></option><option value="uf2"></option></select></div>
+        <div><label for="ledpol"><span data-i18n="ledPol"></span><span class="help" data-help="helpLedPol">?</span></label><select id="ledpol"><option value="high"></option><option value="low"></option></select></div>
+      </div>
+
+      <div class="sec" data-i18n="secPins"></div>
       <div id="pins" class="pins"></div>
       <div id="warn" class="warn"></div>
 
-      <div class="section-title" data-i18n="overlayTitle"></div>
-      <pre id="dts"></pre>
+      <div class="sec" data-i18n="secDiagram"></div>
+      <div id="boardWrap" style="background:var(--sub); border:1px solid var(--line); border-radius:9px; padding:10px;">
+        <svg id="board" viewBox="0 0 520 360" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto; max-height:360px;" role="img"><title>wiring</title></svg>
+      </div>
+
+      <details style="margin-top:18px;">
+        <summary style="cursor:pointer; font-size:13px; color:var(--muted); user-select:none;" data-i18n="secAdvanced"></summary>
+        <label style="display:flex; align-items:center; gap:7px; margin:12px 0; font-size:13px; color:var(--muted); cursor:pointer;">
+          <input type="checkbox" id="adv" style="width:auto; margin:0;"> <span data-i18n="advanced"></span>
+        </label>
+        <div class="section-title" data-i18n="overlayTitle"></div>
+        <pre id="dts"></pre>
+      </details>
     </div>
 
     <div id="recvNote" class="note" style="display:none;" data-i18n="recvNote"></div>
     <div id="unsupported" class="note" style="display:none;"></div>
-
-    <div class="section-title" data-i18n="diagramTitle"></div>
-    <div id="boardWrap" style="background:var(--sub); border:1px solid var(--line); border-radius:9px; padding:10px;">
-      <svg id="board" viewBox="0 0 520 360" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto; max-height:360px;" role="img"><title>wiring</title></svg>
-    </div>
-
-    <label style="display:flex; align-items:center; gap:7px; margin-top:16px; font-size:13px; color:var(--muted); cursor:pointer;">
-      <input type="checkbox" id="adv" style="width:auto; margin:0;"> <span data-i18n="advanced"></span>
-    </label>
 
     <button id="go"></button>
     <div id="progress"><div id="progressBar"></div></div>
@@ -155,9 +166,11 @@ const I18N = {
     failed:"編譯失敗，請查看 GitHub Actions 紀錄。", timeout:"編譯逾時，請稍後到 Releases 查看或重試。",
     errINT:"請至少指定 IMU INT 腳。", errI2C:"I2C 需指定 SDA 與 SCL。", errSPI:"SPI 需指定 SCK/MOSI/MISO/CS。", errDup:"腳位重複指定。",
     advanced:"進階模式（有警告仍可生成）", confirmTitle:"確認以下設定？", confirmYes:"確認生成", confirmNo:"取消", forceRebuild:"強制重新編譯（忽略快取）", advNote:"進階模式：仍可生成，但請自行確認。", cached:"已有相同版本固件，直接提供下載（略過編譯）。", viewLog:"查看完整即時 log ↗", experimentalTag:"實驗性",
-    battery:"電池類型", batteryLiion:"鋰電池（原廠）", batteryNimh:"鎳氫 NiMH",
+    battery:"電池類型", batteryLiion:"鋰電池", batteryNimh:"鎳氫 NiMH",
+    secSensor:"感測器", secPower:"電源與電池", secBehavior:"行為 / 輸出", secPins:"腳位指定", secDiagram:"接線圖", secAdvanced:"進階 / overlay 預覽",
     helpIMU:"你板子上用的慣性感測器晶片。", helpMag:"磁力計晶片，沒有就選無。", helpBus:"IMU 走 SPI 或 I2C，依你的接線。", helpSleep:"啟用後靜止進低功耗、動作喚醒，較省電。", helpOutput:"SWD (.hex)：無 bootloader、從 0x0 起的完整映像，可直接 SWD 燒到裸晶片。USB bootloader (.uf2)：給有 Adafruit bootloader 的板子拖曳燒錄。", helpBattery:"鋰電池用原廠曲線；選鎳氫 NiMH 時，編譯前會自動幫官方原始碼套用 NiMH 電量曲線補丁。",
     adc:"電池量測", adcExternal:"外部 AIN 腳", adcInternal:"內建 VDDHDIV5", adcPin:"ADC 腳（AIN）", adcR1:"上臂電阻 R1 (kΩ)", adcR2:"下臂電阻 R2 (kΩ)", helpADC:"電池電壓量測來源。外部 AIN 腳可搭配分壓量測鋰電；電壓直接進 ADC（無分壓）兩個電阻留 0。內建 VDDHDIV5 是晶片內部量測。",
+    ledPol:"LED 極性", ledPolHigh:"接地（一般）", ledPolLow:"接 VCC（反向）", helpLedPol:"LED 接法：GPIO→電阻→LED→地 選「接地」；GPIO→LED→電阻→VCC 選「接 VCC」（反向點亮）。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK（選填）", pinLED:"LED", pinSW0:"按鈕 SW0（選填）", pinVCC:"感測器電源（選填）"
   },
@@ -176,9 +189,11 @@ const I18N = {
     failed:"Build failed — check the GitHub Actions log.", timeout:"Build timed out — check Releases later or retry.",
     errINT:"Please assign the IMU INT pin.", errI2C:"I2C needs SDA and SCL.", errSPI:"SPI needs SCK/MOSI/MISO/CS.", errDup:"Duplicate pin assignment.",
     advanced:"Advanced mode (build despite warnings)", confirmTitle:"Confirm these settings?", confirmYes:"Confirm build", confirmNo:"Cancel", forceRebuild:"Force rebuild (ignore cache)", advNote:"Advanced mode: you can still build, verify yourself.", cached:"Same firmware already built — download ready (build skipped).", viewLog:"View full live log ↗", experimentalTag:"Experimental",
-    battery:"Battery type", batteryLiion:"Li-ion (default)", batteryNimh:"NiMH",
+    battery:"Battery type", batteryLiion:"Li-ion", batteryNimh:"NiMH",
+    secSensor:"Sensors", secPower:"Power & battery", secBehavior:"Behavior / output", secPins:"Pin assignment", secDiagram:"Wiring diagram", secAdvanced:"Advanced / overlay preview",
     helpIMU:"The IMU chip on your board.", helpMag:"Magnetometer chip, or None.", helpBus:"IMU on SPI or I2C, per your wiring.", helpSleep:"Low-power when idle, wake on motion — saves battery.", helpOutput:"SWD (.hex): standalone image from 0x0, no bootloader — flash straight to a bare chip via SWD. USB bootloader (.uf2): drag-drop for boards with the Adafruit bootloader.", helpBattery:"Li-ion uses the factory curve; choosing NiMH patches the official source with a NiMH curve at build time.",
     adc:"Battery sense", adcExternal:"External AIN pin", adcInternal:"Internal VDDHDIV5", adcPin:"ADC pin (AIN)", adcR1:"R1 top (kΩ)", adcR2:"R2 bottom (kΩ)", helpADC:"Battery voltage source. External AIN pin can use a divider for Li-ion; leave both resistors 0 if voltage goes straight to ADC. Internal VDDHDIV5 uses the chip's internal measurement.",
+    ledPol:"LED polarity", ledPolHigh:"To GND (normal)", ledPolLow:"To VCC (inverted)", helpLedPol:"LED wiring: GPIO->R->LED->GND pick To GND; GPIO->LED->R->VCC pick To VCC (inverted).",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK (optional)", pinLED:"LED", pinSW0:"Button SW0 (optional)", pinVCC:"Sensor power (optional)"
   },
@@ -197,9 +212,11 @@ const I18N = {
     failed:"ビルド失敗 — GitHub Actions のログを確認してください。", timeout:"タイムアウト — Releases を確認するか再試行してください。",
     errINT:"IMU INT ピンを割り当ててください。", errI2C:"I2C には SDA と SCL が必要です。", errSPI:"SPI には SCK/MOSI/MISO/CS が必要です。", errDup:"ピンの重複割り当て。",
     advanced:"詳細モード（警告があってもビルド可）", confirmTitle:"以下の設定でよろしいですか？", confirmYes:"生成を確認", confirmNo:"キャンセル", forceRebuild:"強制再ビルド（キャッシュ無視）", advNote:"詳細モード：ビルド可能ですが自己確認を。", cached:"同一ファームが既にあります — ダウンロード可能（ビルド省略）。", viewLog:"完全なライブログを見る ↗", experimentalTag:"実験的",
-    battery:"電池タイプ", batteryLiion:"Li-ion（既定）", batteryNimh:"NiMH",
+    battery:"電池タイプ", batteryLiion:"Li-ion", batteryNimh:"NiMH",
+    secSensor:"センサー", secPower:"電源・電池", secBehavior:"動作 / 出力", secPins:"ピン割り当て", secDiagram:"配線図", secAdvanced:"詳細 / overlay プレビュー",
     helpIMU:"基板の IMU チップ。", helpMag:"磁気センサー、なければ「なし」。", helpBus:"配線に応じて SPI か I2C。", helpSleep:"静止時は低消費、動作で復帰し省電力。", helpOutput:"SWD (.hex)：0x0 からの単体イメージ（bootloader なし）、SWD で直接書き込み。USB bootloader (.uf2)：Adafruit bootloader 搭載基板用。", helpBattery:"Li-ion は既定カーブ。NiMH を選ぶとビルド時に公式ソースへ NiMH カーブのパッチを適用。",
     adc:"電池計測", adcExternal:"外部 AIN ピン", adcInternal:"内蔵 VDDHDIV5", adcPin:"ADC ピン (AIN)", adcR1:"R1 上側 (kΩ)", adcR2:"R2 下側 (kΩ)", helpADC:"電池電圧の計測元。外部 AIN ピンは分圧で Li-ion 計測可。分圧なし（直接 ADC）は両抵抗を 0。内蔵 VDDHDIV5 はチップ内部計測。",
+    ledPol:"LED 極性", ledPolHigh:"GND 側（通常）", ledPolLow:"VCC 側（反転）", helpLedPol:"LED 配線：GPIO→R→LED→GND は「GND 側」、GPIO→LED→R→VCC は「VCC 側」（反転点灯）。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK（任意）", pinLED:"LED", pinSW0:"ボタン SW0（任意）", pinVCC:"センサー電源（任意）"
   }
@@ -228,6 +245,7 @@ function applyLang() {
   setOpt("output", "hex", x.outputHex); setOpt("output", "uf2", x.outputUf2);
   setOpt("battery", "liion", x.batteryLiion); setOpt("battery", "nimh", x.batteryNimh);
   setOpt("adc", "external", x.adcExternal); setOpt("adc", "internal", x.adcInternal);
+  setOpt("ledpol", "high", x.ledPolHigh); setOpt("ledpol", "low", x.ledPolLow);
   document.querySelectorAll(".langbar button").forEach(b => b.classList.toggle("on", b.dataset.lang === LANG));
   populateModules();
   onChange();
@@ -242,7 +260,7 @@ function parsePin(p) {
 
 async function init() {
   MODULES = (await (await fetch("modules.json")).json()).modules;
-  ["imu","mag","sleep","output","battery"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
+  ["imu","mag","sleep","output","battery","ledpol"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
   document.getElementById("bus").addEventListener("change", () => { markDirty(); onChange(); });
   document.getElementById("adc").addEventListener("change", () => { markDirty(); updateAdc(); render(); });
   ["adcPin","adcR1","adcR2"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
@@ -310,8 +328,7 @@ function updateAdc() {
   if (ains.length === 0) { extOpt.disabled = true; if (adcSel.value === "external") adcSel.value = "internal"; }
   else { extOpt.disabled = false; }
   const ext = adcSel.value === "external" && ains.length > 0;
-  document.getElementById("adcPinWrap").style.display = ext ? "" : "none";
-  document.getElementById("adcRes").style.display = ext ? "" : "none";
+  document.getElementById("adcFields").style.display = ext ? "" : "none";
 }
 
 function collectPins() {
@@ -476,7 +493,8 @@ function collectConfig() {
       adc: (!isRecv && document.getElementById("adc").value === "external" && ((mod.analog_pins || []).length > 0)) ? "external" : "internal",
       adc_pin: document.getElementById("adcPin").value,
       adc_r1: parseInt(document.getElementById("adcR1").value || "0", 10) || 0,
-      adc_r2: parseInt(document.getElementById("adcR2").value || "0", 10) || 0
+      adc_r2: parseInt(document.getElementById("adcR2").value || "0", 10) || 0,
+      led_polarity: document.getElementById("ledpol").value
     }
   };
 }
