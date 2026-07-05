@@ -157,6 +157,7 @@ jobs:
             append 'CONFIG_USE_IMU_WAKE_UP=n'; append 'CONFIG_USE_ACTIVE_TIMEOUT=n'
           fi
           if [ "$BAT" = "nimh" ]; then python3 "$GITHUB_WORKSPACE/.github/scripts/patch_nimh.py"; fi
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_pwr.py"
           tail -n 10 prj.conf
 
       - name: west build

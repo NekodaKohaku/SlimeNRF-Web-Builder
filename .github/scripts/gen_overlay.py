@@ -69,12 +69,20 @@ def build_nrf52(bus, pins, opts):
         L.append(f"\tpwm0_default {{ group1 {{ psels = <{psel('PWM_OUT0', pins['led'])}>; "
                  f"nordic,drive-mode = <NRF_DRIVE_D0S1>; }}; }};")
         L.append(f"\tpwm0_sleep  {{ group1 {{ psels = <{psel('PWM_OUT0', pins['led'])}>; low-power-enable; }}; }};")
+    if pins.get("tx") and pins.get("rx"):
+        ugrp = f"<{psel('UART_TX', pins['tx'])}>, <{psel('UART_RX', pins['rx'])}>"
+        L.append(f"\tuart0_default {{ group1 {{ psels = {ugrp}; }}; }};")
+        L.append(f"\tuart0_sleep  {{ group1 {{ psels = {ugrp}; low-power-enable; }}; }};")
     L.append("};")
     if bus == "spi":
         need(pins, "cs", "IMU CS")
         L.append(f"&spi3 {{ cs-gpios = {gpio(pins['cs'], 'GPIO_ACTIVE_LOW')}; }};")
+    if pins.get("tx") and pins.get("rx"):
+        L.append('&uart0 { status = "okay"; pinctrl-0 = <&uart0_default>; pinctrl-1 = <&uart0_sleep>; pinctrl-names = "default", "sleep"; current-speed = <115200>; };')
     need(pins, "int", "IMU INT")
     L.append("/ {")
+    if pins.get("tx") and pins.get("rx"):
+        L.append("\tchosen { zephyr,console = &uart0; zephyr,shell-uart = &uart0; };")
     L.append("\tzephyr,user {")
     L.append(f"\t\tint0-gpios = {gpio(pins['int'], '0')};")
     if pins.get("led"):
@@ -84,6 +92,8 @@ def build_nrf52(bus, pins, opts):
         L.append(f"\t\tclk-gpios = {gpio(pins['clk'], 'GPIO_OPEN_DRAIN')};")
     if pins.get("vcc"):
         L.append(f"\t\tvcc-gpios = {gpio(pins['vcc'], '0')};")
+    if pins.get("pwr"):
+        L.append(f"\t\tpwr-gpios = {gpio(pins['pwr'], 'GPIO_ACTIVE_HIGH')};")
     L.append("\t};")
     if pins.get("sw0") and parse_pin(pins["sw0"]):
         L.append("\taliases { sw0 = &button0; };")
@@ -112,13 +122,19 @@ def build_nrf54l(bus, pins, opts):
                f"<{psel('SPIM_MISO', pins['miso'])}>")
         L.append(f"\tspi00_default {{ group1 {{ psels = {grp}; }}; }};")
         L.append(f"\tspi00_sleep  {{ group1 {{ psels = {grp}; low-power-enable; }}; }};")
+    if pins.get("tx") and pins.get("rx"):
+        ugrp = f"<{psel('UART_TX', pins['tx'])}>, <{psel('UART_RX', pins['rx'])}>"
+        L.append(f"\tuart20_default {{ group1 {{ psels = {ugrp}; }}; }};")
+        L.append(f"\tuart20_sleep  {{ group1 {{ psels = {ugrp}; low-power-enable; }}; }};")
     L.append("};")
     if bus == "spi":
         need(pins, "cs", "IMU CS")
         L.append(f"&spi20 {{ cs-gpios = {gpio(pins['cs'], 'GPIO_ACTIVE_LOW')}; }};")
+    if pins.get("tx") and pins.get("rx"):
+        L.append('&uart20 { status = "okay"; pinctrl-0 = <&uart20_default>; pinctrl-1 = <&uart20_sleep>; pinctrl-names = "default", "sleep"; current-speed = <115200>; };')
     need(pins, "int", "IMU INT")
     ports = set()
-    for key in ("int", "cs"):
+    for key in ("int", "cs", "pwr"):
         q = parse_pin(pins.get(key))
         if q:
             ports.add(q[0])
@@ -128,8 +144,12 @@ def build_nrf54l(bus, pins, opts):
     for g in sorted({gpiote_for.get(p, 20) for p in ports}):
         L.append(f'&gpiote{g} {{ status = "okay"; }};')
     L.append("/ {")
+    if pins.get("tx") and pins.get("rx"):
+        L.append("\tchosen { zephyr,console = &uart20; zephyr,shell-uart = &uart20; };")
     L.append("\tzephyr,user {")
     L.append(f"\t\tint0-gpios = {gpio(pins['int'], '0')};")
+    if pins.get("pwr"):
+        L.append(f"\t\tpwr-gpios = {gpio(pins['pwr'], 'GPIO_ACTIVE_HIGH')};")
     L.append("\t};")
     L.append("};")
     return L
