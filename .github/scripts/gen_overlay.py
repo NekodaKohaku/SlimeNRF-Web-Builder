@@ -127,14 +127,14 @@ def build_nrf54l(bus, pins, opts):
         L.append(f"\tspi00_sleep  {{ group1 {{ psels = {grp}; low-power-enable; }}; }};")
     if pins.get("tx") and pins.get("rx"):
         ugrp = f"<{psel('UART_TX', pins['tx'])}>, <{psel('UART_RX', pins['rx'])}>"
-        L.append(f"\tuart20_default {{ group1 {{ psels = {ugrp}; }}; }};")
-        L.append(f"\tuart20_sleep  {{ group1 {{ psels = {ugrp}; low-power-enable; }}; }};")
+        L.append(f"\tuart22_default {{ group1 {{ psels = {ugrp}; }}; }};")
+        L.append(f"\tuart22_sleep  {{ group1 {{ psels = {ugrp}; low-power-enable; }}; }};")
     L.append("};")
     if bus == "spi":
         need(pins, "cs", "IMU CS")
         L.append(f"&spi20 {{ cs-gpios = {gpio(pins['cs'], 'GPIO_ACTIVE_LOW')}; }};")
     if pins.get("tx") and pins.get("rx"):
-        L.append('&uart20 { status = "okay"; pinctrl-0 = <&uart20_default>; pinctrl-1 = <&uart20_sleep>; pinctrl-names = "default", "sleep"; current-speed = <115200>; };')
+        L.append('&uart22 { status = "okay"; pinctrl-0 = <&uart22_default>; pinctrl-1 = <&uart22_sleep>; pinctrl-names = "default", "sleep"; current-speed = <115200>; };')
     need(pins, "int", "IMU INT")
     ports = set()
     for key in ("int", "cs", "pwr"):
@@ -152,7 +152,7 @@ def build_nrf54l(bus, pins, opts):
         L.append('&adc { status = "okay"; };')
     L.append("/ {")
     if pins.get("tx") and pins.get("rx"):
-        L.append("\tchosen { zephyr,console = &uart20; zephyr,shell-uart = &uart20; };")
+        L.append("\tchosen { zephyr,console = &uart22; zephyr,shell-uart = &uart22; };")
     L.append("\tzephyr,user {")
     L.append(f"\t\tint0-gpios = {gpio(pins['int'], '0')};")
     if pins.get("pwr"):
