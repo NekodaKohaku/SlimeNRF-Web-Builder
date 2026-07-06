@@ -143,6 +143,8 @@ def build_nrf54l(bus, pins, opts):
         L.append(f'&gpio{p} {{ status = "okay"; }};')
     for g in sorted({gpiote_for.get(p, 20) for p in ports}):
         L.append(f'&gpiote{g} {{ status = "okay"; }};')
+    for n in ("dppic10", "ppib11", "ppib21", "dppic20", "ppib22", "ppib30", "dppic30"):
+        L.append(f'&{n} {{ status = "okay"; }};')
     L.append("/ {")
     if pins.get("tx") and pins.get("rx"):
         L.append("\tchosen { zephyr,console = &uart20; zephyr,shell-uart = &uart20; };")
