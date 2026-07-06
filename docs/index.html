@@ -295,6 +295,19 @@ function pinFields(bus) {
   return base.concat([["int","pinINT"],["clk","pinCLK"],["led","pinLED"],["sw0","pinSW0"],["vcc","pinVCC"],["tx","pinTX"],["rx","pinRX"],["pwr","pinPWR"]]);
 }
 
+const NRF54L_PORTS = {
+  sck:["1"], mosi:["1"], miso:["1"], sda:["1"], scl:["1"],
+  cs:["0","1"], int:["0","1"], led:["1"], sw0:["0","1"],
+  vcc:["0","1"], pwr:["0","1"], clk:["0","1"], tx:["1"], rx:["1"]
+};
+function allowedPins(mod, key) {
+  const pins = mod.pins || [];
+  if (mod.mcu !== "nrf54l15") return pins;
+  const allow = NRF54L_PORTS[key];
+  if (!allow) return pins;
+  return pins.filter(p => { const m = /^P(\d)\./.exec(p); return m && allow.indexOf(m[1]) >= 0; });
+}
+
 function buildPins() {
   const mod = currentModule();
   const bus = document.getElementById("bus").value;
@@ -307,7 +320,7 @@ function buildPins() {
     const l = document.createElement("label"); l.textContent = x[i18nKey];
     const s = document.createElement("select"); s.id = "pin_" + key; s.dataset.key = key;
     const none = document.createElement("option"); none.value = ""; none.textContent = "—"; s.appendChild(none);
-    (mod.pins || []).forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = p; s.appendChild(o); });
+    allowedPins(mod, key).forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = p; s.appendChild(o); });
     if (defs[key]) s.value = defs[key];
     s.addEventListener("change", () => { markDirty(); render(); });
     wrap.appendChild(l); wrap.appendChild(s); host.appendChild(wrap);
