@@ -6,6 +6,9 @@ import sys
 AIN_NRF52 = {"P0.02": 0, "P0.03": 1, "P0.04": 2, "P0.05": 3,
              "P0.28": 4, "P0.29": 5, "P0.30": 6, "P0.31": 7}
 
+AIN_NRF54L = {"P1.04": 0, "P1.05": 1, "P1.06": 2, "P1.07": 3,
+              "P1.11": 4, "P1.12": 5, "P1.13": 6, "P1.14": 7}
+
 
 def parse_pin(p):
     m = re.fullmatch(r"P(\d)\.(\d+)", (p or "").strip())
@@ -27,13 +30,13 @@ def need(pins, key, human):
         sys.exit(f"missing or invalid pin: {human} ({key}) = {pins.get(key)!r}")
 
 
-def battery_divider_nrf52(opts):
+def battery_divider(opts, ain_map):
     if (opts or {}).get("adc") != "external":
         return []
     pin = opts.get("adc_pin")
-    if pin not in AIN_NRF52:
+    if pin not in ain_map:
         return []
-    ain = AIN_NRF52[pin]
+    ain = ain_map[pin]
     r1 = int(opts.get("adc_r1", 0) or 0) * 1000
     r2 = int(opts.get("adc_r2", 0) or 0) * 1000
     if r2 > 0:
@@ -97,7 +100,7 @@ def build_nrf52(bus, pins, opts):
     L.append("\t};")
     if pins.get("sw0") and parse_pin(pins["sw0"]):
         L.append("\taliases { sw0 = &button0; };")
-    L += battery_divider_nrf52(opts)
+    L += battery_divider(opts, AIN_NRF52)
     L.append("};")
     if pins.get("sw0") and parse_pin(pins["sw0"]):
         q = parse_pin(pins["sw0"])
@@ -145,6 +148,8 @@ def build_nrf54l(bus, pins, opts):
         L.append(f'&gpiote{g} {{ status = "okay"; }};')
     for n in ("dppic10", "ppib11", "ppib21", "dppic20", "ppib22", "ppib30", "dppic30"):
         L.append(f'&{n} {{ status = "okay"; }};')
+    if (opts or {}).get("adc") == "external" and (opts or {}).get("adc_pin") in AIN_NRF54L:
+        L.append('&adc { status = "okay"; };')
     L.append("/ {")
     if pins.get("tx") and pins.get("rx"):
         L.append("\tchosen { zephyr,console = &uart20; zephyr,shell-uart = &uart20; };")
@@ -153,6 +158,7 @@ def build_nrf54l(bus, pins, opts):
     if pins.get("pwr"):
         L.append(f"\t\tpwr-gpios = {gpio(pins['pwr'], 'GPIO_ACTIVE_HIGH')};")
     L.append("\t};")
+    L += battery_divider(opts, AIN_NRF54L)
     L.append("};")
     return L
 
