@@ -70,19 +70,16 @@
           <option value="ISM330BX">ISM330BX</option>
           <option value="BMI270">BMI270</option>
         </select></div>
-        <div><label for="mag"><span data-i18n="mag"></span><span class="help" data-help="helpMag">?</span></label><select id="mag">
-          <option value="none"></option>
-          <option value="MMC5983">MMC5983MA</option>
-          <option value="QMC6309">QMC6309</option>
-          <option value="AK09940">AK09940</option>
-          <option value="BMM150">BMM150</option>
-          <option value="BMM350">BMM350</option>
-          <option value="IST8306">IST8306</option>
-          <option value="IST8308">IST8308</option>
-          <option value="LIS2MDL">LIS2MDL</option>
-          <option value="LIS3MDL">LIS3MDL</option>
-        </select></div>
         <div><label for="bus"><span data-i18n="bus"></span><span class="help" data-help="helpBus">?</span></label><select id="bus"><option value="spi">SPI</option><option value="i2c">I2C</option></select></div>
+      </div>
+      <div class="grid" style="margin-top:12px;">
+        <div><label for="magconn"><span data-i18n="magConn"></span><span class="help" data-help="helpMagConn">?</span></label><select id="magconn">
+          <option value="none"></option>
+          <option value="aux"></option>
+          <option value="i2c_shared"></option>
+          <option value="i2c"></option>
+          <option value="spi"></option>
+        </select></div>
       </div>
 
       <div class="sec" data-i18n="secPower"></div>
@@ -155,6 +152,9 @@ const I18N = {
     title:"SlimeNRF 固件產生器", subtitle:"選模組、指定每支腳接什麼，按下產生就會編出專屬固件。",
     module:"模組", type:"類型", typeTracker:"Tracker（追蹤器）", typeReceiver:"Dongle（接收器）",
     imu:"IMU 感測器", mag:"磁力計", magNone:"無", bus:"匯流排",
+    magConn:"磁力計", magConnNone:"無", magConnAux:"接在 IMU 上（aux）", magConnI2cShared:"跟 IMU 同一條 I2C", magConnI2c:"獨立 I2C", magConnSpi:"與 IMU 同一條 SPI",
+    helpMagConn:"磁力計晶片韌體會自動偵測，這裡只選「接在哪」。接在 IMU 上(aux)：只有 IMU 走 SPI 且為 ST 家族(LSM6DSV/DSO/ISM330BX/DSM)時可用，不占腳。跟 IMU 同一條 I2C：IMU 走 I2C 時共用 SDA/SCL。獨立 I2C：另接兩支 SDA/SCL。與 IMU 同一條 SPI：共用 SCK/MOSI/MISO，另接一支 CS。",
+    pinMagSDA:"磁力計 SDA", pinMagSCL:"磁力計 SCL", pinMagCS:"磁力計 CS",
     sleep:"睡眠喚醒", enabled:"啟用", disabled:"停用",
     flash:"燒錄方式", flashBoot:"Bootloader（USB .uf2）", flashSwd:"直接 SWD（無 bootloader）",
     pinsTitle:"腳位指定", diagramTitle:"接線示意圖", overlayTitle:"board overlay 預覽",
@@ -178,6 +178,9 @@ const I18N = {
     title:"SlimeNRF Firmware Builder", subtitle:"Pick a module, map each pin, then build to get custom firmware.",
     module:"Module", type:"Type", typeTracker:"Tracker", typeReceiver:"Dongle (Receiver)",
     imu:"IMU sensor", mag:"Magnetometer", magNone:"None", bus:"Bus",
+    magConn:"Magnetometer", magConnNone:"None", magConnAux:"On the IMU (aux)", magConnI2cShared:"Same I2C as IMU", magConnI2c:"Separate I2C", magConnSpi:"Same SPI as IMU",
+    helpMagConn:"The mag chip is auto-detected; here you only choose where it connects. On the IMU (aux): only when the IMU is on SPI and is ST family (LSM6DSV/DSO/ISM330BX/DSM); no pins. Same I2C as IMU: when IMU is I2C, shares SDA/SCL. Separate I2C: adds its own SDA/SCL. Same SPI as IMU: shares SCK/MOSI/MISO, adds one CS.",
+    pinMagSDA:"Mag SDA", pinMagSCL:"Mag SCL", pinMagCS:"Mag CS",
     sleep:"Sleep / wake", enabled:"Enabled", disabled:"Disabled",
     flash:"Flashing method", flashBoot:"Bootloader (USB .uf2)", flashSwd:"Direct SWD (no bootloader)",
     pinsTitle:"Pin assignment", diagramTitle:"Wiring diagram", overlayTitle:"Board overlay preview",
@@ -201,6 +204,9 @@ const I18N = {
     title:"SlimeNRF ファームウェアビルダー", subtitle:"モジュールを選び各ピンを割り当て、ビルドを押すと専用ファームができます。",
     module:"モジュール", type:"種類", typeTracker:"トラッカー", typeReceiver:"ドングル（レシーバー）",
     imu:"IMU センサー", mag:"磁気センサー", magNone:"なし", bus:"バス",
+    magConn:"磁気センサー", magConnNone:"なし", magConnAux:"IMU に接続（aux）", magConnI2cShared:"IMU と同じ I2C", magConnI2c:"独立 I2C", magConnSpi:"IMU と同じ SPI",
+    helpMagConn:"チップは自動検出。ここは「どこに繋ぐか」だけ。IMU に接続(aux)：IMU が SPI かつ ST 系(LSM6DSV/DSO/ISM330BX/DSM)のみ、ピン不要。IMU と同じ I2C：IMU が I2C の時 SDA/SCL 共用。独立 I2C：SDA/SCL を別途。IMU と同じ SPI：SCK/MOSI/MISO 共用、CS を1本追加。",
+    pinMagSDA:"磁気 SDA", pinMagSCL:"磁気 SCL", pinMagCS:"磁気 CS",
     sleep:"スリープ / 復帰", enabled:"有効", disabled:"無効",
     flash:"書き込み方法", flashBoot:"Bootloader（USB .uf2）", flashSwd:"直接 SWD（bootloader なし）",
     pinsTitle:"ピン割り当て", diagramTitle:"配線図", overlayTitle:"ボード overlay プレビュー",
@@ -240,7 +246,8 @@ function applyLang() {
   document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = x[el.dataset.i18n]; });
   document.querySelectorAll("[data-help]").forEach(el => { el.title = x[el.dataset.help] || ""; });
   setOpt("type", "tracker", x.typeTracker); setOpt("type", "receiver", x.typeReceiver);
-  setOpt("mag", "none", x.magNone);
+  setOpt("magconn", "none", x.magConnNone); setOpt("magconn", "aux", x.magConnAux);
+  setOpt("magconn", "i2c_shared", x.magConnI2cShared); setOpt("magconn", "i2c", x.magConnI2c); setOpt("magconn", "spi", x.magConnSpi);
   setOpt("sleep", "enabled", x.enabled); setOpt("sleep", "disabled", x.disabled);
   setOpt("output", "bootloader", x.flashBoot); setOpt("output", "swd", x.flashSwd);
   setOpt("battery", "liion", x.batteryLiion); setOpt("battery", "nimh", x.batteryNimh);
@@ -260,8 +267,8 @@ function parsePin(p) {
 
 async function init() {
   MODULES = (await (await fetch("modules.json")).json()).modules;
-  ["imu","mag","sleep","output","battery","ledpol"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
-  document.getElementById("bus").addEventListener("change", () => { markDirty(); onChange(); });
+  ["sleep","output","battery","ledpol"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
+  ["bus","imu","magconn"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); onChange(); }));
   document.getElementById("adc").addEventListener("change", () => { markDirty(); updateAdc(); render(); });
   ["adcPin","adcR1","adcR2"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
   document.getElementById("type").addEventListener("change", () => { markDirty(); populateModules(); onChange(); });
@@ -295,10 +302,18 @@ function pinFields(bus) {
   return base.concat([["int","pinINT"],["clk","pinCLK"],["led","pinLED"],["sw0","pinSW0"],["vcc","pinVCC"],["tx","pinTX"],["rx","pinRX"],["pwr","pinPWR"]]);
 }
 
+function magPinFields() {
+  const mc = magConn();
+  if (mc === "i2c") return [["mag_sda","pinMagSDA"],["mag_scl","pinMagSCL"]];
+  if (mc === "spi") return [["mag_cs","pinMagCS"]];
+  return [];
+}
+
 const NRF54L_PORTS = {
   sck:["1"], mosi:["1"], miso:["1"], sda:["1"], scl:["1"],
   cs:["0","1"], int:["0","1"], led:["1"], sw0:["0","1"],
-  vcc:["0","1"], pwr:["0","1"], clk:["0","1"], tx:["0","1"], rx:["0","1"]
+  vcc:["0","1"], pwr:["0","1"], clk:["0","1"], tx:["0","1"], rx:["0","1"],
+  mag_sda:["1"], mag_scl:["1"], mag_cs:["0","1"]
 };
 function allowedPins(mod, key) {
   const pins = mod.pins || [];
@@ -315,7 +330,7 @@ function buildPins() {
   host.innerHTML = "";
   const defs = (mod.defaults && mod.defaults[bus]) || {};
   const x = t();
-  pinFields(bus).forEach(([key, i18nKey]) => {
+  pinFields(bus).concat(magPinFields()).forEach(([key, i18nKey]) => {
     const wrap = document.createElement("div");
     const l = document.createElement("label"); l.textContent = x[i18nKey];
     const s = document.createElement("select"); s.id = "pin_" + key; s.dataset.key = key;
@@ -400,6 +415,7 @@ function onChange() {
   updateButton();
 
   if (supported) updateFlash();
+  if (supported && !isRecv) updateMagConn();
   if (supported && !isRecv) { buildPins(); updateAdc(); }
   render();
 }
@@ -410,7 +426,8 @@ const FUNC_META = {
   miso:{label:"MISO",color:"#3b82c4"}, cs:{label:"CS",color:"#9c5a2a"},
   int:{label:"INT",color:"#4bb543"}, clk:{label:"CLK",color:"#17a2a2"},
   led:{label:"LED",color:"#d4537e"}, sw0:{label:"SW0",color:"#b0952a"}, vcc:{label:"VCC",color:"#c0398f"},
-  tx:{label:"TX",color:"#6d6df0"}, rx:{label:"RX",color:"#8a63d2"}, pwr:{label:"PWR",color:"#c0392b"}
+  tx:{label:"TX",color:"#6d6df0"}, rx:{label:"RX",color:"#8a63d2"}, pwr:{label:"PWR",color:"#c0392b"},
+  mag_sda:{label:"M-SDA",color:"#2f9e44"}, mag_scl:{label:"M-SCL",color:"#e0902a"}, mag_cs:{label:"M-CS",color:"#9c5a2a"}
 };
 const SVGNS = "http://www.w3.org/2000/svg";
 function svgEl(n, a) { const e = document.createElementNS(SVGNS, n); for (const k in a) e.setAttribute(k, a[k]); return e; }
@@ -470,7 +487,7 @@ function render() {
   const pins = collectPins();
   drawBoard(pins);
   document.getElementById("dts").textContent = renderOverlay(pins, document.getElementById("bus").value,
-    document.getElementById("imu").value, document.getElementById("mag").value);
+    document.getElementById("imu").value, magConn());
   refreshValidation();
 }
 
@@ -491,18 +508,35 @@ function updateFlash() {
   if (!cur || cur.disabled) sel.value = isRecv ? "bootloader" : (hasUsb ? (mod.flash_default || "swd") : "swd");
 }
 
+const MAG_AUX_IMUS = ["LSM6DSV", "LSM6DSO", "LSM6DSM", "ISM330BX"];
+function magConn() {
+  const s = document.getElementById("magconn");
+  return (s && s.value) || "none";
+}
+function updateMagConn() {
+  const sel = document.getElementById("magconn");
+  const imu = document.getElementById("imu").value;
+  const bus = document.getElementById("bus").value;
+  const opt = v => sel.querySelector('option[value="' + v + '"]');
+  opt("aux").disabled = !(bus === "spi" && MAG_AUX_IMUS.indexOf(imu) >= 0);
+  opt("i2c_shared").disabled = bus !== "i2c";
+  opt("spi").disabled = bus !== "spi";
+  const cur = sel.querySelector('option[value="' + sel.value + '"]');
+  if (!cur || cur.disabled) sel.value = "none";
+}
+
 function collectConfig() {
   const mod = currentModule();
   const type = document.getElementById("type").value;
   const bus = document.getElementById("bus").value;
   const imu = document.getElementById("imu").value;
-  const mag = document.getElementById("mag").value;
+  const mconn = magConn();
   const isRecv = type === "receiver";
   const src = isRecv ? (mod.receiver || mod) : mod;
   const noBusVariant = mod.mcu === "nrf54l15";
   const board_target = (isRecv || noBusVariant) ? mod.base_board : (mod.base_board + "/" + bus);
   const parts = ["SlimeNRF", mod.id, isRecv ? "Receiver" : "Tracker"];
-  if (!isRecv) { parts.push(imu); parts.push(bus.toUpperCase()); if (mag !== "none") parts.push("Mag"); }
+  if (!isRecv) { parts.push(imu); parts.push(bus.toUpperCase()); if (mconn !== "none") parts.push("Mag"); }
   const fm = flashMethod();
   return {
     module: mod.id,
@@ -518,10 +552,11 @@ function collectConfig() {
     flash_method: fm,
     fileformat: fm === "bootloader" ? "uf2" : "hex",
     filename: parts.join("_"),
-    bus, imu, mag,
+    bus, imu, mag_conn: mconn,
     pins: isRecv ? {} : collectPins(),
     options: {
-      magnetometer: (!isRecv && mag !== "none") ? "enabled" : "disabled",
+      magnetometer: (!isRecv && mconn !== "none") ? "enabled" : "disabled",
+      mag_conn: mconn,
       sleep: document.getElementById("sleep").value,
       battery: document.getElementById("battery").value,
       adc: (!isRecv && document.getElementById("adc").value === "external" && ((mod.analog_pins || []).length > 0)) ? "external" : "internal",
@@ -627,7 +662,7 @@ function showConfirm() {
   const rows = [["Module", cfg.module], ["Type", cfg.type]];
   if (cfg.type === "tracker") {
     rows.push(["IMU", cfg.imu]);
-    if (cfg.mag !== "none") rows.push(["Mag", cfg.mag]);
+    if (cfg.mag_conn && cfg.mag_conn !== "none") rows.push(["Mag", cfg.mag_conn]);
     rows.push(["Bus", cfg.bus.toUpperCase()]);
     rows.push(["Battery", cfg.options.battery]);
     rows.push(["ADC", cfg.options.adc === "external" ? cfg.options.adc_pin + " (R1 " + cfg.options.adc_r1 + "k / R2 " + cfg.options.adc_r2 + "k)" : "VDDHDIV5"]);
