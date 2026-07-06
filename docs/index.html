@@ -99,7 +99,7 @@
       <div class="sec" data-i18n="secBehavior"></div>
       <div class="grid">
         <div><label for="sleep"><span data-i18n="sleep"></span><span class="help" data-help="helpSleep">?</span></label><select id="sleep"><option value="disabled"></option><option value="enabled"></option></select></div>
-        <div><label for="output"><span data-i18n="output"></span><span class="help" data-help="helpOutput">?</span></label><select id="output"><option value="hex"></option><option value="uf2"></option></select></div>
+        <div><label for="output"><span data-i18n="flash"></span><span class="help" data-help="helpFlash">?</span></label><select id="output"><option value="bootloader"></option><option value="swd"></option></select></div>
         <div><label for="ledpol"><span data-i18n="ledPol"></span><span class="help" data-help="helpLedPol">?</span></label><select id="ledpol"><option value="high"></option><option value="low"></option></select></div>
       </div>
 
@@ -156,10 +156,10 @@ const I18N = {
     module:"模組", type:"類型", typeTracker:"Tracker（追蹤器）", typeReceiver:"Dongle（接收器）",
     imu:"IMU 感測器", mag:"磁力計", magNone:"無", bus:"匯流排",
     sleep:"睡眠喚醒", enabled:"啟用", disabled:"停用",
-    output:"輸出 / 燒錄", outputHex:"SWD (.hex)", outputUf2:"USB bootloader (.uf2)",
+    flash:"燒錄方式", flashBoot:"Bootloader（USB .uf2）", flashSwd:"直接 SWD（無 bootloader）",
     pinsTitle:"腳位指定", diagramTitle:"接線示意圖", overlayTitle:"board overlay 預覽",
     build:"產生固件", unsupportedBtn:"此模組尚未支援",
-    recvNote:"接收器不需接 IMU，選好模組即可編譯（SWD 燒錄 .hex）。",
+    recvNote:"接收器（Dongle）不需接 IMU，選好模組即可編譯（USB bootloader .uf2）。",
     noDiagram:"此模組尚無接線圖", warnDup:"有腳位重複指定，請調整。",
     sending:"正在送出編譯要求…", queued:"排隊 / 準備環境中", building:"編譯中",
     buildHint:"（約 5–10 分鐘，請保持頁面開啟）", done:"完成！", download:"下載",
@@ -168,7 +168,7 @@ const I18N = {
     advanced:"進階模式（有警告仍可生成）", confirmTitle:"確認以下設定？", confirmYes:"確認生成", confirmNo:"取消", forceRebuild:"強制重新編譯（忽略快取）", advNote:"進階模式：仍可生成，但請自行確認。", cached:"已有相同版本固件，直接提供下載（略過編譯）。", viewLog:"查看完整即時 log ↗", experimentalTag:"實驗性",
     battery:"電池類型", batteryLiion:"鋰電池", batteryNimh:"鎳氫 NiMH",
     secSensor:"感測器", secPower:"電源與電池", secBehavior:"行為 / 輸出", secPins:"腳位指定", secDiagram:"接線圖", secAdvanced:"進階 / overlay 預覽",
-    helpIMU:"你板子上用的慣性感測器晶片。", helpMag:"磁力計晶片，沒有就選無。", helpBus:"IMU 走 SPI 或 I2C，依你的接線。", helpSleep:"啟用後靜止進低功耗、動作喚醒，較省電。", helpOutput:"SWD (.hex)：無 bootloader、從 0x0 起的完整映像，可直接 SWD 燒到裸晶片。USB bootloader (.uf2)：給有 Adafruit bootloader 的板子拖曳燒錄。", helpBattery:"鋰電池用原廠曲線；選鎳氫 NiMH 時，編譯前會自動幫官方原始碼套用 NiMH 電量曲線補丁。",
+    helpIMU:"你板子上用的慣性感測器晶片。", helpMag:"磁力計晶片，沒有就選無。", helpBus:"IMU 走 SPI 或 I2C，依你的接線。", helpSleep:"啟用後靜止進低功耗、動作喚醒，較省電。", helpFlash:"Bootloader：韌體疊在 bootloader 之後（0x1000），同時產出 .uf2（USB 拖放）與 .hex（SWD 保留 bootloader）；需板子已有 Adafruit bootloader。直接 SWD：0x0 起的完整映像、無 bootloader，用 SWD 直接燒 .hex。Dongle 需 USB，固定 Bootloader；無 USB 的模組只能直接 SWD。", helpBattery:"鋰電池用原廠曲線；選鎳氫 NiMH 時，編譯前會自動幫官方原始碼套用 NiMH 電量曲線補丁。",
     adc:"電池量測", adcExternal:"外部 AIN 腳", adcInternal:"內建 VDDHDIV5", adcPin:"ADC 腳（AIN）", adcR1:"上臂電阻 R1 (kΩ)", adcR2:"下臂電阻 R2 (kΩ)", helpADC:"電池電壓量測來源。外部 AIN 腳可搭配分壓量測鋰電；電壓直接進 ADC（無分壓）兩個電阻留 0。內建 VDDHDIV5 是晶片內部量測。",
     ledPol:"LED 極性", ledPolHigh:"接地（一般）", ledPolLow:"接 VCC（反向）", helpLedPol:"LED 接法：GPIO→電阻→LED→地 選「接地」；GPIO→LED→電阻→VCC 選「接 VCC」（反向點亮）。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
@@ -179,10 +179,10 @@ const I18N = {
     module:"Module", type:"Type", typeTracker:"Tracker", typeReceiver:"Dongle (Receiver)",
     imu:"IMU sensor", mag:"Magnetometer", magNone:"None", bus:"Bus",
     sleep:"Sleep / wake", enabled:"Enabled", disabled:"Disabled",
-    output:"Output / flashing", outputHex:"SWD (.hex)", outputUf2:"USB bootloader (.uf2)",
+    flash:"Flashing method", flashBoot:"Bootloader (USB .uf2)", flashSwd:"Direct SWD (no bootloader)",
     pinsTitle:"Pin assignment", diagramTitle:"Wiring diagram", overlayTitle:"Board overlay preview",
     build:"Build firmware", unsupportedBtn:"Module not supported yet",
-    recvNote:"A receiver needs no IMU — just pick the module and build (SWD .hex).",
+    recvNote:"A dongle needs no IMU — just pick the module and build (USB bootloader .uf2).",
     noDiagram:"No wiring diagram for this module yet", warnDup:"A pin is assigned twice — please fix.",
     sending:"Sending build request…", queued:"Queued / preparing", building:"Building",
     buildHint:"(about 5–10 min, keep this page open)", done:"Done!", download:"Download",
@@ -191,7 +191,7 @@ const I18N = {
     advanced:"Advanced mode (build despite warnings)", confirmTitle:"Confirm these settings?", confirmYes:"Confirm build", confirmNo:"Cancel", forceRebuild:"Force rebuild (ignore cache)", advNote:"Advanced mode: you can still build, verify yourself.", cached:"Same firmware already built — download ready (build skipped).", viewLog:"View full live log ↗", experimentalTag:"Experimental",
     battery:"Battery type", batteryLiion:"Li-ion", batteryNimh:"NiMH",
     secSensor:"Sensors", secPower:"Power & battery", secBehavior:"Behavior / output", secPins:"Pin assignment", secDiagram:"Wiring diagram", secAdvanced:"Advanced / overlay preview",
-    helpIMU:"The IMU chip on your board.", helpMag:"Magnetometer chip, or None.", helpBus:"IMU on SPI or I2C, per your wiring.", helpSleep:"Low-power when idle, wake on motion — saves battery.", helpOutput:"SWD (.hex): standalone image from 0x0, no bootloader — flash straight to a bare chip via SWD. USB bootloader (.uf2): drag-drop for boards with the Adafruit bootloader.", helpBattery:"Li-ion uses the factory curve; choosing NiMH patches the official source with a NiMH curve at build time.",
+    helpIMU:"The IMU chip on your board.", helpMag:"Magnetometer chip, or None.", helpBus:"IMU on SPI or I2C, per your wiring.", helpSleep:"Low-power when idle, wake on motion — saves battery.", helpFlash:"Bootloader: app sits after the bootloader (0x1000); outputs both .uf2 (USB drag-drop) and .hex (SWD, keeps bootloader). Needs the Adafruit bootloader already on the chip. Direct SWD: full image from 0x0, no bootloader — flash .hex via SWD. A dongle needs USB so it's fixed to Bootloader; a module without USB can only use Direct SWD.", helpBattery:"Li-ion uses the factory curve; choosing NiMH patches the official source with a NiMH curve at build time.",
     adc:"Battery sense", adcExternal:"External AIN pin", adcInternal:"Internal VDDHDIV5", adcPin:"ADC pin (AIN)", adcR1:"R1 top (kΩ)", adcR2:"R2 bottom (kΩ)", helpADC:"Battery voltage source. External AIN pin can use a divider for Li-ion; leave both resistors 0 if voltage goes straight to ADC. Internal VDDHDIV5 uses the chip's internal measurement.",
     ledPol:"LED polarity", ledPolHigh:"To GND (normal)", ledPolLow:"To VCC (inverted)", helpLedPol:"LED wiring: GPIO->R->LED->GND pick To GND; GPIO->LED->R->VCC pick To VCC (inverted).",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
@@ -202,10 +202,10 @@ const I18N = {
     module:"モジュール", type:"種類", typeTracker:"トラッカー", typeReceiver:"ドングル（レシーバー）",
     imu:"IMU センサー", mag:"磁気センサー", magNone:"なし", bus:"バス",
     sleep:"スリープ / 復帰", enabled:"有効", disabled:"無効",
-    output:"出力 / 書き込み", outputHex:"SWD (.hex)", outputUf2:"USB bootloader (.uf2)",
+    flash:"書き込み方法", flashBoot:"Bootloader（USB .uf2）", flashSwd:"直接 SWD（bootloader なし）",
     pinsTitle:"ピン割り当て", diagramTitle:"配線図", overlayTitle:"ボード overlay プレビュー",
     build:"ファームを生成", unsupportedBtn:"このモジュールは未対応",
-    recvNote:"レシーバーは IMU 不要。モジュールを選んでビルドするだけ（SWD .hex）。",
+    recvNote:"ドングルは IMU 不要。モジュールを選んでビルドするだけ（USB bootloader .uf2）。",
     noDiagram:"このモジュールの配線図はまだありません", warnDup:"ピンが重複しています。修正してください。",
     sending:"ビルド要求を送信中…", queued:"順番待ち / 準備中", building:"ビルド中",
     buildHint:"（約5〜10分、このページは開いたままに）", done:"完了！", download:"ダウンロード",
@@ -214,7 +214,7 @@ const I18N = {
     advanced:"詳細モード（警告があってもビルド可）", confirmTitle:"以下の設定でよろしいですか？", confirmYes:"生成を確認", confirmNo:"キャンセル", forceRebuild:"強制再ビルド（キャッシュ無視）", advNote:"詳細モード：ビルド可能ですが自己確認を。", cached:"同一ファームが既にあります — ダウンロード可能（ビルド省略）。", viewLog:"完全なライブログを見る ↗", experimentalTag:"実験的",
     battery:"電池タイプ", batteryLiion:"Li-ion", batteryNimh:"NiMH",
     secSensor:"センサー", secPower:"電源・電池", secBehavior:"動作 / 出力", secPins:"ピン割り当て", secDiagram:"配線図", secAdvanced:"詳細 / overlay プレビュー",
-    helpIMU:"基板の IMU チップ。", helpMag:"磁気センサー、なければ「なし」。", helpBus:"配線に応じて SPI か I2C。", helpSleep:"静止時は低消費、動作で復帰し省電力。", helpOutput:"SWD (.hex)：0x0 からの単体イメージ（bootloader なし）、SWD で直接書き込み。USB bootloader (.uf2)：Adafruit bootloader 搭載基板用。", helpBattery:"Li-ion は既定カーブ。NiMH を選ぶとビルド時に公式ソースへ NiMH カーブのパッチを適用。",
+    helpIMU:"基板の IMU チップ。", helpMag:"磁気センサー、なければ「なし」。", helpBus:"配線に応じて SPI か I2C。", helpSleep:"静止時は低消費、動作で復帰し省電力。", helpFlash:"Bootloader：アプリを bootloader の後ろ（0x1000）に配置し、.uf2（USB ドラッグ）と .hex（SWD、bootloader 保持）を両方出力。Adafruit bootloader が必要。直接 SWD：0x0 からの単体イメージ、bootloader なし、SWD で .hex を書き込み。ドングルは USB 必須のため Bootloader 固定、USB なしのモジュールは直接 SWD のみ。", helpBattery:"Li-ion は既定カーブ。NiMH を選ぶとビルド時に公式ソースへ NiMH カーブのパッチを適用。",
     adc:"電池計測", adcExternal:"外部 AIN ピン", adcInternal:"内蔵 VDDHDIV5", adcPin:"ADC ピン (AIN)", adcR1:"R1 上側 (kΩ)", adcR2:"R2 下側 (kΩ)", helpADC:"電池電圧の計測元。外部 AIN ピンは分圧で Li-ion 計測可。分圧なし（直接 ADC）は両抵抗を 0。内蔵 VDDHDIV5 はチップ内部計測。",
     ledPol:"LED 極性", ledPolHigh:"GND 側（通常）", ledPolLow:"VCC 側（反転）", helpLedPol:"LED 配線：GPIO→R→LED→GND は「GND 側」、GPIO→LED→R→VCC は「VCC 側」（反転点灯）。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
@@ -242,7 +242,7 @@ function applyLang() {
   setOpt("type", "tracker", x.typeTracker); setOpt("type", "receiver", x.typeReceiver);
   setOpt("mag", "none", x.magNone);
   setOpt("sleep", "enabled", x.enabled); setOpt("sleep", "disabled", x.disabled);
-  setOpt("output", "hex", x.outputHex); setOpt("output", "uf2", x.outputUf2);
+  setOpt("output", "bootloader", x.flashBoot); setOpt("output", "swd", x.flashSwd);
   setOpt("battery", "liion", x.batteryLiion); setOpt("battery", "nimh", x.batteryNimh);
   setOpt("adc", "external", x.adcExternal); setOpt("adc", "internal", x.adcInternal);
   setOpt("ledpol", "high", x.ledPolHigh); setOpt("ledpol", "low", x.ledPolLow);
@@ -386,6 +386,7 @@ function onChange() {
 
   updateButton();
 
+  if (supported) updateFlash();
   if (supported && !isRecv) { buildPins(); updateAdc(); }
   render();
 }
@@ -460,6 +461,23 @@ function render() {
   refreshValidation();
 }
 
+function flashMethod() {
+  const s = document.getElementById("output");
+  return (s && s.value) || "swd";
+}
+function updateFlash() {
+  const mod = currentModule(); if (!mod) return;
+  const isRecv = document.getElementById("type").value === "receiver";
+  const hasUsb = !!mod.has_usb;
+  const sel = document.getElementById("output");
+  const boot = sel.querySelector('option[value="bootloader"]');
+  const swd = sel.querySelector('option[value="swd"]');
+  boot.disabled = !(isRecv || hasUsb);
+  swd.disabled = isRecv;
+  const cur = sel.querySelector('option[value="' + sel.value + '"]');
+  if (!cur || cur.disabled) sel.value = isRecv ? "bootloader" : (hasUsb ? (mod.flash_default || "swd") : "swd");
+}
+
 function collectConfig() {
   const mod = currentModule();
   const type = document.getElementById("type").value;
@@ -472,6 +490,7 @@ function collectConfig() {
   const board_target = (isRecv || noBusVariant) ? mod.base_board : (mod.base_board + "/" + bus);
   const parts = ["SlimeNRF", mod.id, isRecv ? "Receiver" : "Tracker"];
   if (!isRecv) { parts.push(imu); parts.push(bus.toUpperCase()); if (mag !== "none") parts.push("Mag"); }
+  const fm = flashMethod();
   return {
     module: mod.id,
     mcu: mod.mcu,
@@ -483,7 +502,8 @@ function collectConfig() {
     sdk_url: mod.sdk_url,
     sdk_revision: mod.sdk_revision,
     zephyr_sdk_version: mod.zephyr_sdk_version,
-    fileformat: (document.getElementById("output") && document.getElementById("output").value) || mod.fileformat,
+    flash_method: fm,
+    fileformat: fm === "bootloader" ? "uf2" : "hex",
     filename: parts.join("_"),
     bus, imu, mag,
     pins: isRecv ? {} : collectPins(),
@@ -600,7 +620,7 @@ function showConfirm() {
     rows.push(["ADC", cfg.options.adc === "external" ? cfg.options.adc_pin + " (R1 " + cfg.options.adc_r1 + "k / R2 " + cfg.options.adc_r2 + "k)" : "VDDHDIV5"]);
     Object.keys(cfg.pins).forEach(k => rows.push([k.toUpperCase(), cfg.pins[k]]));
   }
-  rows.push(["Output", cfg.fileformat]);
+  rows.push(["Flashing", cfg.flash_method === "bootloader" ? "Bootloader (.uf2 + .hex)" : "Direct SWD (.hex)"]);
   document.getElementById("confirmSummary").innerHTML =
     rows.map(r => '<div>' + r[0] + ': <span style="color:#e7e9ee">' + r[1] + '</span></div>').join("");
   document.getElementById("force").checked = false;

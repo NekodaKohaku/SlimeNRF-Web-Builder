@@ -24,6 +24,11 @@ export default {
   },
 };
 
+function pickAsset(assets) {
+  const a = assets || [];
+  return a.find(x => /\.uf2$/i.test(x.name)) || a.find(x => /\.hex$/i.test(x.name)) || null;
+}
+
 async function handleBuild(request, env) {
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   if (env.RATE_LIMIT) {
@@ -75,7 +80,7 @@ async function handleBuild(request, env) {
     const rel = await gh(env, `/repos/${env.GITHUB_REPO}/releases/tags/fw-${buildId}`);
     if (rel.ok) {
       const r = await rel.json();
-      const asset = (r.assets || []).find(a => /\.(hex|uf2)$/i.test(a.name));
+      const asset = pickAsset(r.assets);
       const versionOk = !curSha || (r.body || "").includes("BUILT:" + curSha);
       if (asset && versionOk) {
         return json({ build_id: buildId, status: "done", cached: true, filename: asset.name, download_url: asset.browser_download_url });
@@ -116,7 +121,7 @@ async function handleStatus(url, env) {
   if (!resp.ok) return json({ error: `查詢狀態失敗 (${resp.status})` }, 502);
 
   const release = await resp.json();
-  const asset = (release.assets || []).find(a => /\.(hex|uf2)$/i.test(a.name));
+  const asset = pickAsset(release.assets);
   if (asset) return json({ status: "done", filename: asset.name, download_url: asset.browser_download_url });
   if ((release.body || "").includes("STATUS:FAILED")) return json({ status: "failed" });
   return json({ status: "building" });
