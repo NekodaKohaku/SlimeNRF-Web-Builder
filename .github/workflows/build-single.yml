@@ -145,10 +145,18 @@ jobs:
           SLEEP='${{ steps.cfg.outputs.sleep }}'
           BAT='${{ steps.cfg.outputs.battery }}'
           FMT='${{ steps.cfg.outputs.fileformat }}'
+          BOARD='${{ steps.cfg.outputs.board_target }}'
           if [ "$FMT" = "hex" ]; then
             append 'CONFIG_FLASH_LOAD_OFFSET=0'
             append 'CONFIG_BUILD_OUTPUT_UF2=n'
           fi
+          case "$BOARD" in
+            *nrf54l*)
+              append 'CONFIG_NRFX_DPPI10=y'
+              append 'CONFIG_NRFX_DPPI20=y'
+              append 'CONFIG_NRFX_DPPI30=y'
+              ;;
+          esac
           [ "$MAG" = "enabled" ]  && append 'CONFIG_SENSOR_USE_MAG=y'
           [ "$MAG" = "disabled" ] && append 'CONFIG_SENSOR_USE_MAG=n'
           if [ "$SLEEP" = "enabled" ]; then
