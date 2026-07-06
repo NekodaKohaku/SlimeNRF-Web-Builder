@@ -112,6 +112,8 @@ def build_nrf52(bus, pins, opts):
 
 def build_nrf54l(bus, pins, opts):
     L = ["&pinctrl {"]
+    txq = parse_pin(pins.get("tx"))
+    uart_node = "uart30" if (txq and txq[0] == 0) else "uart22"
     if bus == "i2c":
         need(pins, "sda", "IMU SDA"); need(pins, "scl", "IMU SCL")
         grp = f"<{psel('TWIM_SDA', pins['sda'])}>, <{psel('TWIM_SCL', pins['scl'])}>"
@@ -127,17 +129,17 @@ def build_nrf54l(bus, pins, opts):
         L.append(f"\tspi00_sleep  {{ group1 {{ psels = {grp}; low-power-enable; }}; }};")
     if pins.get("tx") and pins.get("rx"):
         ugrp = f"<{psel('UART_TX', pins['tx'])}>, <{psel('UART_RX', pins['rx'])}>"
-        L.append(f"\tuart22_default {{ group1 {{ psels = {ugrp}; }}; }};")
-        L.append(f"\tuart22_sleep  {{ group1 {{ psels = {ugrp}; low-power-enable; }}; }};")
+        L.append(f"\t{uart_node}_default {{ group1 {{ psels = {ugrp}; }}; }};")
+        L.append(f"\t{uart_node}_sleep  {{ group1 {{ psels = {ugrp}; low-power-enable; }}; }};")
     L.append("};")
     if bus == "spi":
         need(pins, "cs", "IMU CS")
         L.append(f"&spi20 {{ cs-gpios = {gpio(pins['cs'], 'GPIO_ACTIVE_LOW')}; }};")
     if pins.get("tx") and pins.get("rx"):
-        L.append('&uart22 { status = "okay"; pinctrl-0 = <&uart22_default>; pinctrl-1 = <&uart22_sleep>; pinctrl-names = "default", "sleep"; current-speed = <115200>; };')
+        L.append(f'&{uart_node} {{ status = "okay"; pinctrl-0 = <&{uart_node}_default>; pinctrl-1 = <&{uart_node}_sleep>; pinctrl-names = "default", "sleep"; current-speed = <115200>; }};')
     need(pins, "int", "IMU INT")
     ports = set()
-    for key in ("int", "cs", "pwr"):
+    for key in ("int", "cs", "pwr", "tx", "rx"):
         q = parse_pin(pins.get(key))
         if q:
             ports.add(q[0])
@@ -152,7 +154,7 @@ def build_nrf54l(bus, pins, opts):
         L.append('&adc { status = "okay"; };')
     L.append("/ {")
     if pins.get("tx") and pins.get("rx"):
-        L.append("\tchosen { zephyr,console = &uart22; zephyr,shell-uart = &uart22; };")
+        L.append(f"\tchosen {{ zephyr,console = &{uart_node}; zephyr,shell-uart = &{uart_node}; }};")
     L.append("\tzephyr,user {")
     L.append(f"\t\tint0-gpios = {gpio(pins['int'], '0')};")
     if pins.get("pwr"):
