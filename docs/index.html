@@ -298,7 +298,7 @@ function pinFields(bus) {
 const NRF54L_PORTS = {
   sck:["1"], mosi:["1"], miso:["1"], sda:["1"], scl:["1"],
   cs:["0","1"], int:["0","1"], led:["1"], sw0:["0","1"],
-  vcc:["0","1"], pwr:["0","1"], clk:["0","1"], tx:["1"], rx:["1"]
+  vcc:["0","1"], pwr:["0","1"], clk:["0","1"], tx:["0","1"], rx:["0","1"]
 };
 function allowedPins(mod, key) {
   const pins = mod.pins || [];
