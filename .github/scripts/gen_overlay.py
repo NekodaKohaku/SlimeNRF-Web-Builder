@@ -52,7 +52,27 @@ def battery_divider(opts, ain_map):
     ]
 
 
+MAG_I2C_DEV = '{ compatible = "i2c-device"; label = "mag"; reg = <0>; }'
+MAG_SPI_DEV = '{ compatible = "vnd,spi-device"; spi-max-frequency = <DT_FREQ_M(8)>; label = "mag-spi"; reg = <1>; }'
+
+
+def mag_device_nodes(mcu, pins, mc):
+    if mcu == "nrf54l15":
+        imu_i2c, imu_spi, sep_i2c = "i2c21", "spi20", "i2c22"
+    else:
+        imu_i2c, imu_spi, sep_i2c = "i2c0", "spi3", "i2c1"
+    L = []
+    if mc == "i2c_shared":
+        L.append(f"&{imu_i2c} {{ mag: mag@0 {MAG_I2C_DEV}; }};")
+    elif mc == "i2c" and pins.get("mag_sda") and pins.get("mag_scl"):
+        L.append(f'&{sep_i2c} {{ status = "okay"; pinctrl-0 = <&{sep_i2c}_default>; pinctrl-1 = <&{sep_i2c}_sleep>; pinctrl-names = "default", "sleep"; mag: mag@0 {MAG_I2C_DEV}; }};')
+    elif mc == "spi" and pins.get("mag_cs"):
+        L.append(f"&{imu_spi} {{ mag_spi: mag_spi@1 {MAG_SPI_DEV}; }};")
+    return L
+
+
 def build_nrf52(bus, pins, opts):
+    mc = (opts or {}).get("mag_conn", "none")
     L = ["&pinctrl {"]
     if bus == "i2c":
         need(pins, "sda", "IMU SDA"); need(pins, "scl", "IMU SCL")
@@ -76,10 +96,17 @@ def build_nrf52(bus, pins, opts):
         ugrp = f"<{psel('UART_TX', pins['tx'])}>, <{psel('UART_RX', pins['rx'])}>"
         L.append(f"\tuart0_default {{ group1 {{ psels = {ugrp}; }}; }};")
         L.append(f"\tuart0_sleep  {{ group1 {{ psels = {ugrp}; low-power-enable; }}; }};")
+    if mc == "i2c" and pins.get("mag_sda") and pins.get("mag_scl"):
+        mgrp = f"<{psel('TWIM_SDA', pins['mag_sda'])}>, <{psel('TWIM_SCL', pins['mag_scl'])}>"
+        L.append(f"\ti2c1_default {{ group1 {{ psels = {mgrp}; bias-disable; }}; }};")
+        L.append(f"\ti2c1_sleep  {{ group1 {{ psels = {mgrp}; bias-disable; low-power-enable; }}; }};")
     L.append("};")
     if bus == "spi":
         need(pins, "cs", "IMU CS")
-        L.append(f"&spi3 {{ cs-gpios = {gpio(pins['cs'], 'GPIO_ACTIVE_LOW')}; }};")
+        cs = gpio(pins['cs'], 'GPIO_ACTIVE_LOW')
+        if mc == "spi" and pins.get("mag_cs"):
+            cs += f", {gpio(pins['mag_cs'], 'GPIO_ACTIVE_LOW')}"
+        L.append(f"&spi3 {{ cs-gpios = {cs}; }};")
     if pins.get("tx") and pins.get("rx"):
         L.append('&uart0 { status = "okay"; pinctrl-0 = <&uart0_default>; pinctrl-1 = <&uart0_sleep>; pinctrl-names = "default", "sleep"; current-speed = <115200>; };')
     need(pins, "int", "IMU INT")
@@ -107,10 +134,12 @@ def build_nrf52(bus, pins, opts):
         L.append(f"&button0 {{ gpios = <&gpio{q[0]} {q[1]} (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>; }};")
     if pins.get("led") and (opts or {}).get("led_polarity") == "low":
         L.append("&pwm_led0 { pwms = <&pwm0 0 PWM_MSEC(1) PWM_POLARITY_INVERTED>; };")
+    L += mag_device_nodes("nrf52", pins, mc)
     return L
 
 
 def build_nrf54l(bus, pins, opts):
+    mc = (opts or {}).get("mag_conn", "none")
     L = ["&pinctrl {"]
     txq = parse_pin(pins.get("tx"))
     uart_node = "uart30" if (txq and txq[0] == 0) else "uart22"
@@ -131,10 +160,21 @@ def build_nrf54l(bus, pins, opts):
         ugrp = f"<{psel('UART_TX', pins['tx'])}>, <{psel('UART_RX', pins['rx'])}>"
         L.append(f"\t{uart_node}_default {{ group1 {{ psels = {ugrp}; }}; }};")
         L.append(f"\t{uart_node}_sleep  {{ group1 {{ psels = {ugrp}; low-power-enable; }}; }};")
+    if mc == "i2c" and bus == "spi" and pins.get("mag_sda") and pins.get("mag_scl"):
+        mgrp = f"<{psel('TWIM_SDA', pins['mag_sda'])}>, <{psel('TWIM_SCL', pins['mag_scl'])}>"
+        L.append(f"\ti2c0_default {{ group1 {{ psels = {mgrp}; bias-disable; }}; }};")
+        L.append(f"\ti2c0_sleep  {{ group1 {{ psels = {mgrp}; bias-disable; low-power-enable; }}; }};")
     L.append("};")
     if bus == "spi":
         need(pins, "cs", "IMU CS")
-        L.append(f"&spi20 {{ cs-gpios = {gpio(pins['cs'], 'GPIO_ACTIVE_LOW')}; }};")
+        cs = gpio(pins['cs'], 'GPIO_ACTIVE_LOW')
+        if mc == "spi" and pins.get("mag_cs"):
+            cs += f", {gpio(pins['mag_cs'], 'GPIO_ACTIVE_LOW')}"
+        L.append(f"&spi20 {{ cs-gpios = {cs}; }};")
+    if mc in ("i2c", "i2c_shared"):
+        L.append('&i2c21 { status = "okay"; };')
+    if mc == "spi" and pins.get("mag_cs"):
+        L.append(f"&spi20 {{ mag_spi: mag_spi@1 {MAG_SPI_DEV}; }};")
     if pins.get("tx") and pins.get("rx"):
         L.append(f'&{uart_node} {{ status = "okay"; pinctrl-0 = <&{uart_node}_default>; pinctrl-1 = <&{uart_node}_sleep>; pinctrl-names = "default", "sleep"; current-speed = <115200>; }};')
     need(pins, "int", "IMU INT")
