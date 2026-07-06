@@ -194,6 +194,12 @@ jobs:
           [ -f "$SRC" ] || { echo "missing build output $SRC" >&2; exit 1; }
           cp "$SRC" "out/${NAME}.${FMT}"
 
+          EXTRA_HEX=""
+          if [ "$FMT" = "uf2" ]; then
+            HEXSRC="SlimeVR-Tracker-nRF/build/SlimeVR-Tracker-nRF/zephyr/zephyr.hex"
+            if [ -f "$HEXSRC" ]; then cp "$HEXSRC" "out/${NAME}.hex"; EXTRA_HEX="zephyr-workspace/out/${NAME}.hex"; fi
+          fi
+
           PIN="out/${NAME}.pinout.txt"
           {
             echo "SlimeNRF firmware"
@@ -201,7 +207,8 @@ jobs:
             echo "firmware: ${{ steps.cfg.outputs.repository_url }}@${{ steps.cfg.outputs.repository_revision }} (commit ${SHA})"
             echo "sdk:      ${{ steps.cfg.outputs.sdk_url }}@${{ steps.cfg.outputs.sdk_revision }}"
             echo "board:    ${{ steps.cfg.outputs.board_target }}"
-            echo "output:   ${NAME}.${FMT}"
+            echo "output:   ${NAME}.${FMT}$( [ -n "$EXTRA_HEX" ] && echo " + ${NAME}.hex" )"
+            echo "flashing: $( [ "$FMT" = "uf2" ] && echo "bootloader (UF2 拖放 / SWD 保留 bootloader 用 .hex)" || echo "direct SWD (.hex @ 0x0, no bootloader)" )"
             echo ""
             echo "== settings =="
             echo "$CONFIG_JSON" | jq -r '"module: \(.module)\ntype:   \(.type)\nIMU:    \(.imu // "-")\nmag:    \(.mag // "-")\nbus:    \(.bus // "-")"'
@@ -214,6 +221,7 @@ jobs:
           } > "$PIN"
 
           echo "artifact=zephyr-workspace/out/${NAME}.${FMT}" >> "$GITHUB_OUTPUT"
+          echo "extra=$EXTRA_HEX" >> "$GITHUB_OUTPUT"
           echo "pinout=zephyr-workspace/out/${NAME}.pinout.txt" >> "$GITHUB_OUTPUT"
 
       - name: Upload firmware to release
@@ -222,7 +230,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="fw-${BUILD_ID}"
-          gh release upload "$TAG" "${{ steps.build.outputs.artifact }}" "${{ steps.build.outputs.pinout }}" --clobber --repo "$GITHUB_REPOSITORY"
+          gh release upload "$TAG" "${{ steps.build.outputs.artifact }}" "${{ steps.build.outputs.pinout }}" ${{ steps.build.outputs.extra }} --clobber --repo "$GITHUB_REPOSITORY"
           gh release edit  "$TAG" --notes "STATUS:DONE BUILT:${{ steps.clone.outputs.fw_sha }}" --repo "$GITHUB_REPOSITORY"
 
       - name: Mark release as failed
