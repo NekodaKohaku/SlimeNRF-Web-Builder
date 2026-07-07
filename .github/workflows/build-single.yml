@@ -149,6 +149,7 @@ jobs:
           FMT='${{ steps.cfg.outputs.fileformat }}'
           BOARD='${{ steps.cfg.outputs.board_target }}'
           if [ "$FMT" = "hex" ]; then
+            append 'CONFIG_USE_DT_CODE_PARTITION=n'
             append 'CONFIG_FLASH_LOAD_OFFSET=0'
             append 'CONFIG_BUILD_OUTPUT_UF2=n'
           fi
@@ -171,8 +172,6 @@ jobs:
             append 'CONFIG_USE_IMU_WAKE_UP=n'; append 'CONFIG_USE_ACTIVE_TIMEOUT=n'
             append 'CONFIG_SENSOR_LP_TIMEOUT=300000'; append 'CONFIG_SENSOR_USE_LOW_POWER_2=n'
           fi
-          PWR='${{ steps.cfg.outputs.pwr_pin }}'
-          if [ -n "$PWR" ]; then append 'CONFIG_USER_SHUTDOWN=n'; fi
           CLK='${{ steps.cfg.outputs.clk_pin }}'
           if [ -n "$CLK" ]; then append 'CONFIG_USE_SENSOR_CLOCK=y'; else append 'CONFIG_USE_SENSOR_CLOCK=n'; fi
           EXTRA='${{ steps.cfg.outputs.extra_actions }}'
