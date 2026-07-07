@@ -159,6 +159,7 @@ jobs:
               append 'CONFIG_NRFX_DPPI10=y'
               append 'CONFIG_NRFX_DPPI20=y'
               append 'CONFIG_NRFX_DPPI30=y'
+              cp "$GITHUB_WORKSPACE/.github/scripts/test54l_board.c" boards/nordic/test54l/board.c && echo "test54l board.c -> reads DT vcc/gnd-gpios"
               ;;
             *)
               append 'CONFIG_GPIO_AS_PINRESET=y'
@@ -281,6 +282,7 @@ jobs:
             echo ""
             echo "== pin assignment =="
             echo "$CONFIG_JSON" | jq -r '.pins // {} | to_entries[] | "  \(.key | ascii_upcase): \(.value)"'
+            [ "${{ steps.cfg.outputs.led_type }}" = "strip" ] && echo "  NOTE: LED = WS2812 可定址 data 腳 (單線)"
             if [ -n "$OVL" ] && [ -f "$OVL" ]; then
               echo ""; echo "== generated overlay =="; cat "$OVL"
             fi

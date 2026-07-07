@@ -162,8 +162,10 @@ def build_nrf52(bus, pins, opts):
         L.append(f"\t\tled-gpios = {gpio(pins['led'], led_flag)};")
     if pins.get("clk"):
         L.append(f"\t\tclk-gpios = {gpio(pins['clk'], 'GPIO_OPEN_DRAIN')};")
-    if pins.get("vcc"):
+    if parse_pin(pins.get("vcc")):
         L.append(f"\t\tvcc-gpios = {gpio(pins['vcc'], '0')};")
+    if parse_pin(pins.get("gnd")):
+        L.append(f"\t\tgnd-gpios = {gpio(pins['gnd'], '0')};")
     if pins.get("pwr"):
         L.append(f"\t\tpwr-gpios = {gpio(pins['pwr'], 'GPIO_ACTIVE_HIGH')};")
     L.append("\t};")
@@ -245,7 +247,7 @@ def build_nrf54l(bus, pins, opts):
         L.append(f'&{uart_node} {{ status = "okay"; pinctrl-0 = <&{uart_node}_default>; pinctrl-1 = <&{uart_node}_sleep>; pinctrl-names = "default", "sleep"; current-speed = <115200>; }};')
     need(pins, "int", "IMU INT")
     ports = set()
-    for key in ("int", "cs", "pwr", "tx", "rx", "led"):
+    for key in ("int", "cs", "pwr", "tx", "rx", "led", "vcc", "gnd"):
         q = parse_pin(pins.get(key))
         if q:
             ports.add(q[0])
@@ -268,6 +270,10 @@ def build_nrf54l(bus, pins, opts):
     elif pins.get("led"):
         led_flag = "GPIO_ACTIVE_LOW" if (opts or {}).get("led_polarity") == "low" else "GPIO_ACTIVE_HIGH"
         L.append(f"\t\tled-gpios = {gpio(pins['led'], led_flag)};")
+    if parse_pin(pins.get("vcc")):
+        L.append(f"\t\tvcc-gpios = {gpio(pins['vcc'], '0')};")
+    if parse_pin(pins.get("gnd")):
+        L.append(f"\t\tgnd-gpios = {gpio(pins['gnd'], '0')};")
     if pins.get("pwr"):
         L.append(f"\t\tpwr-gpios = {gpio(pins['pwr'], 'GPIO_ACTIVE_HIGH')};")
     L.append("\t};")
