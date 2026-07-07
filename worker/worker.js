@@ -80,8 +80,12 @@ async function handleBuild(request, env) {
     const rel = await gh(env, `/repos/${env.GITHUB_REPO}/releases/tags/fw-${buildId}`);
     if (rel.ok) {
       const r = await rel.json();
+      const body = r.body || "";
+      if (body.includes("STATUS:BUILDING")) {
+        return json({ build_id: buildId, status: "queued", building: true });
+      }
       const asset = pickAsset(r.assets);
-      const versionOk = !curSha || (r.body || "").includes("BUILT:" + curSha);
+      const versionOk = !curSha || body.includes("BUILT:" + curSha);
       if (asset && versionOk) {
         return json({ build_id: buildId, status: "done", cached: true, filename: asset.name, download_url: asset.browser_download_url });
       }
