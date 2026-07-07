@@ -99,12 +99,12 @@ def build_nrf52(bus, pins, opts):
         L.append(f"\tpwm0_sleep  {{ group1 {{ psels = {psels}; low-power-enable; }}; }};")
     if pins.get("tx") and pins.get("rx"):
         ugrp = f"<{psel('UART_TX', pins['tx'])}>, <{psel('UART_RX', pins['rx'])}>"
-        L.append(f"\tuart0_default {{ group1 {{ psels = {ugrp}; }}; }};")
-        L.append(f"\tuart0_sleep  {{ group1 {{ psels = {ugrp}; low-power-enable; }}; }};")
+        L.append(f"\tuart0_default: uart0_default {{ group1 {{ psels = {ugrp}; }}; }};")
+        L.append(f"\tuart0_sleep: uart0_sleep  {{ group1 {{ psels = {ugrp}; low-power-enable; }}; }};")
     if mc == "i2c" and pins.get("mag_sda") and pins.get("mag_scl"):
         mgrp = f"<{psel('TWIM_SDA', pins['mag_sda'])}>, <{psel('TWIM_SCL', pins['mag_scl'])}>"
-        L.append(f"\ti2c1_default {{ group1 {{ psels = {mgrp}; bias-disable; }}; }};")
-        L.append(f"\ti2c1_sleep  {{ group1 {{ psels = {mgrp}; bias-disable; low-power-enable; }}; }};")
+        L.append(f"\ti2c1_default: i2c1_default {{ group1 {{ psels = {mgrp}; bias-disable; }}; }};")
+        L.append(f"\ti2c1_sleep: i2c1_sleep  {{ group1 {{ psels = {mgrp}; bias-disable; low-power-enable; }}; }};")
     L.append("};")
     if bus == "spi":
         need(pins, "cs", "IMU CS")
@@ -180,8 +180,8 @@ def build_nrf54l(bus, pins, opts):
         L.append(f"\tspi00_sleep  {{ group1 {{ psels = {grp}; low-power-enable; }}; }};")
     if pins.get("tx") and pins.get("rx"):
         ugrp = f"<{psel('UART_TX', pins['tx'])}>, <{psel('UART_RX', pins['rx'])}>"
-        L.append(f"\t{uart_node}_default {{ group1 {{ psels = {ugrp}; }}; }};")
-        L.append(f"\t{uart_node}_sleep  {{ group1 {{ psels = {ugrp}; low-power-enable; }}; }};")
+        L.append(f"\t{uart_node}_default: {uart_node}_default {{ group1 {{ psels = {ugrp}; }}; }};")
+        L.append(f"\t{uart_node}_sleep: {uart_node}_sleep  {{ group1 {{ psels = {ugrp}; low-power-enable; }}; }};")
     if mc == "i2c" and bus == "spi" and pins.get("mag_sda") and pins.get("mag_scl"):
         mgrp = f"<{psel('TWIM_SDA', pins['mag_sda'])}>, <{psel('TWIM_SCL', pins['mag_scl'])}>"
         L.append(f"\ti2c0_default {{ group1 {{ psels = {mgrp}; bias-disable; }}; }};")
