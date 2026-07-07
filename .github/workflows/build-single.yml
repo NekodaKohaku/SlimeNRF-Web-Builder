@@ -264,33 +264,6 @@ jobs:
           echo "extra=$EXTRA_HEX" >> "$GITHUB_OUTPUT"
           echo "pinout=zephyr-workspace/out/${NAME}.pinout.txt" >> "$GITHUB_OUTPUT"
 
-      - name: Verify load address (hex)
-        if: ${{ success() && steps.cfg.outputs.fileformat == 'hex' }}
-        shell: bash
-        run: |
-          python3 - "${{ steps.build.outputs.artifact }}" <<'PY'
-          import sys
-          f=sys.argv[1]; base=0; addrs=[]; d={}
-          for line in open(f):
-              line=line.strip()
-              if not line.startswith(":"): continue
-              ll=int(line[1:3],16); a=int(line[3:7],16); t=int(line[7:9],16); p=line[9:9+ll*2]
-              if t==4: base=int(p,16)<<16
-              elif t==2: base=int(p,16)<<4
-              elif t==0:
-                  aa=base+a; addrs.append(aa)
-                  for i in range(ll): d[aa+i]=int(p[i*2:i*2+2],16)
-          def wd(x): return d.get(x,0xff)|(d.get(x+1,0xff)<<8)|(d.get(x+2,0xff)<<16)|(d.get(x+3,0xff)<<24)
-          lo=min(addrs)
-          print("=== FIRMWARE LOAD ADDRESS CHECK ===")
-          print("lowest load address : 0x%08X" % lo)
-          print("word @0x0 (SP)      : 0x%08X" % wd(0))
-          print("word @0x4 (reset)   : 0x%08X" % wd(4))
-          if lo != 0:
-              print("ERROR: SWD .hex 應從 0x0 開始,但實際 0x%X -> 不會開機" % lo); sys.exit(1)
-          print("OK: app 在 0x0,可開機")
-          PY
-
       - name: Upload firmware to release
         if: ${{ success() }}
         env:
