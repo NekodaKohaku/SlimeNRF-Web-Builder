@@ -149,23 +149,9 @@ jobs:
           FMT='${{ steps.cfg.outputs.fileformat }}'
           BOARD='${{ steps.cfg.outputs.board_target }}'
           if [ "$FMT" = "hex" ]; then
-            # board defconfig 的 FLASH_LOAD_OFFSET=0x1000 蓋不過,直接改板子 defconfig -> 0x0 (SWD 直燒、無 bootloader)
-            find boards -name '*_defconfig' -exec sed -i 's/CONFIG_FLASH_LOAD_OFFSET=0x1000/CONFIG_FLASH_LOAD_OFFSET=0x0/g' {} + 2>/dev/null || true
-            echo '== board defconfig FLASH_LOAD_OFFSET after sed =='; grep -rHn 'FLASH_LOAD_OFFSET' boards/ 2>/dev/null | head || true
+            # SWD 直燒、無 bootloader:code-partition 由 overlay 定在 0x0,確保用 DT 分割
             append 'CONFIG_USE_DT_CODE_PARTITION=y'
-            append 'CONFIG_FLASH_LOAD_OFFSET=0'
             append 'CONFIG_BUILD_OUTPUT_UF2=n'
-            if [ "${BOARD#*nrf54l}" = "$BOARD" ]; then
-              BN="${BOARD%%/*}"
-              BDTS="$(find boards -name "${BN}.dts" 2>/dev/null | head -1)"
-              if [ -n "$BDTS" ]; then
-                printf '\n' >> "$BDTS"
-                cat "$GITHUB_WORKSPACE/.github/overlays/nrf52_swd_direct.overlay" >> "$BDTS"
-                echo "== SWD partition 直接寫入 board dts: $BDTS =="
-              else
-                echo "WARN: 找不到 ${BN}.dts,partition 只能靠 overlay"
-              fi
-            fi
           fi
           case "$BOARD" in
             *nrf54l*)
@@ -248,30 +234,7 @@ jobs:
           [ -f "$SRC" ] || SRC="$(find SlimeVR-Tracker-nRF/build -path "*/zephyr/zephyr.$FMT" | grep -v _sysbuild | head -1)"
           [ -f "$SRC" ] || { echo "missing build output (zephyr.$FMT)" >&2; find SlimeVR-Tracker-nRF/build -name "zephyr.$FMT" || true; exit 1; }
           cp "$SRC" "out/${NAME}.${FMT}"
-          ZDIR="$(dirname "$SRC")"
 
-          echo "===== BUILD OUTPUT OFFSET CHECK (debug) ====="
-          CFG="$ZDIR/.config"
-          grep -iE 'FLASH_LOAD_OFFSET|USE_DT_CODE_PARTITION' "$CFG" || true
-          DTS="$ZDIR/zephyr.dts"
-          echo "--- code-partition / slot0 in merged DT ---"
-          grep -nE 'code-partition|image-0|partition@0 ' "$DTS" 2>/dev/null | head || true
-          echo "--- 腳位 overlay 是否套上 (int0-gpios / spi psel) ---"
-          grep -nE 'int0-gpios|SPIM_MISO|spi@|led-gpios' "$DTS" 2>/dev/null | head || true
-          echo "--- hex lowest address ---"
-          python3 - "$SRC" <<'PYEOF'
-          import sys
-          f=sys.argv[1]; base=0; lo=1<<32
-          for line in open(f):
-              line=line.strip()
-              if not line.startswith(":"): continue
-              ll=int(line[1:3],16); a=int(line[3:7],16); t=int(line[7:9],16); p=line[9:9+ll*2]
-              if t==4: base=int(p,16)<<16
-              elif t==2: base=int(p,16)<<4
-              elif t==0: lo=min(lo, base+a)
-          print("lowest load address = 0x%08X %s" % (lo, "(OK 0x0)" if lo==0 else "(!! still 0x%X)"%lo))
-          PYEOF
-          echo "============================================="
 
           EXTRA_HEX=""
           if [ "$FMT" = "uf2" ]; then
