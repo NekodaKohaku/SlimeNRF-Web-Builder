@@ -205,13 +205,35 @@ def build_nrf54l(bus, pins, opts):
     return L
 
 
+def build_receiver(pins, opts):
+    L = []
+    led = pins.get("led")
+    if led == "none":
+        return ["/ {", "\tzephyr,user { /delete-property/ led-gpios; };", "};"]
+    if led and parse_pin(led):
+        pol = (opts or {}).get("led_polarity")
+        led_flag = "GPIO_OPEN_DRAIN" if pol == "low" else "GPIO_OPEN_SOURCE"
+        L.append("&pinctrl {")
+        L.append(f"\tpwm0_default {{ group1 {{ psels = <{psel('PWM_OUT0', led)}>; nordic,drive-mode = <NRF_DRIVE_D0S1>; }}; }};")
+        L.append(f"\tpwm0_sleep  {{ group1 {{ psels = <{psel('PWM_OUT0', led)}>; low-power-enable; }}; }};")
+        L.append("};")
+        L.append("/ {")
+        L.append(f"\tzephyr,user {{ led-gpios = {gpio(led, led_flag)}; }};")
+        L.append("};")
+        if pol == "low":
+            L.append("&pwm_led0 { pwms = <&pwm0 0 PWM_MSEC(1) PWM_POLARITY_INVERTED>; };")
+    return L
+
+
 def main():
     cfg = json.loads(sys.argv[1])
     mcu = cfg.get("mcu", "nrf52840")
     bus = cfg.get("bus", "spi")
     pins = cfg.get("pins", {}) or {}
     opts = cfg.get("options", {}) or {}
-    if mcu == "nrf54l15":
+    if cfg.get("type") == "receiver":
+        L = build_receiver(pins, opts)
+    elif mcu == "nrf54l15":
         L = build_nrf54l(bus, pins, opts)
     else:
         L = build_nrf52(bus, pins, opts)

@@ -128,12 +128,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ steps.cfg.outputs.type }}" = "tracker" ]; then
-            OUT="$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
-            python3 "$GITHUB_WORKSPACE/.github/scripts/gen_overlay.py" "$CONFIG_JSON" > "$OUT"
-            cat "$OUT"
-            echo "overlay_path=$OUT" >> "$GITHUB_OUTPUT"
-          fi
+          OUT="$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/gen_overlay.py" "$CONFIG_JSON" > "$OUT"
+          cat "$OUT"
+          if [ -s "$OUT" ]; then echo "overlay_path=$OUT" >> "$GITHUB_OUTPUT"; fi
 
       - name: Apply firmware options
         if: ${{ steps.cfg.outputs.type == 'tracker' }}
