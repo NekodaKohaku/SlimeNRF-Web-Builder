@@ -54,6 +54,7 @@ jobs:
             echo "sleep=$(get '.options.sleep // "unset"')"
             echo "battery=$(get '.options.battery // "unset"')"
             echo "clk_pin=$(get '.pins.clk // ""')"
+            echo "pwr_pin=$(get '.pins.pwr // ""')"
             echo "extra_actions=$(get '.options.extra_actions // "unset"')"
           } >> "$GITHUB_OUTPUT"
 
@@ -170,6 +171,8 @@ jobs:
             append 'CONFIG_USE_IMU_WAKE_UP=n'; append 'CONFIG_USE_ACTIVE_TIMEOUT=n'
             append 'CONFIG_SENSOR_LP_TIMEOUT=300000'; append 'CONFIG_SENSOR_USE_LOW_POWER_2=n'
           fi
+          PWR='${{ steps.cfg.outputs.pwr_pin }}'
+          if [ -n "$PWR" ]; then append 'CONFIG_USER_SHUTDOWN=n'; fi
           CLK='${{ steps.cfg.outputs.clk_pin }}'
           if [ -n "$CLK" ]; then append 'CONFIG_USE_SENSOR_CLOCK=y'; else append 'CONFIG_USE_SENSOR_CLOCK=n'; fi
           EXTRA='${{ steps.cfg.outputs.extra_actions }}'
