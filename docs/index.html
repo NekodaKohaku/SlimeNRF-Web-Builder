@@ -35,6 +35,7 @@
   .langbar { display:flex; gap:6px; justify-content:flex-end; margin-bottom:8px; }
   .langbar button { width:auto; margin:0; padding:4px 10px; font-size:12px; font-weight:500; background:transparent; color:var(--muted); border:1px solid var(--line); border-radius:7px; }
   .langbar button.on { background:var(--accent); color:#08111f; border-color:var(--accent); }
+  .langbar select { width:auto; margin:0; padding:4px 8px; font-size:12px; color:var(--muted); background:transparent; border:1px solid var(--line); border-radius:7px; }
   .help { display:inline-flex; width:15px; height:15px; border:1px solid var(--line); border-radius:50%; font-size:11px; line-height:1; align-items:center; justify-content:center; margin-left:6px; color:var(--muted); cursor:help; vertical-align:middle; }
   .sec { font-size:12px; font-weight:600; letter-spacing:.03em; color:var(--muted); margin:22px 0 10px; padding-top:16px; border-top:1px solid var(--line); }
   details { margin-top:18px; border-top:1px solid var(--line); padding-top:14px; }
@@ -49,7 +50,7 @@
       <button id="exportBtn" data-i18n="exportCfg"></button>
       <button id="importBtn" data-i18n="importCfg"></button>
     </span>
-    <span id="langButtons" style="display:flex; gap:6px;"></span>
+    <select id="langSelect"></select>
     <input type="file" id="importFile" accept="application/json,.json" style="display:none">
   </div>
 
@@ -174,15 +175,16 @@ function detectLang() {
   return hit || (I18N.en ? "en" : Object.keys(I18N)[0]);
 }
 function buildLangButtons() {
-  const host = document.getElementById("langButtons");
-  host.innerHTML = "";
+  const sel = document.getElementById("langSelect");
+  sel.innerHTML = "";
   Object.keys(I18N).forEach(k => {
-    const b = document.createElement("button");
-    b.dataset.lang = k;
-    b.textContent = (I18N[k] && I18N[k]._name) || k;
-    b.addEventListener("click", () => { LANG = k; try { localStorage.setItem("lang", k); } catch (e) {} applyLang(); });
-    host.appendChild(b);
+    const o = document.createElement("option");
+    o.value = k;
+    o.textContent = (I18N[k] && I18N[k]._name) || k;
+    sel.appendChild(o);
   });
+  sel.value = LANG;
+  sel.onchange = () => { LANG = sel.value; try { localStorage.setItem("lang", LANG); } catch (e) {} applyLang(); };
 }
 let LANG = detectLang();
 function t() { return I18N[LANG]; }
@@ -206,7 +208,7 @@ function applyLang() {
   setOpt("ledch", "1", x.ledCh1); setOpt("ledch", "2", x.ledCh2); setOpt("ledch", "3", x.ledCh3);
   ["featLed","featSw0","featClk","featVcc","featUart","featPwr"].forEach(id => { setOpt(id, "enabled", x.featOn); setOpt(id, "disabled", x.featOff); });
   setOpt("recvLedPol", "high", x.ledPolHigh); setOpt("recvLedPol", "low", x.ledPolLow);
-  document.querySelectorAll(".langbar button[data-lang]").forEach(b => b.classList.toggle("on", b.dataset.lang === LANG));
+  { const __ls = document.getElementById("langSelect"); if (__ls) __ls.value = LANG; }
   populateModules();
 }
 
