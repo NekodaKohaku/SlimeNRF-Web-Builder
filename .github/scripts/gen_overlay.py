@@ -87,7 +87,7 @@ def build_nrf52(bus, pins, opts):
                f"<{psel('SPIM_SCK', pins['sck'])}>")
         L.append(f"\tspi3_default {{ group1 {{ psels = {grp}; }}; }};")
         L.append(f"\tspi3_sleep  {{ group1 {{ psels = {grp}; low-power-enable; }}; }};")
-    if pins.get("led"):
+    if pins.get("led") and pins.get("led") != "none":
         need(pins, "led", "LED")
         L.append(f"\tpwm0_default {{ group1 {{ psels = <{psel('PWM_OUT0', pins['led'])}>; "
                  f"nordic,drive-mode = <NRF_DRIVE_D0S1>; }}; }};")
@@ -115,7 +115,9 @@ def build_nrf52(bus, pins, opts):
         L.append("\tchosen { zephyr,console = &uart0; zephyr,shell-uart = &uart0; };")
     L.append("\tzephyr,user {")
     L.append(f"\t\tint0-gpios = {gpio(pins['int'], '0')};")
-    if pins.get("led"):
+    if pins.get("led") == "none":
+        L.append("\t\t/delete-property/ led-gpios;")
+    elif pins.get("led"):
         led_flag = "GPIO_OPEN_DRAIN" if (opts or {}).get("led_polarity") == "low" else "GPIO_OPEN_SOURCE"
         L.append(f"\t\tled-gpios = {gpio(pins['led'], led_flag)};")
     if pins.get("clk"):
@@ -132,7 +134,7 @@ def build_nrf52(bus, pins, opts):
     if pins.get("sw0") and parse_pin(pins["sw0"]):
         q = parse_pin(pins["sw0"])
         L.append(f"&button0 {{ gpios = <&gpio{q[0]} {q[1]} (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>; }};")
-    if pins.get("led") and (opts or {}).get("led_polarity") == "low":
+    if pins.get("led") and pins.get("led") != "none" and (opts or {}).get("led_polarity") == "low":
         L.append("&pwm_led0 { pwms = <&pwm0 0 PWM_MSEC(1) PWM_POLARITY_INVERTED>; };")
     L += mag_device_nodes("nrf52", pins, mc)
     return L
@@ -179,7 +181,7 @@ def build_nrf54l(bus, pins, opts):
         L.append(f'&{uart_node} {{ status = "okay"; pinctrl-0 = <&{uart_node}_default>; pinctrl-1 = <&{uart_node}_sleep>; pinctrl-names = "default", "sleep"; current-speed = <115200>; }};')
     need(pins, "int", "IMU INT")
     ports = set()
-    for key in ("int", "cs", "pwr", "tx", "rx"):
+    for key in ("int", "cs", "pwr", "tx", "rx", "led"):
         q = parse_pin(pins.get(key))
         if q:
             ports.add(q[0])
@@ -197,6 +199,11 @@ def build_nrf54l(bus, pins, opts):
         L.append(f"\tchosen {{ zephyr,console = &{uart_node}; zephyr,shell-uart = &{uart_node}; }};")
     L.append("\tzephyr,user {")
     L.append(f"\t\tint0-gpios = {gpio(pins['int'], '0')};")
+    if pins.get("led") == "none":
+        L.append("\t\t/delete-property/ led-gpios;")
+    elif pins.get("led"):
+        led_flag = "GPIO_ACTIVE_LOW" if (opts or {}).get("led_polarity") == "low" else "GPIO_ACTIVE_HIGH"
+        L.append(f"\t\tled-gpios = {gpio(pins['led'], led_flag)};")
     if pins.get("pwr"):
         L.append(f"\t\tpwr-gpios = {gpio(pins['pwr'], 'GPIO_ACTIVE_HIGH')};")
     L.append("\t};")

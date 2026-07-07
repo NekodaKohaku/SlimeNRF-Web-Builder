@@ -53,6 +53,8 @@ jobs:
             echo "magnetometer=$(get '.options.magnetometer // "unset"')"
             echo "sleep=$(get '.options.sleep // "unset"')"
             echo "battery=$(get '.options.battery // "unset"')"
+            echo "clk_pin=$(get '.pins.clk // ""')"
+            echo "extra_actions=$(get '.options.extra_actions // "unset"')"
           } >> "$GITHUB_OUTPUT"
 
       - name: Create placeholder release
@@ -163,8 +165,17 @@ jobs:
             append 'CONFIG_USE_IMU_WAKE_UP=y'; append 'CONFIG_USE_ACTIVE_TIMEOUT=y'
           elif [ "$SLEEP" = "disabled" ]; then
             append 'CONFIG_USE_IMU_WAKE_UP=n'; append 'CONFIG_USE_ACTIVE_TIMEOUT=n'
+            append 'CONFIG_SENSOR_LP_TIMEOUT=300000'; append 'CONFIG_SENSOR_USE_LOW_POWER_2=n'
           fi
-          if [ "$BAT" = "nimh" ]; then python3 "$GITHUB_WORKSPACE/.github/scripts/patch_nimh.py"; fi
+          CLK='${{ steps.cfg.outputs.clk_pin }}'
+          if [ -n "$CLK" ]; then append 'CONFIG_USE_SENSOR_CLOCK=y'; else append 'CONFIG_USE_SENSOR_CLOCK=n'; fi
+          EXTRA='${{ steps.cfg.outputs.extra_actions }}'
+          if [ "$EXTRA" = "enabled" ]; then append 'CONFIG_USER_EXTRA_ACTIONS=y'; elif [ "$EXTRA" = "disabled" ]; then append 'CONFIG_USER_EXTRA_ACTIONS=n'; fi
+          if [ "$BAT" = "nimh" ]; then
+            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_nimh.py"
+          elif [ "$BAT" = "liion" ]; then
+            append 'CONFIG_BATTERY_USE_REG_BUCK_MAPPING=y'
+          fi
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_pwr.py"
           tail -n 10 prj.conf
 
