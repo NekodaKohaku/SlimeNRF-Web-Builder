@@ -155,6 +155,17 @@ jobs:
             append 'CONFIG_USE_DT_CODE_PARTITION=y'
             append 'CONFIG_FLASH_LOAD_OFFSET=0'
             append 'CONFIG_BUILD_OUTPUT_UF2=n'
+            if [ "${BOARD#*nrf54l}" = "$BOARD" ]; then
+              BN="${BOARD%%/*}"
+              BDTS="$(find boards -name "${BN}.dts" 2>/dev/null | head -1)"
+              if [ -n "$BDTS" ]; then
+                printf '\n' >> "$BDTS"
+                cat "$GITHUB_WORKSPACE/.github/overlays/nrf52_swd_direct.overlay" >> "$BDTS"
+                echo "== SWD partition 直接寫入 board dts: $BDTS =="
+              else
+                echo "WARN: 找不到 ${BN}.dts,partition 只能靠 overlay"
+              fi
+            fi
           fi
           case "$BOARD" in
             *nrf54l*)
@@ -240,6 +251,8 @@ jobs:
           DTS="SlimeVR-Tracker-nRF/build/SlimeVR-Tracker-nRF/zephyr/zephyr.dts"
           echo "--- code-partition / slot0 in merged DT ---"
           grep -nE 'code-partition|image-0|partition@0 ' "$DTS" 2>/dev/null | head || true
+          echo "--- 腳位 overlay 是否套上 (int0-gpios / spi psel) ---"
+          grep -nE 'int0-gpios|SPIM_MISO|spi@|led-gpios' "$DTS" 2>/dev/null | head || true
           echo "--- hex lowest address ---"
           python3 - "$SRC" <<'PYEOF'
           import sys
