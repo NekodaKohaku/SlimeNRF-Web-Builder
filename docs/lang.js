@@ -29,13 +29,13 @@ const I18N = {
     featOn:"啟用", featOff:"停用",
     featLed:"狀態 LED", helpFeatLed:"狀態 LED，顯示配對/錯誤/充電/電量。停用則整板不裝 LED。打開後可設顏色通道、極性與腳位。",
     featSw0:"按鈕 SW0", helpFeatSw0:"實體按鈕。短按開機、長按關機、關機時長按可重設配對。額外功能開啟時連按可校正/配對/DFU。",
-    featClk:"外部 IMU 時脈", helpFeatClk:"給 IMU 接外部時鐘（約 32.768kHz），讓取樣時序更精準穩定（IMU 內部振盪器會隨溫度漂移）；省電效果有限、非主要目的。需 IMU 支援。",
+    featClk:"外部 IMU 時脈", helpFeatClk:"給 IMU 接外部時鐘（約 32.768kHz），讓取樣時序更精準穩定（IMU 內部振盪器會隨溫度漂移）。需 IMU 支援。",
     featVcc:"感測器電源", helpFeatVcc:"用一支 GPIO 直接供電給感測器，睡眠時可切斷省電。",
-    featUart:"UART 日誌", helpFeatUart:"接外部序列晶片輸出 log，或透過 bootloader 燒錄（需 TX/RX 兩腳）。",
+    featUart:"UART 日誌", helpFeatUart:"接外部序列晶片輸出 log（除錯用的主控台）。需 TX/RX 兩腳。",
     featPwr:"電源自鎖", helpFeatPwr:"用 GPIO 拉住 MOSFET 維持整板電源（配合實體自鎖開關電路）。",
     exportCfg:"匯出設定", importCfg:"匯入設定", importErr:"匯入失敗：檔案格式不正確。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
-    pinINT:"IMU INT", pinCLK:"IMU CLK（選填）", pinLED:"LED 通道1", pinLED1:"LED 通道2", pinLED2:"LED 通道3", pinSW0:"按鈕 SW0（選填）", pinVCC:"感測器電源（選填）", pinTX:"UART TX（選填）", pinRX:"UART RX（選填）", pinPWR:"電源自鎖（選填）"
+    pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED 通道1", pinLED1:"LED 通道2", pinLED2:"LED 通道3", pinSW0:"按鈕 SW0", pinVCC:"感測器電源", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"電源自鎖"
   },
   en: {
     _name: "EN",
@@ -67,13 +67,13 @@ const I18N = {
     featOn:"On", featOff:"Off",
     featLed:"Status LED", helpFeatLed:"Status LED for pairing/error/charging/battery. Off = no LED at all. When on you can set color channels, polarity and pins.",
     featSw0:"Button SW0", helpFeatSw0:"Physical button. Short press powers on, long press powers off / resets pairing. With extra functions on, multi-press does calibrate/pair/DFU.",
-    featClk:"External IMU clock", helpFeatClk:"Feed the IMU an external clock (~32.768kHz) for more accurate, stable sampling timing (its internal oscillator drifts with temperature). Power savings are marginal, not the main point. Requires IMU support.",
+    featClk:"External IMU clock", helpFeatClk:"Feed the IMU an external clock (~32.768kHz) for more accurate, stable sampling timing (its internal oscillator drifts with temperature). Requires IMU support.",
     featVcc:"Sensor power", helpFeatVcc:"Power the sensor directly from a GPIO so it can be cut off during sleep to save power.",
-    featUart:"UART log", helpFeatUart:"Output logs to an external serial chip, or flash via bootloader (needs TX/RX pins).",
+    featUart:"UART log", helpFeatUart:"Output logs to an external serial chip (debug console). Needs TX/RX pins.",
     featPwr:"Power hold", helpFeatPwr:"Use a GPIO to latch a MOSFET and keep the whole board powered (with a self-latching switch circuit).",
     exportCfg:"Export", importCfg:"Import", importErr:"Import failed: invalid file.",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
-    pinINT:"IMU INT", pinCLK:"IMU CLK (optional)", pinLED:"LED ch1", pinLED1:"LED ch2", pinLED2:"LED ch3", pinSW0:"Button SW0 (optional)", pinVCC:"Sensor power (optional)", pinTX:"UART TX (optional)", pinRX:"UART RX (optional)", pinPWR:"Power hold (optional)"
+    pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED ch1", pinLED1:"LED ch2", pinLED2:"LED ch3", pinSW0:"Button SW0", pinVCC:"Sensor power", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"Power hold"
   },
   ja: {
     _name: "日本語",
@@ -105,12 +105,12 @@ const I18N = {
     featOn:"有効", featOff:"無効",
     featLed:"ステータス LED", helpFeatLed:"ペアリング/エラー/充電/電池を表示。無効なら LED なし。有効時に色数・極性・ピンを設定。",
     featSw0:"ボタン SW0", helpFeatSw0:"物理ボタン。短押しで起動、長押しで電源オフ/ペアリング解除。拡張機能オンで連打が校正/ペアリング/DFU。",
-    featClk:"外部 IMU クロック", helpFeatClk:"IMU に外部クロック（約32.768kHz）を供給し、サンプリング時刻をより正確・安定に（内部発振器は温度でドリフト）。省電力効果は限定的で主目的ではありません。IMU 対応が必要。",
+    featClk:"外部 IMU クロック", helpFeatClk:"IMU に外部クロック（約32.768kHz）を供給し、サンプリング時刻をより正確・安定に（内部発振器は温度でドリフト）。IMU 対応が必要。",
     featVcc:"センサー電源", helpFeatVcc:"GPIO から直接センサーへ給電し、スリープ時に遮断して省電力。",
-    featUart:"UART ログ", helpFeatUart:"外部シリアルチップへログ出力、または bootloader 書き込み（TX/RX 2 ピン必要）。",
+    featUart:"UART ログ", helpFeatUart:"外部シリアルチップへログ出力（デバッグ用コンソール）。TX/RX 2 ピン必要。",
     featPwr:"電源ラッチ", helpFeatPwr:"GPIO で MOSFET をラッチし基板全体の電源を維持（自己保持スイッチ回路）。",
     exportCfg:"エクスポート", importCfg:"インポート", importErr:"インポート失敗：ファイル形式が不正です。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
-    pinINT:"IMU INT", pinCLK:"IMU CLK（任意）", pinLED:"LED ch1", pinLED1:"LED ch2", pinLED2:"LED ch3", pinSW0:"ボタン SW0（任意）", pinVCC:"センサー電源（任意）", pinTX:"UART TX（任意）", pinRX:"UART RX（任意）", pinPWR:"電源保持（任意）"
+    pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED ch1", pinLED1:"LED ch2", pinLED2:"LED ch3", pinSW0:"ボタン SW0", pinVCC:"センサー電源", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"電源保持"
   }
 };

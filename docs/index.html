@@ -90,7 +90,7 @@
       <div class="sec" data-i18n="secPower"></div>
       <div class="grid">
         <div><label for="battery"><span data-i18n="battery"></span><span class="help" data-help="helpBattery">?</span></label><select id="battery"><option value="liion"></option><option value="nimh"></option><option value="none"></option></select></div>
-        <div><label for="adc"><span data-i18n="adc"></span><span class="help" data-help="helpADC">?</span></label><select id="adc"><option value="external"></option><option value="internal"></option></select></div>
+        <div id="adcRow"><label for="adc"><span data-i18n="adc"></span><span class="help" data-help="helpADC">?</span></label><select id="adc"><option value="external"></option><option value="internal"></option></select></div>
       </div>
       <div id="adcFields" class="grid" style="margin-top:12px;">
         <div><label for="adcR1"><span data-i18n="adcR1"></span></label><input id="adcR1" type="number" min="0" value="0"></div>
@@ -274,8 +274,8 @@ function importConfig(e) {
 }
 async function init() {
   MODULES = (await (await fetch("modules.json")).json()).modules;
-  ["sleep","output","battery","ledpol","extra","recvLed","recvLedPol"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
-  ["bus","imu","magconn","ledch","featLed","featSw0","featClk","featVcc","featUart","featPwr"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); onChange(); }));
+  ["sleep","output","ledpol","extra","recvLed","recvLedPol"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
+  ["bus","imu","magconn","battery","ledch","featLed","featSw0","featClk","featVcc","featUart","featPwr"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); onChange(); }));
   document.getElementById("adc").addEventListener("change", () => { markDirty(); onChange(); });
   ["adcR1","adcR2"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
   document.getElementById("type").addEventListener("change", () => { markDirty(); switchType(document.getElementById("type").value); });
@@ -344,7 +344,7 @@ function pinFields(bus) {
   if (featOn("featVcc")) f.push(["vcc","pinVCC"]);
   if (featOn("featUart")) f.push(["tx","pinTX"], ["rx","pinRX"]);
   if (featOn("featPwr")) f.push(["pwr","pinPWR"]);
-  if (document.getElementById("adc").value === "external") f.push(["adc","adcPin"]);
+  if (document.getElementById("adc").value === "external" && document.getElementById("battery").value !== "none") f.push(["adc","adcPin"]);
   return f;
 }
 
@@ -369,7 +369,7 @@ function allowedPins(mod, key) {
   return pins.filter(p => { const m = /^P(\d)\./.exec(p); return m && allow.indexOf(m[1]) >= 0; });
 }
 
-const REQUIRED_PINS = ["sck","mosi","miso","cs","sda","scl","led","led1","led2","adc"];
+const REQUIRED_PINS = ["sck","mosi","miso","cs","sda","scl","led","led1","led2","adc","clk","sw0","vcc","tx","rx","pwr"];
 function buildPins() {
   const mod = currentModule();
   const bus = document.getElementById("bus").value;
@@ -409,9 +409,11 @@ function updateAdc() {
   const ains = (currentModule() && currentModule().analog_pins) || [];
   const adcSel = document.getElementById("adc");
   const extOpt = adcSel.querySelector('option[value="external"]');
+  const batOn = document.getElementById("battery").value !== "none";
   if (ains.length === 0) { extOpt.disabled = true; if (adcSel.value === "external") adcSel.value = "internal"; }
   else { extOpt.disabled = false; }
-  const ext = adcSel.value === "external" && ains.length > 0;
+  document.getElementById("adcRow").style.display = batOn ? "" : "none";
+  const ext = adcSel.value === "external" && ains.length > 0 && batOn;
   document.getElementById("adcFields").style.display = ext ? "" : "none";
 }
 
@@ -622,7 +624,7 @@ function collectConfig() {
       sleep: document.getElementById("sleep").value,
       extra_actions: (!isRecv) ? document.getElementById("extra").value : "disabled",
       battery: document.getElementById("battery").value,
-      adc: (!isRecv && document.getElementById("adc").value === "external" && ((mod.analog_pins || []).length > 0)) ? "external" : "internal",
+      adc: (!isRecv && document.getElementById("battery").value !== "none" && document.getElementById("adc").value === "external" && ((mod.analog_pins || []).length > 0)) ? "external" : "internal",
       adc_pin: (document.getElementById("pin_adc") ? document.getElementById("pin_adc").value : ""),
       adc_r1: parseInt(document.getElementById("adcR1").value || "0", 10) || 0,
       adc_r2: parseInt(document.getElementById("adcR2").value || "0", 10) || 0,
