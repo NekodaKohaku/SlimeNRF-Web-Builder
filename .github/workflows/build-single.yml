@@ -211,9 +211,13 @@ jobs:
           OVL="${{ steps.overlay.outputs.overlay_path }}"
           FMT="${{ steps.cfg.outputs.fileformat }}"; BOARD="${{ steps.cfg.outputs.board_target }}"
           OVLS="$OVL"
-          if [ "$FMT" = "hex" ] && [ "${BOARD#*nrf54l}" = "$BOARD" ]; then
-            PART="$GITHUB_WORKSPACE/.github/overlays/nrf52_swd_direct.overlay"
-            echo "== SWD direct partition overlay (code @ 0x0) =="; cat "$PART"
+          if [ "$FMT" = "hex" ]; then
+            if [ "${BOARD#*nrf54l}" = "$BOARD" ]; then
+              PART="$GITHUB_WORKSPACE/.github/overlays/nrf52_swd_direct.overlay"
+            else
+              PART="$GITHUB_WORKSPACE/.github/overlays/nrf54l_swd_direct.overlay"
+            fi
+            echo "== SWD direct partition overlay: $PART =="; cat "$PART"
             if [ -n "$OVLS" ]; then OVLS="$OVLS;$PART"; else OVLS="$PART"; fi
           fi
           BUILDARGS=(-DNCS_TOOLCHAIN_VERSION=NONE -DBOARD_ROOT=../SlimeVR-Tracker-nRF)
@@ -234,6 +238,23 @@ jobs:
           [ -f "$SRC" ] || SRC="$(find SlimeVR-Tracker-nRF/build -path "*/zephyr/zephyr.$FMT" | grep -v _sysbuild | head -1)"
           [ -f "$SRC" ] || { echo "missing build output (zephyr.$FMT)" >&2; find SlimeVR-Tracker-nRF/build -name "zephyr.$FMT" || true; exit 1; }
           cp "$SRC" "out/${NAME}.${FMT}"
+          ZDIR="$(dirname "$SRC")"
+          echo "===== OFFSET CHECK (debug) ====="
+          grep -iE 'FLASH_LOAD_OFFSET|USE_DT_CODE_PARTITION' "$ZDIR/.config" 2>/dev/null || true
+          grep -nE 'code-partition|image-0|partition@0 ' "$ZDIR/zephyr.dts" 2>/dev/null | head || true
+          python3 - "$SRC" <<'PYEOF'
+          import sys
+          f=sys.argv[1]; base=0; lo=1<<32
+          for line in open(f):
+              line=line.strip()
+              if not line.startswith(":"): continue
+              ll=int(line[1:3],16); a=int(line[3:7],16); t=int(line[7:9],16); p=line[9:9+ll*2]
+              if t==4: base=int(p,16)<<16
+              elif t==2: base=int(p,16)<<4
+              elif t==0: lo=min(lo, base+a)
+          print("lowest load address = 0x%08X %s" % (lo, "(OK 0x0)" if lo==0 else "(!! 0x%X)"%lo))
+          PYEOF
+          echo "==============================="
 
 
           EXTRA_HEX=""
