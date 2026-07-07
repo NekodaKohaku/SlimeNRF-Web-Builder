@@ -87,9 +87,8 @@ def build_nrf52(bus, pins, opts):
                f"<{psel('SPIM_SCK', pins['sck'])}>")
         L.append(f"\tspi3_default {{ group1 {{ psels = {grp}; }}; }};")
         L.append(f"\tspi3_sleep  {{ group1 {{ psels = {grp}; low-power-enable; }}; }};")
-    _led = pins.get("led")
-    _led_multi = bool(_led) and _led != "none" and (pins.get("led1") or pins.get("led2"))
-    if _led_multi:
+    if pins.get("led") and pins.get("led") != "none":
+        need(pins, "led", "LED")
         chans = [("PWM_OUT0", pins["led"])]
         if pins.get("led1"):
             chans.append(("PWM_OUT1", pins["led1"]))
@@ -123,11 +122,8 @@ def build_nrf52(bus, pins, opts):
     L.append(f"\t\tint0-gpios = {gpio(pins['int'], '0')};")
     if pins.get("led") == "none":
         L.append("\t\t/delete-property/ led-gpios;")
-    elif _led_multi:
-        led_flag = "GPIO_OPEN_DRAIN" if (opts or {}).get("led_polarity") == "low" else "GPIO_OPEN_SOURCE"
-        L.append(f"\t\tled-gpios = {gpio(pins['led'], led_flag)};")
     elif pins.get("led"):
-        led_flag = "GPIO_ACTIVE_LOW" if (opts or {}).get("led_polarity") == "low" else "GPIO_ACTIVE_HIGH"
+        led_flag = "GPIO_OPEN_DRAIN" if (opts or {}).get("led_polarity") == "low" else "GPIO_OPEN_SOURCE"
         L.append(f"\t\tled-gpios = {gpio(pins['led'], led_flag)};")
     if pins.get("clk"):
         L.append(f"\t\tclk-gpios = {gpio(pins['clk'], 'GPIO_OPEN_DRAIN')};")
@@ -143,10 +139,7 @@ def build_nrf52(bus, pins, opts):
     if pins.get("sw0") and parse_pin(pins["sw0"]):
         q = parse_pin(pins["sw0"])
         L.append(f"&button0 {{ gpios = <&gpio{q[0]} {q[1]} (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>; }};")
-    if not _led_multi and pins.get("led") and pins.get("led") != "none":
-        L.append('&pwm0 { status = "disabled"; };')
-        L.append("/ { /delete-node/ pwmleds; aliases { /delete-property/ pwm-led0; }; };")
-    if _led_multi:
+    if pins.get("led") and pins.get("led") != "none":
         pol = (opts or {}).get("led_polarity")
         ppol = "PWM_POLARITY_INVERTED" if pol == "low" else "PWM_POLARITY_NORMAL"
         if pol == "low":
