@@ -39,6 +39,7 @@
   .sec { font-size:12px; font-weight:600; letter-spacing:.03em; color:var(--muted); margin:22px 0 10px; padding-top:16px; border-top:1px solid var(--line); }
   details { margin-top:18px; border-top:1px solid var(--line); padding-top:14px; }
   details summary::-webkit-details-marker { color:var(--muted); }
+  .off { opacity:.45; }
 </style>
 </head>
 <body>
@@ -187,8 +188,8 @@ const I18N = {
     helpIMU:"你板子上用的慣性感測器晶片。", helpMag:"磁力計晶片，沒有就選無。", helpBus:"IMU 走 SPI 或 I2C，依你的接線。", helpSleep:"啟用後靜止進低功耗、動作喚醒，較省電。", helpFlash:"Bootloader：韌體疊在 bootloader 之後（0x1000），同時產出 .uf2（USB 拖放）與 .hex（SWD 保留 bootloader）；需板子已有 Adafruit bootloader。直接 SWD：0x0 起的完整映像、無 bootloader，用 SWD 直接燒 .hex。Dongle 需 USB，固定 Bootloader；無 USB 的模組只能直接 SWD。", helpBattery:"鋰電池用原廠曲線；選鎳氫 NiMH 時，編譯前會自動幫官方原始碼套用 NiMH 電量曲線補丁。",
     adc:"電池量測", adcExternal:"外部 AIN 腳", adcInternal:"內建 VDDHDIV5", adcPin:"ADC 腳（AIN）", adcR1:"上臂電阻 R1 (kΩ)", adcR2:"下臂電阻 R2 (kΩ)", helpADC:"電池電壓量測來源。外部 AIN 腳可搭配分壓量測鋰電；電壓直接進 ADC（無分壓）兩個電阻留 0。內建 VDDHDIV5 是晶片內部量測。",
     ledPol:"LED 極性", ledPolHigh:"接地（一般）", ledPolLow:"接 VCC（反向）", helpLedPol:"LED 接法：GPIO→電阻→LED→地 選「接地」；GPIO→LED→電阻→VCC 選「接 VCC」（反向點亮）。",
-    ledCh:"LED 顏色/通道", ledCh1:"單色", ledCh2:"雙色", ledCh3:"RGB 三色", helpLedCh:"選幾色就接幾支 PWM LED 腳：單色 1 支、雙色 2 支、RGB 三色 3 支（共陽/共陰皆可，極性沿用上面設定，三通道共用）。多通道僅 nRF52（MS88）支援；ME54 目前限單色。",
-    extraAct:"sw0 額外功能", extraActOff:"停用", extraActOn:"啟用", helpExtraAct:"需有接 sw0 才有作用。停用（預設）：連按回報給 SlimeVR 伺服器由伺服器決定（暫無功能）。啟用：連按由本機執行——2 下校正、3 下配對、4/5 下 DFU。長按關機不受此設定影響。",
+    ledCh:"LED 顏色/通道", ledCh1:"單色", ledCh2:"雙色", ledCh3:"RGB 三色", helpLedCh:"選幾色就接幾支 PWM LED 腳：單色 1 支、雙色 2 支、RGB 三色 3 支（共陽/共陰皆可，極性沿用上面設定，三通道共用）。多通道僅 nRF52（MS88）支援；ME54 目前限單色。顏色順序固定：通道1（LED）＝紅、通道2＝綠、通道3＝藍，請把對應顏色的 LED 接到對應通道。",
+    extraAct:"SW0 額外功能", extraActOff:"停用", extraActOn:"啟用", helpExtraAct:"需有接 SW0 才有作用。停用（預設）：連按回報給 SlimeVR 伺服器由伺服器決定（暫無功能）。啟用：連按由本機執行——2 下校正、3 下配對、4/5 下 DFU。長按關機不受此設定影響。",
     featOn:"啟用", featOff:"停用",
     featLed:"狀態 LED", helpFeatLed:"狀態 LED，顯示配對/錯誤/充電/電量。停用則整板不裝 LED。打開後可設顏色通道、極性與腳位。",
     featSw0:"按鈕 SW0", helpFeatSw0:"實體按鈕。短按開機、長按關機、關機時長按可重設配對。額外功能開啟時連按可校正/配對/DFU。",
@@ -197,7 +198,7 @@ const I18N = {
     featUart:"UART 日誌", helpFeatUart:"接外部序列晶片輸出 log，或透過 bootloader 燒錄（需 TX/RX 兩腳）。",
     featPwr:"電源自鎖", helpFeatPwr:"用 GPIO 拉住 MOSFET 維持整板電源（配合實體自鎖開關電路）。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
-    pinINT:"IMU INT", pinCLK:"IMU CLK（選填）", pinLED:"LED", pinLED1:"LED 綠（通道2）", pinLED2:"LED 藍（通道3）", pinSW0:"按鈕 SW0（選填）", pinVCC:"感測器電源（選填）", pinTX:"UART TX（選填）", pinRX:"UART RX（選填）", pinPWR:"電源自鎖（選填）"
+    pinINT:"IMU INT", pinCLK:"IMU CLK（選填）", pinLED:"LED", pinLED1:"LED 通道2", pinLED2:"LED 通道3", pinSW0:"按鈕 SW0（選填）", pinVCC:"感測器電源（選填）", pinTX:"UART TX（選填）", pinRX:"UART RX（選填）", pinPWR:"電源自鎖（選填）"
   },
   en: {
     title:"SlimeNRF Firmware Builder", subtitle:"Pick a module, map each pin, then build to get custom firmware.",
@@ -223,8 +224,8 @@ const I18N = {
     helpIMU:"The IMU chip on your board.", helpMag:"Magnetometer chip, or None.", helpBus:"IMU on SPI or I2C, per your wiring.", helpSleep:"Low-power when idle, wake on motion — saves battery.", helpFlash:"Bootloader: app sits after the bootloader (0x1000); outputs both .uf2 (USB drag-drop) and .hex (SWD, keeps bootloader). Needs the Adafruit bootloader already on the chip. Direct SWD: full image from 0x0, no bootloader — flash .hex via SWD. A dongle needs USB so it's fixed to Bootloader; a module without USB can only use Direct SWD.", helpBattery:"Li-ion uses the factory curve; choosing NiMH patches the official source with a NiMH curve at build time.",
     adc:"Battery sense", adcExternal:"External AIN pin", adcInternal:"Internal VDDHDIV5", adcPin:"ADC pin (AIN)", adcR1:"R1 top (kΩ)", adcR2:"R2 bottom (kΩ)", helpADC:"Battery voltage source. External AIN pin can use a divider for Li-ion; leave both resistors 0 if voltage goes straight to ADC. Internal VDDHDIV5 uses the chip's internal measurement.",
     ledPol:"LED polarity", ledPolHigh:"To GND (normal)", ledPolLow:"To VCC (inverted)", helpLedPol:"LED wiring: GPIO->R->LED->GND pick To GND; GPIO->LED->R->VCC pick To VCC (inverted).",
-    ledCh:"LED colors/channels", ledCh1:"Single", ledCh2:"Dual", ledCh3:"RGB (tri)", helpLedCh:"Number of colors = number of PWM LED pins: single 1, dual 2, RGB 3 (common anode/cathode both fine; polarity above is shared by all channels). Multi-channel is nRF52 (MS88) only; ME54 is single-color for now.",
-    extraAct:"sw0 extra functions", extraActOff:"Off", extraActOn:"On", helpExtraAct:"Only works if sw0 is wired. Off (default): presses reported to the SlimeVR server, which decides (no function yet). On: presses act locally — 2x calibrate, 3x pair, 4/5x DFU. Long-press shutdown unaffected.",
+    ledCh:"LED colors/channels", ledCh1:"Single", ledCh2:"Dual", ledCh3:"RGB (tri)", helpLedCh:"Number of colors = number of PWM LED pins: single 1, dual 2, RGB 3 (common anode/cathode both fine; polarity above is shared by all channels). Multi-channel is nRF52 (MS88) only; ME54 is single-color for now. Fixed color order: ch1 (LED)=red, ch2=green, ch3=blue — wire each color LED to its channel.",
+    extraAct:"SW0 extra functions", extraActOff:"Off", extraActOn:"On", helpExtraAct:"Only works if SW0 is wired. Off (default): presses reported to the SlimeVR server, which decides (no function yet). On: presses act locally — 2x calibrate, 3x pair, 4/5x DFU. Long-press shutdown unaffected.",
     featOn:"On", featOff:"Off",
     featLed:"Status LED", helpFeatLed:"Status LED for pairing/error/charging/battery. Off = no LED at all. When on you can set color channels, polarity and pins.",
     featSw0:"Button SW0", helpFeatSw0:"Physical button. Short press powers on, long press powers off / resets pairing. With extra functions on, multi-press does calibrate/pair/DFU.",
@@ -233,7 +234,7 @@ const I18N = {
     featUart:"UART log", helpFeatUart:"Output logs to an external serial chip, or flash via bootloader (needs TX/RX pins).",
     featPwr:"Power hold", helpFeatPwr:"Use a GPIO to latch a MOSFET and keep the whole board powered (with a self-latching switch circuit).",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
-    pinINT:"IMU INT", pinCLK:"IMU CLK (optional)", pinLED:"LED", pinLED1:"LED green (ch2)", pinLED2:"LED blue (ch3)", pinSW0:"Button SW0 (optional)", pinVCC:"Sensor power (optional)", pinTX:"UART TX (optional)", pinRX:"UART RX (optional)", pinPWR:"Power hold (optional)"
+    pinINT:"IMU INT", pinCLK:"IMU CLK (optional)", pinLED:"LED", pinLED1:"LED ch2", pinLED2:"LED ch3", pinSW0:"Button SW0 (optional)", pinVCC:"Sensor power (optional)", pinTX:"UART TX (optional)", pinRX:"UART RX (optional)", pinPWR:"Power hold (optional)"
   },
   ja: {
     title:"SlimeNRF ファームウェアビルダー", subtitle:"モジュールを選び各ピンを割り当て、ビルドを押すと専用ファームができます。",
@@ -259,8 +260,8 @@ const I18N = {
     helpIMU:"基板の IMU チップ。", helpMag:"磁気センサー、なければ「なし」。", helpBus:"配線に応じて SPI か I2C。", helpSleep:"静止時は低消費、動作で復帰し省電力。", helpFlash:"Bootloader：アプリを bootloader の後ろ（0x1000）に配置し、.uf2（USB ドラッグ）と .hex（SWD、bootloader 保持）を両方出力。Adafruit bootloader が必要。直接 SWD：0x0 からの単体イメージ、bootloader なし、SWD で .hex を書き込み。ドングルは USB 必須のため Bootloader 固定、USB なしのモジュールは直接 SWD のみ。", helpBattery:"Li-ion は既定カーブ。NiMH を選ぶとビルド時に公式ソースへ NiMH カーブのパッチを適用。",
     adc:"電池計測", adcExternal:"外部 AIN ピン", adcInternal:"内蔵 VDDHDIV5", adcPin:"ADC ピン (AIN)", adcR1:"R1 上側 (kΩ)", adcR2:"R2 下側 (kΩ)", helpADC:"電池電圧の計測元。外部 AIN ピンは分圧で Li-ion 計測可。分圧なし（直接 ADC）は両抵抗を 0。内蔵 VDDHDIV5 はチップ内部計測。",
     ledPol:"LED 極性", ledPolHigh:"GND 側（通常）", ledPolLow:"VCC 側（反転）", helpLedPol:"LED 配線：GPIO→R→LED→GND は「GND 側」、GPIO→LED→R→VCC は「VCC 側」（反転点灯）。",
-    ledCh:"LED 色数/チャンネル", ledCh1:"単色", ledCh2:"2色", ledCh3:"RGB（3色）", helpLedCh:"色数だけ PWM LED ピンを接続：単色1本、2色2本、RGB3本（アノード/カソード共通どちらも可、極性は上の設定を全チャンネル共用）。多チャンネルは nRF52（MS88）のみ；ME54 は現状単色。",
-    extraAct:"sw0 拡張機能", extraActOff:"無効", extraActOn:"有効", helpExtraAct:"sw0 を接続時のみ有効。無効（既定）：連打はサーバーへ送信しサーバーが決定（現状機能なし）。有効：連打は本体で実行——2回 校正、3回 ペアリング、4/5回 DFU。長押しシャットダウンは影響なし。",
+    ledCh:"LED 色数/チャンネル", ledCh1:"単色", ledCh2:"2色", ledCh3:"RGB（3色）", helpLedCh:"色数だけ PWM LED ピンを接続：単色1本、2色2本、RGB3本（アノード/カソード共通どちらも可、極性は上の設定を全チャンネル共用）。多チャンネルは nRF52（MS88）のみ；ME54 は現状単色。色順は固定：ch1(LED)=赤・ch2=緑・ch3=青。各色 LED を対応チャンネルへ。",
+    extraAct:"SW0 拡張機能", extraActOff:"無効", extraActOn:"有効", helpExtraAct:"SW0 を接続時のみ有効。無効（既定）：連打はサーバーへ送信しサーバーが決定（現状機能なし）。有効：連打は本体で実行——2回 校正、3回 ペアリング、4/5回 DFU。長押しシャットダウンは影響なし。",
     featOn:"有効", featOff:"無効",
     featLed:"ステータス LED", helpFeatLed:"ペアリング/エラー/充電/電池を表示。無効なら LED なし。有効時に色数・極性・ピンを設定。",
     featSw0:"ボタン SW0", helpFeatSw0:"物理ボタン。短押しで起動、長押しで電源オフ/ペアリング解除。拡張機能オンで連打が校正/ペアリング/DFU。",
@@ -269,7 +270,7 @@ const I18N = {
     featUart:"UART ログ", helpFeatUart:"外部シリアルチップへログ出力、または bootloader 書き込み（TX/RX 2 ピン必要）。",
     featPwr:"電源ラッチ", helpFeatPwr:"GPIO で MOSFET をラッチし基板全体の電源を維持（自己保持スイッチ回路）。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
-    pinINT:"IMU INT", pinCLK:"IMU CLK（任意）", pinLED:"LED", pinLED1:"LED 緑（ch2）", pinLED2:"LED 青（ch3）", pinSW0:"ボタン SW0（任意）", pinVCC:"センサー電源（任意）", pinTX:"UART TX（任意）", pinRX:"UART RX（任意）", pinPWR:"電源保持（任意）"
+    pinINT:"IMU INT", pinCLK:"IMU CLK（任意）", pinLED:"LED", pinLED1:"LED ch2", pinLED2:"LED ch3", pinSW0:"ボタン SW0（任意）", pinVCC:"センサー電源（任意）", pinTX:"UART TX（任意）", pinRX:"UART RX（任意）", pinPWR:"電源保持（任意）"
   }
 };
 
@@ -366,21 +367,25 @@ function updateLedCh() {
 }
 function featOn(id) { const e = document.getElementById(id); return !!(e && e.value === "enabled"); }
 function updateFeatVis() {
-  const led = featOn("featLed"), sw0 = featOn("featSw0");
-  const set = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? "" : "none"; };
-  set("wrapLedch", led); set("wrapLedpol", led); set("wrapExtra", sw0);
+  const set = (id, on) => { const w = document.getElementById(id); if (!w) return; const el = w.querySelector("select"); if (el) el.disabled = !on; w.classList.toggle("off", !on); };
+  set("wrapLedch", featOn("featLed")); set("wrapLedpol", featOn("featLed")); set("wrapExtra", featOn("featSw0"));
 }
 function pinFields(bus) {
   const base = bus === "i2c" ? [["sda","pinSDA"],["scl","pinSCL"]]
                              : [["sck","pinSCK"],["mosi","pinMOSI"],["miso","pinMISO"],["cs","pinCS"]];
-  const f = base.concat([["int","pinINT"]]);
-  if (featOn("featClk")) f.push(["clk","pinCLK"]);
-  if (featOn("featLed")) ledFields().forEach(x => f.push(x));
-  if (featOn("featSw0")) f.push(["sw0","pinSW0"]);
-  if (featOn("featVcc")) f.push(["vcc","pinVCC"]);
-  if (featOn("featUart")) f.push(["tx","pinTX"], ["rx","pinRX"]);
-  if (featOn("featPwr")) f.push(["pwr","pinPWR"]);
-  return f;
+  return base.concat([["int","pinINT"],["clk","pinCLK"],["led","pinLED"],["led1","pinLED1"],["led2","pinLED2"],["sw0","pinSW0"],["vcc","pinVCC"],["tx","pinTX"],["rx","pinRX"],["pwr","pinPWR"]]);
+}
+function pinActive(key) {
+  if (["sck","mosi","miso","cs","sda","scl","int"].indexOf(key) >= 0) return true;
+  if (key === "clk") return featOn("featClk");
+  if (key === "led") return featOn("featLed");
+  if (key === "led1") return featOn("featLed") && ledChannels() >= 2;
+  if (key === "led2") return featOn("featLed") && ledChannels() >= 3;
+  if (key === "sw0") return featOn("featSw0");
+  if (key === "vcc") return featOn("featVcc");
+  if (key === "tx" || key === "rx") return featOn("featUart");
+  if (key === "pwr") return featOn("featPwr");
+  return true;
 }
 
 function magPinFields() {
@@ -409,6 +414,7 @@ function buildPins() {
   const mod = currentModule();
   const bus = document.getElementById("bus").value;
   const host = document.getElementById("pins");
+  const __prev = {}; document.querySelectorAll("#pins select").forEach(s => { if (s.value) __prev[s.dataset.key] = s.value; });
   host.innerHTML = "";
   const defs = (mod.defaults && mod.defaults[bus]) || {};
   const x = t();
@@ -418,8 +424,10 @@ function buildPins() {
     const s = document.createElement("select"); s.id = "pin_" + key; s.dataset.key = key;
     if (!REQUIRED_PINS.includes(key)) { const none = document.createElement("option"); none.value = ""; none.textContent = "—"; s.appendChild(none); }
     allowedPins(mod, key).forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = p; s.appendChild(o); });
-    if (defs[key]) s.value = defs[key];
+    if (__prev[key] !== undefined && [...s.options].some(o => o.value === __prev[key])) s.value = __prev[key];
+    else if (defs[key]) s.value = defs[key];
     else if (REQUIRED_PINS.includes(key) && s.options.length) s.value = s.options[0].value;
+    if (!pinActive(key)) { s.disabled = true; wrap.classList.add("off"); }
     s.addEventListener("change", () => { markDirty(); render(); });
     wrap.appendChild(l); wrap.appendChild(s); host.appendChild(wrap);
   });
@@ -455,7 +463,7 @@ function updateAdc() {
 
 function collectPins() {
   const pins = {};
-  document.querySelectorAll("#pins select").forEach(s => { if (s.value) pins[s.dataset.key] = s.value; });
+  document.querySelectorAll("#pins select").forEach(s => { if (!s.disabled && s.value) pins[s.dataset.key] = s.value; });
   if (!featOn("featLed")) pins.led = "none";
   return pins;
 }
