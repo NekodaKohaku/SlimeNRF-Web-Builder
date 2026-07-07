@@ -113,7 +113,6 @@
 
       <div class="sec" data-i18n="secPins"></div>
       <div id="pins" class="pins"></div>
-      <div id="adcPinRow" class="grid" style="margin-top:12px; display:none;"><div><label for="adcPin"><span data-i18n="adcPin"></span></label><select id="adcPin"></select></div></div>
       <div id="warn" class="warn"></div>
 
       <div class="sec" data-i18n="secDiagram"></div>
@@ -218,7 +217,7 @@ function parsePin(p) {
   return m ? { port: +m[1], pin: +m[2] } : null;
 }
 
-const SAVE_IDS = ["type","mod","bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featVcc","featUart","featPwr","recvLedPol","adcPin","adcR1","adcR2","recvLed"];
+const SAVE_IDS = ["type","mod","bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featVcc","featUart","featPwr","recvLedPol","adcR1","adcR2","recvLed"];
 function collectState() {
   const st = { v: 1, ctrl: {}, pins: {} };
   SAVE_IDS.forEach(id => { const e = document.getElementById(id); if (e) st.ctrl[id] = e.value; });
@@ -240,7 +239,7 @@ function applyState(st) {
   ["bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featVcc","featUart","featPwr","recvLedPol","adcR1","adcR2"].forEach(id => setVal(id, c[id]));
   onChange();
   Object.keys(st.pins || {}).forEach(k => setVal("pin_" + k, st.pins[k]));
-  ["adcPin","recvLed"].forEach(id => setVal(id, c[id]));
+  ["recvLed"].forEach(id => setVal(id, c[id]));
   render();
 }
 function switchType(nt) {
@@ -275,8 +274,8 @@ async function init() {
   MODULES = (await (await fetch("modules.json")).json()).modules;
   ["sleep","output","battery","ledpol","extra","recvLed","recvLedPol"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
   ["bus","imu","magconn","ledch","featLed","featSw0","featClk","featVcc","featUart","featPwr"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); onChange(); }));
-  document.getElementById("adc").addEventListener("change", () => { markDirty(); updateAdc(); render(); });
-  ["adcPin","adcR1","adcR2"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
+  document.getElementById("adc").addEventListener("change", () => { markDirty(); onChange(); });
+  ["adcR1","adcR2"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
   document.getElementById("type").addEventListener("change", () => { markDirty(); switchType(document.getElementById("type").value); });
   document.getElementById("mod").addEventListener("change", () => { markDirty(); onChange(); });
   buildLangButtons();
@@ -343,6 +342,7 @@ function pinFields(bus) {
   if (featOn("featVcc")) f.push(["vcc","pinVCC"]);
   if (featOn("featUart")) f.push(["tx","pinTX"], ["rx","pinRX"]);
   if (featOn("featPwr")) f.push(["pwr","pinPWR"]);
+  if (document.getElementById("adc").value === "external") f.push(["adc","adcPin"]);
   return f;
 }
 
@@ -367,7 +367,7 @@ function allowedPins(mod, key) {
   return pins.filter(p => { const m = /^P(\d)\./.exec(p); return m && allow.indexOf(m[1]) >= 0; });
 }
 
-const REQUIRED_PINS = ["sck","mosi","miso","cs","sda","scl","led","led1","led2"];
+const REQUIRED_PINS = ["sck","mosi","miso","cs","sda","scl","led","led1","led2","adc"];
 function buildPins() {
   const mod = currentModule();
   const bus = document.getElementById("bus").value;
@@ -381,8 +381,10 @@ function buildPins() {
     const l = document.createElement("label"); l.dataset.i18n = i18nKey; l.textContent = x[i18nKey];
     const s = document.createElement("select"); s.id = "pin_" + key; s.dataset.key = key;
     if (!REQUIRED_PINS.includes(key)) { const none = document.createElement("option"); none.value = ""; none.textContent = "—"; s.appendChild(none); }
-    allowedPins(mod, key).forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = p; s.appendChild(o); });
+    const optPins = (key === "adc") ? ((mod.analog_pins) || []) : allowedPins(mod, key);
+    optPins.forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = p; s.appendChild(o); });
     if (__prev[key] !== undefined && [...s.options].some(o => o.value === __prev[key])) s.value = __prev[key];
+    else if (key === "adc" && mod.adc_default && [...s.options].some(o => o.value === mod.adc_default)) s.value = mod.adc_default;
     else if (defs[key]) s.value = defs[key];
     else if (REQUIRED_PINS.includes(key) && s.options.length) s.value = s.options[0].value;
     s.addEventListener("change", () => { markDirty(); render(); });
@@ -402,21 +404,13 @@ function populateRecvLed() {
 }
 
 function updateAdc() {
-  const mod = currentModule();
-  const ains = (mod && mod.analog_pins) || [];
+  const ains = (currentModule() && currentModule().analog_pins) || [];
   const adcSel = document.getElementById("adc");
   const extOpt = adcSel.querySelector('option[value="external"]');
-  const pinSel = document.getElementById("adcPin");
-  const prev = pinSel.value;
-  pinSel.innerHTML = "";
-  ains.forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = p; pinSel.appendChild(o); });
-  if (mod && mod.adc_default && ains.indexOf(mod.adc_default) >= 0) pinSel.value = mod.adc_default;
-  else if ([...pinSel.options].some(o => o.value === prev)) pinSel.value = prev;
   if (ains.length === 0) { extOpt.disabled = true; if (adcSel.value === "external") adcSel.value = "internal"; }
   else { extOpt.disabled = false; }
   const ext = adcSel.value === "external" && ains.length > 0;
   document.getElementById("adcFields").style.display = ext ? "" : "none";
-  document.getElementById("adcPinRow").style.display = ext ? "" : "none";
 }
 
 function collectPins() {
@@ -480,7 +474,7 @@ function onChange() {
   if (supported && isRecv) populateRecvLed();
   if (supported && !isRecv) updateMagConn();
   if (supported && !isRecv) { updateLedCh(); updateFeatVis(); }
-  if (supported && !isRecv) { buildPins(); updateAdc(); }
+  if (supported && !isRecv) { updateAdc(); buildPins(); }
   render();
 }
 
@@ -551,9 +545,7 @@ function render() {
   document.querySelectorAll("#pins select").forEach(s => { s.style.outline = ""; if (!s.disabled && s.value) { used[s.value] = (used[s.value]||0)+1; } });
   document.querySelectorAll("#pins select").forEach(s => { if (!s.disabled && s.value && used[s.value] > 1) s.style.outline = "2px solid var(--err)"; });
   const pins = collectPins();
-  const dispPins = Object.assign({}, pins);
-  if (document.getElementById("adc").value === "external" && document.getElementById("adcPin").value) dispPins.adc = document.getElementById("adcPin").value;
-  drawBoard(dispPins);
+  drawBoard(pins);
   document.getElementById("dts").textContent = renderOverlay(pins, document.getElementById("bus").value,
     document.getElementById("imu").value, magConn());
   refreshValidation();
@@ -629,7 +621,7 @@ function collectConfig() {
       extra_actions: (!isRecv) ? document.getElementById("extra").value : "disabled",
       battery: document.getElementById("battery").value,
       adc: (!isRecv && document.getElementById("adc").value === "external" && ((mod.analog_pins || []).length > 0)) ? "external" : "internal",
-      adc_pin: document.getElementById("adcPin").value,
+      adc_pin: (document.getElementById("pin_adc") ? document.getElementById("pin_adc").value : ""),
       adc_r1: parseInt(document.getElementById("adcR1").value || "0", 10) || 0,
       adc_r2: parseInt(document.getElementById("adcR2").value || "0", 10) || 0,
       led_polarity: (isRecv ? document.getElementById("recvLedPol") : document.getElementById("ledpol")).value,
