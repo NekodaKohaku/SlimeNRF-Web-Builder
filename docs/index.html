@@ -84,7 +84,7 @@
 
       <div class="sec" data-i18n="secPower"></div>
       <div class="grid">
-        <div><label for="battery"><span data-i18n="battery"></span><span class="help" data-help="helpBattery">?</span></label><select id="battery"><option value="liion"></option><option value="nimh"></option></select></div>
+        <div><label for="battery"><span data-i18n="battery"></span><span class="help" data-help="helpBattery">?</span></label><select id="battery"><option value="liion"></option><option value="nimh"></option><option value="none"></option></select></div>
         <div><label for="adc"><span data-i18n="adc"></span><span class="help" data-help="helpADC">?</span></label><select id="adc"><option value="external"></option><option value="internal"></option></select></div>
       </div>
       <div id="adcFields" class="grid" style="margin-top:12px;">
@@ -98,6 +98,7 @@
         <div><label for="sleep"><span data-i18n="sleep"></span><span class="help" data-help="helpSleep">?</span></label><select id="sleep"><option value="disabled"></option><option value="enabled"></option></select></div>
         <div><label for="output"><span data-i18n="flash"></span><span class="help" data-help="helpFlash">?</span></label><select id="output"><option value="bootloader"></option><option value="swd"></option></select></div>
         <div><label for="ledpol"><span data-i18n="ledPol"></span><span class="help" data-help="helpLedPol">?</span></label><select id="ledpol"><option value="high"></option><option value="low"></option></select></div>
+        <div><label for="extra"><span data-i18n="extraAct"></span><span class="help" data-help="helpExtraAct">?</span></label><select id="extra"><option value="disabled"></option><option value="enabled"></option></select></div>
       </div>
 
       <div class="sec" data-i18n="secPins"></div>
@@ -167,18 +168,19 @@ const I18N = {
     pinsTitle:"腳位指定", diagramTitle:"接線示意圖", overlayTitle:"board overlay 預覽",
     build:"產生固件", unsupportedBtn:"此模組尚未支援",
     recvNote:"接收器（Dongle）不需接 IMU，選好模組即可編譯（USB bootloader .uf2）。",
-    secRecvLed:"接收器 LED（選填）", recvLedPin:"LED 腳位", recvLedDefault:"預設（P0.15）", recvLedNone:"無（不使用 LED）", helpRecvLed:"接收器狀態 LED 腳位。維持「預設（P0.15）」就用官方板預設；你的自訂 dongle 板 LED 不在 P0.15 時，選實際腳位＋極性覆蓋。nRF52840 任意 GPIO 皆可。",
+    secRecvLed:"接收器 LED（選填）", recvLedPin:"LED 腳位", helpRecvLed:"接收器狀態 LED 腳位。預設 P0.15（官方板腳）；自訂 dongle 板 LED 不在 P0.15 時，選實際腳位＋極性覆蓋；選「—」則不使用 LED。nRF52840 任意 GPIO 皆可。",
     noDiagram:"此模組尚無接線圖", warnDup:"有腳位重複指定，請調整。",
     sending:"正在送出編譯要求…", queued:"排隊 / 準備環境中", building:"編譯中",
     buildHint:"（約 5–10 分鐘，請保持頁面開啟）", done:"完成！", download:"下載",
     failed:"編譯失敗，請查看 GitHub Actions 紀錄。", timeout:"編譯逾時，請稍後到 Releases 查看或重試。",
-    errINT:"請至少指定 IMU INT 腳。", errI2C:"I2C 需指定 SDA 與 SCL。", errSPI:"SPI 需指定 SCK/MOSI/MISO/CS。", errDup:"腳位重複指定。",
+    errINT:"睡眠/喚醒已開啟，請指定 IMU INT 腳（省電喚醒需要）。", errI2C:"I2C 需指定 SDA 與 SCL。", errSPI:"SPI 需指定 SCK/MOSI/MISO/CS。", errDup:"腳位重複指定。",
     advanced:"進階模式（有警告仍可生成）", confirmTitle:"確認以下設定？", confirmYes:"確認生成", confirmNo:"取消", forceRebuild:"強制重新編譯（忽略快取）", advNote:"進階模式：仍可生成，但請自行確認。", cached:"已有相同版本固件，直接提供下載（略過編譯）。", viewLog:"查看完整即時 log ↗", experimentalTag:"實驗性",
-    battery:"電池類型", batteryLiion:"鋰電池", batteryNimh:"鎳氫 NiMH",
+    battery:"電池類型", batteryLiion:"鋰電池（Li-ion/LiPo）", batteryNimh:"鎳氫 NiMH", batteryNone:"不偵測（一律 100%）",
     secSensor:"感測器", secPower:"電源與電池", secBehavior:"行為 / 輸出", secPins:"腳位指定", secDiagram:"接線圖", secAdvanced:"進階 / overlay 預覽",
     helpIMU:"你板子上用的慣性感測器晶片。", helpMag:"磁力計晶片，沒有就選無。", helpBus:"IMU 走 SPI 或 I2C，依你的接線。", helpSleep:"啟用後靜止進低功耗、動作喚醒，較省電。", helpFlash:"Bootloader：韌體疊在 bootloader 之後（0x1000），同時產出 .uf2（USB 拖放）與 .hex（SWD 保留 bootloader）；需板子已有 Adafruit bootloader。直接 SWD：0x0 起的完整映像、無 bootloader，用 SWD 直接燒 .hex。Dongle 需 USB，固定 Bootloader；無 USB 的模組只能直接 SWD。", helpBattery:"鋰電池用原廠曲線；選鎳氫 NiMH 時，編譯前會自動幫官方原始碼套用 NiMH 電量曲線補丁。",
     adc:"電池量測", adcExternal:"外部 AIN 腳", adcInternal:"內建 VDDHDIV5", adcPin:"ADC 腳（AIN）", adcR1:"上臂電阻 R1 (kΩ)", adcR2:"下臂電阻 R2 (kΩ)", helpADC:"電池電壓量測來源。外部 AIN 腳可搭配分壓量測鋰電；電壓直接進 ADC（無分壓）兩個電阻留 0。內建 VDDHDIV5 是晶片內部量測。",
     ledPol:"LED 極性", ledPolHigh:"接地（一般）", ledPolLow:"接 VCC（反向）", helpLedPol:"LED 接法：GPIO→電阻→LED→地 選「接地」；GPIO→LED→電阻→VCC 選「接 VCC」（反向點亮）。",
+    extraAct:"sw0 連按動作", extraActOff:"停用（回報伺服器）", extraActOn:"啟用（本機動作）", helpExtraAct:"需有接 sw0 才有作用。停用（預設）：快速連按當按鍵事件回報給 SlimeVR 伺服器。啟用：連按在本機直接觸發——2 下 IMU 校正、3 下 重設配對、4/5 下 進 DFU。長按關機不受此設定影響（由 sw0 長按觸發）。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK（選填）", pinLED:"LED", pinSW0:"按鈕 SW0（選填）", pinVCC:"感測器電源（選填）", pinTX:"UART TX（選填）", pinRX:"UART RX（選填）", pinPWR:"電源自鎖（選填）"
   },
@@ -194,18 +196,19 @@ const I18N = {
     pinsTitle:"Pin assignment", diagramTitle:"Wiring diagram", overlayTitle:"Board overlay preview",
     build:"Build firmware", unsupportedBtn:"Module not supported yet",
     recvNote:"A dongle needs no IMU — just pick the module and build (USB bootloader .uf2).",
-    secRecvLed:"Dongle LED (optional)", recvLedPin:"LED pin", recvLedDefault:"Default (P0.15)", recvLedNone:"None (no LED)", helpRecvLed:"The dongle status LED pin. Keep \"Default (P0.15)\" to use the official board default. If your custom dongle's LED isn't on P0.15, pick the actual pin + polarity to override. Any GPIO works on nRF52840.",
+    secRecvLed:"Dongle LED (optional)", recvLedPin:"LED pin", helpRecvLed:"The dongle status LED pin. Default is P0.15 (official board pin). If your custom dongle's LED isn't on P0.15, pick the actual pin + polarity to override; pick \"—\" to disable the LED. Any GPIO works on nRF52840.",
     noDiagram:"No wiring diagram for this module yet", warnDup:"A pin is assigned twice — please fix.",
     sending:"Sending build request…", queued:"Queued / preparing", building:"Building",
     buildHint:"(about 5–10 min, keep this page open)", done:"Done!", download:"Download",
     failed:"Build failed — check the GitHub Actions log.", timeout:"Build timed out — check Releases later or retry.",
-    errINT:"Please assign the IMU INT pin.", errI2C:"I2C needs SDA and SCL.", errSPI:"SPI needs SCK/MOSI/MISO/CS.", errDup:"Duplicate pin assignment.",
+    errINT:"Sleep/wake is on — assign the IMU INT pin (needed for wake-on-motion).", errI2C:"I2C needs SDA and SCL.", errSPI:"SPI needs SCK/MOSI/MISO/CS.", errDup:"Duplicate pin assignment.",
     advanced:"Advanced mode (build despite warnings)", confirmTitle:"Confirm these settings?", confirmYes:"Confirm build", confirmNo:"Cancel", forceRebuild:"Force rebuild (ignore cache)", advNote:"Advanced mode: you can still build, verify yourself.", cached:"Same firmware already built — download ready (build skipped).", viewLog:"View full live log ↗", experimentalTag:"Experimental",
-    battery:"Battery type", batteryLiion:"Li-ion", batteryNimh:"NiMH",
+    battery:"Battery type", batteryLiion:"Li-ion / LiPo", batteryNimh:"NiMH", batteryNone:"No monitoring (always 100%)",
     secSensor:"Sensors", secPower:"Power & battery", secBehavior:"Behavior / output", secPins:"Pin assignment", secDiagram:"Wiring diagram", secAdvanced:"Advanced / overlay preview",
     helpIMU:"The IMU chip on your board.", helpMag:"Magnetometer chip, or None.", helpBus:"IMU on SPI or I2C, per your wiring.", helpSleep:"Low-power when idle, wake on motion — saves battery.", helpFlash:"Bootloader: app sits after the bootloader (0x1000); outputs both .uf2 (USB drag-drop) and .hex (SWD, keeps bootloader). Needs the Adafruit bootloader already on the chip. Direct SWD: full image from 0x0, no bootloader — flash .hex via SWD. A dongle needs USB so it's fixed to Bootloader; a module without USB can only use Direct SWD.", helpBattery:"Li-ion uses the factory curve; choosing NiMH patches the official source with a NiMH curve at build time.",
     adc:"Battery sense", adcExternal:"External AIN pin", adcInternal:"Internal VDDHDIV5", adcPin:"ADC pin (AIN)", adcR1:"R1 top (kΩ)", adcR2:"R2 bottom (kΩ)", helpADC:"Battery voltage source. External AIN pin can use a divider for Li-ion; leave both resistors 0 if voltage goes straight to ADC. Internal VDDHDIV5 uses the chip's internal measurement.",
     ledPol:"LED polarity", ledPolHigh:"To GND (normal)", ledPolLow:"To VCC (inverted)", helpLedPol:"LED wiring: GPIO->R->LED->GND pick To GND; GPIO->LED->R->VCC pick To VCC (inverted).",
+    extraAct:"sw0 multi-press", extraActOff:"Off (report to server)", extraActOn:"On (local actions)", helpExtraAct:"Only works if sw0 is wired. Off (default): quick multi-presses are sent to the SlimeVR server as button events. On: presses act locally — 2x IMU calibration, 3x reset pairing, 4/5x enter DFU. Long-press shutdown is unaffected (handled by holding sw0).",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK (optional)", pinLED:"LED", pinSW0:"Button SW0 (optional)", pinVCC:"Sensor power (optional)", pinTX:"UART TX (optional)", pinRX:"UART RX (optional)", pinPWR:"Power hold (optional)"
   },
@@ -221,18 +224,19 @@ const I18N = {
     pinsTitle:"ピン割り当て", diagramTitle:"配線図", overlayTitle:"ボード overlay プレビュー",
     build:"ファームを生成", unsupportedBtn:"このモジュールは未対応",
     recvNote:"ドングルは IMU 不要。モジュールを選んでビルドするだけ（USB bootloader .uf2）。",
-    secRecvLed:"ドングル LED（任意）", recvLedPin:"LED ピン", recvLedDefault:"デフォルト（P0.15）", recvLedNone:"なし（LED 不使用）", helpRecvLed:"ドングルのステータス LED ピン。「デフォルト（P0.15）」のままで公式ボード既定。自作ドングルの LED が P0.15 以外なら実際のピン＋極性を選んで上書き。nRF52840 は任意 GPIO 可。",
+    secRecvLed:"ドングル LED（任意）", recvLedPin:"LED ピン", helpRecvLed:"ドングルのステータス LED ピン。既定は P0.15（公式ボードのピン）。自作ドングルの LED が P0.15 以外なら実際のピン＋極性を選んで上書き。「—」を選ぶと LED 不使用。nRF52840 は任意 GPIO 可。",
     noDiagram:"このモジュールの配線図はまだありません", warnDup:"ピンが重複しています。修正してください。",
     sending:"ビルド要求を送信中…", queued:"順番待ち / 準備中", building:"ビルド中",
     buildHint:"（約5〜10分、このページは開いたままに）", done:"完了！", download:"ダウンロード",
     failed:"ビルド失敗 — GitHub Actions のログを確認してください。", timeout:"タイムアウト — Releases を確認するか再試行してください。",
-    errINT:"IMU INT ピンを割り当ててください。", errI2C:"I2C には SDA と SCL が必要です。", errSPI:"SPI には SCK/MOSI/MISO/CS が必要です。", errDup:"ピンの重複割り当て。",
+    errINT:"スリープ/ウェイクが有効です。IMU INT ピンを割り当ててください（動作ウェイクに必要）。", errI2C:"I2C には SDA と SCL が必要です。", errSPI:"SPI には SCK/MOSI/MISO/CS が必要です。", errDup:"ピンの重複割り当て。",
     advanced:"詳細モード（警告があってもビルド可）", confirmTitle:"以下の設定でよろしいですか？", confirmYes:"生成を確認", confirmNo:"キャンセル", forceRebuild:"強制再ビルド（キャッシュ無視）", advNote:"詳細モード：ビルド可能ですが自己確認を。", cached:"同一ファームが既にあります — ダウンロード可能（ビルド省略）。", viewLog:"完全なライブログを見る ↗", experimentalTag:"実験的",
-    battery:"電池タイプ", batteryLiion:"Li-ion", batteryNimh:"NiMH",
+    battery:"電池タイプ", batteryLiion:"Li-ion / LiPo", batteryNimh:"NiMH", batteryNone:"監視なし（常に 100%）",
     secSensor:"センサー", secPower:"電源・電池", secBehavior:"動作 / 出力", secPins:"ピン割り当て", secDiagram:"配線図", secAdvanced:"詳細 / overlay プレビュー",
     helpIMU:"基板の IMU チップ。", helpMag:"磁気センサー、なければ「なし」。", helpBus:"配線に応じて SPI か I2C。", helpSleep:"静止時は低消費、動作で復帰し省電力。", helpFlash:"Bootloader：アプリを bootloader の後ろ（0x1000）に配置し、.uf2（USB ドラッグ）と .hex（SWD、bootloader 保持）を両方出力。Adafruit bootloader が必要。直接 SWD：0x0 からの単体イメージ、bootloader なし、SWD で .hex を書き込み。ドングルは USB 必須のため Bootloader 固定、USB なしのモジュールは直接 SWD のみ。", helpBattery:"Li-ion は既定カーブ。NiMH を選ぶとビルド時に公式ソースへ NiMH カーブのパッチを適用。",
     adc:"電池計測", adcExternal:"外部 AIN ピン", adcInternal:"内蔵 VDDHDIV5", adcPin:"ADC ピン (AIN)", adcR1:"R1 上側 (kΩ)", adcR2:"R2 下側 (kΩ)", helpADC:"電池電圧の計測元。外部 AIN ピンは分圧で Li-ion 計測可。分圧なし（直接 ADC）は両抵抗を 0。内蔵 VDDHDIV5 はチップ内部計測。",
     ledPol:"LED 極性", ledPolHigh:"GND 側（通常）", ledPolLow:"VCC 側（反転）", helpLedPol:"LED 配線：GPIO→R→LED→GND は「GND 側」、GPIO→LED→R→VCC は「VCC 側」（反転点灯）。",
+    extraAct:"sw0 連打動作", extraActOff:"無効（サーバーへ通知）", extraActOn:"有効（ローカル動作）", helpExtraAct:"sw0 を接続時のみ有効。無効（既定）：連打はボタンイベントとして SlimeVR サーバーへ送信。有効：連打がローカルで動作——2回 IMU 校正、3回 ペアリング解除、4/5回 DFU。長押しシャットダウンはこの設定の影響を受けません（sw0 長押しで動作）。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK（任意）", pinLED:"LED", pinSW0:"ボタン SW0（任意）", pinVCC:"センサー電源（任意）", pinTX:"UART TX（任意）", pinRX:"UART RX（任意）", pinPWR:"電源保持（任意）"
   }
@@ -260,7 +264,8 @@ function applyLang() {
   setOpt("magconn", "i2c_shared", x.magConnI2cShared); setOpt("magconn", "i2c", x.magConnI2c); setOpt("magconn", "spi", x.magConnSpi);
   setOpt("sleep", "enabled", x.enabled); setOpt("sleep", "disabled", x.disabled);
   setOpt("output", "bootloader", x.flashBoot); setOpt("output", "swd", x.flashSwd);
-  setOpt("battery", "liion", x.batteryLiion); setOpt("battery", "nimh", x.batteryNimh);
+  setOpt("battery", "liion", x.batteryLiion); setOpt("battery", "nimh", x.batteryNimh); setOpt("battery", "none", x.batteryNone);
+  setOpt("extra", "disabled", x.extraActOff); setOpt("extra", "enabled", x.extraActOn);
   setOpt("adc", "external", x.adcExternal); setOpt("adc", "internal", x.adcInternal);
   setOpt("ledpol", "high", x.ledPolHigh); setOpt("ledpol", "low", x.ledPolLow);
   setOpt("recvLedPol", "high", x.ledPolHigh); setOpt("recvLedPol", "low", x.ledPolLow);
@@ -277,7 +282,7 @@ function parsePin(p) {
 
 async function init() {
   MODULES = (await (await fetch("modules.json")).json()).modules;
-  ["sleep","output","battery","ledpol","recvLed","recvLedPol"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
+  ["sleep","output","battery","ledpol","extra","recvLed","recvLedPol"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
   ["bus","imu","magconn"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); onChange(); }));
   document.getElementById("adc").addEventListener("change", () => { markDirty(); updateAdc(); render(); });
   ["adcPin","adcR1","adcR2"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
@@ -334,6 +339,7 @@ function allowedPins(mod, key) {
   return pins.filter(p => { const m = /^P(\d)\./.exec(p); return m && allow.indexOf(m[1]) >= 0; });
 }
 
+const REQUIRED_PINS = ["sck","mosi","miso","cs","sda","scl"];
 function buildPins() {
   const mod = currentModule();
   const bus = document.getElementById("bus").value;
@@ -345,9 +351,10 @@ function buildPins() {
     const wrap = document.createElement("div");
     const l = document.createElement("label"); l.dataset.i18n = i18nKey; l.textContent = x[i18nKey];
     const s = document.createElement("select"); s.id = "pin_" + key; s.dataset.key = key;
-    const none = document.createElement("option"); none.value = ""; none.textContent = "—"; s.appendChild(none);
+    if (!REQUIRED_PINS.includes(key)) { const none = document.createElement("option"); none.value = (key === "led") ? "none" : ""; none.textContent = "—"; s.appendChild(none); }
     allowedPins(mod, key).forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = p; s.appendChild(o); });
     if (defs[key]) s.value = defs[key];
+    else if (REQUIRED_PINS.includes(key) && s.options.length) s.value = s.options[0].value;
     s.addEventListener("change", () => { markDirty(); render(); });
     wrap.appendChild(l); wrap.appendChild(s); host.appendChild(wrap);
   });
@@ -358,10 +365,10 @@ function populateRecvLed() {
   const sel = document.getElementById("recvLed");
   const prev = sel.value;
   sel.innerHTML = "";
-  const none = document.createElement("option"); none.value = ""; none.dataset.i18n = "recvLedDefault"; none.textContent = t().recvLedDefault; sel.appendChild(none);
+  const off = document.createElement("option"); off.value = "none"; off.textContent = "—"; sel.appendChild(off);
   (mod.pins || []).forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = p; sel.appendChild(o); });
-  const off = document.createElement("option"); off.value = "none"; off.dataset.i18n = "recvLedNone"; off.textContent = t().recvLedNone; sel.appendChild(off);
   if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+  else if ([...sel.options].some(o => o.value === "P0.15")) sel.value = "P0.15";
 }
 
 function updateAdc() {
@@ -582,6 +589,7 @@ function collectConfig() {
       magnetometer: (!isRecv && mconn !== "none") ? "enabled" : "disabled",
       mag_conn: mconn,
       sleep: document.getElementById("sleep").value,
+      extra_actions: (!isRecv) ? document.getElementById("extra").value : "disabled",
       battery: document.getElementById("battery").value,
       adc: (!isRecv && document.getElementById("adc").value === "external" && ((mod.analog_pins || []).length > 0)) ? "external" : "internal",
       adc_pin: document.getElementById("adcPin").value,
@@ -660,7 +668,7 @@ function validate() {
   const counts = {};
   Object.values(pins).forEach(v => counts[v] = (counts[v] || 0) + 1);
   if (Object.values(counts).some(c => c > 1)) errors.push(t().errDup);
-  if (!pins.int) errors.push(t().errINT);
+  if (document.getElementById("sleep").value === "enabled" && !pins.int) errors.push(t().errINT);
   if (bus === "i2c" && (!pins.sda || !pins.scl)) errors.push(t().errI2C);
   if (bus === "spi" && (!pins.sck || !pins.mosi || !pins.miso || !pins.cs)) errors.push(t().errSPI);
   return errors;

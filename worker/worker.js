@@ -105,6 +105,16 @@ async function handleBuild(request, env) {
     return json({ error: `觸發編譯失敗 (${resp.status}): ${text}` }, 502);
   }
 
+  try {
+    const rel0 = await gh(env, `/repos/${env.GITHUB_REPO}/releases/tags/fw-${buildId}`);
+    if (rel0.ok) {
+      const r0 = await rel0.json();
+      await gh(env, `/repos/${env.GITHUB_REPO}/releases/${r0.id}`, {
+        method: "PATCH", body: JSON.stringify({ body: "STATUS:BUILDING" }),
+      });
+    }
+  } catch (e) {}
+
   return json({ build_id: buildId, status: "queued" });
 }
 
@@ -121,9 +131,11 @@ async function handleStatus(url, env) {
   if (!resp.ok) return json({ error: `查詢狀態失敗 (${resp.status})` }, 502);
 
   const release = await resp.json();
+  const body = release.body || "";
+  if (body.includes("STATUS:FAILED")) return json({ status: "failed" });
+  if (body.includes("STATUS:BUILDING")) return json({ status: "building" });
   const asset = pickAsset(release.assets);
   if (asset) return json({ status: "done", filename: asset.name, download_url: asset.browser_download_url });
-  if ((release.body || "").includes("STATUS:FAILED")) return json({ status: "failed" });
   return json({ status: "building" });
 }
 
