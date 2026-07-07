@@ -121,18 +121,19 @@ jobs:
           git -C SlimeVR-Tracker-nRF submodule update --init --recursive --depth 1
           echo "fw_sha=$(git -C SlimeVR-Tracker-nRF rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Generate board overlay from pins
+      - name: Generate board overlay
         id: overlay
-        if: ${{ steps.cfg.outputs.type == 'tracker' }}
         env:
           CONFIG_JSON: ${{ github.event.inputs.config }}
         shell: bash
         run: |
           set -euo pipefail
-          OUT="$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
-          python3 "$GITHUB_WORKSPACE/.github/scripts/gen_overlay.py" "$CONFIG_JSON" > "$OUT"
-          cat "$OUT"
-          echo "overlay_path=$OUT" >> "$GITHUB_OUTPUT"
+          if [ "${{ steps.cfg.outputs.type }}" = "tracker" ]; then
+            OUT="$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
+            python3 "$GITHUB_WORKSPACE/.github/scripts/gen_overlay.py" "$CONFIG_JSON" > "$OUT"
+            cat "$OUT"
+            echo "overlay_path=$OUT" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Apply firmware options
         if: ${{ steps.cfg.outputs.type == 'tracker' }}
@@ -157,6 +158,7 @@ jobs:
               append 'CONFIG_NRFX_DPPI30=y'
               ;;
           esac
+          sed -i 's|SPI_DT_SPEC_GET(\([^,]*,[[:space:]]*SPI_OP\))|SPI_DT_SPEC_GET(\1, 0)|g' src/sensor/sensor.c || true
           [ "$MAG" = "enabled" ]  && append 'CONFIG_SENSOR_USE_MAG=y'
           [ "$MAG" = "disabled" ] && append 'CONFIG_SENSOR_USE_MAG=n'
           if [ "$SLEEP" = "enabled" ]; then
@@ -168,6 +170,18 @@ jobs:
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_pwr.py"
           tail -n 10 prj.conf
 
+      - name: Apply receiver options
+        if: ${{ steps.cfg.outputs.type == 'receiver' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd zephyr-workspace/SlimeVR-Tracker-nRF
+          sed -i 's/^#CONFIG_NRFX_TIMER1=y/CONFIG_NRFX_TIMER1=y/' prj.conf
+          grep -q '^CONFIG_NRFX_TIMER1=y' prj.conf || printf '\n\nCONFIG_NRFX_TIMER1=y\n' >> prj.conf
+          sed -i 's|^[[:space:]]*//[[:space:]]*\(IRQ_DIRECT_CONNECT(TIMER1_IRQn.*\)|\1|' src/connection/timer.c
+          sed -i 's|^[[:space:]]*//[[:space:]]*\(irq_enable(TIMER1_IRQn.*\)|\1|' src/connection/timer.c
+          tail -n 5 prj.conf
+
       - name: west build
         id: build
         env:
@@ -176,11 +190,8 @@ jobs:
           export PATH="$HOME/.venv/bin:$PATH"
           cd zephyr-workspace
           mkdir -p out
-          EXTRA=""; OVL=""
-          if [ "${{ steps.cfg.outputs.type }}" = "tracker" ]; then
-            OVL="${{ steps.overlay.outputs.overlay_path }}"
-            EXTRA="-DEXTRA_DTC_OVERLAY_FILE=$OVL"
-          fi
+          EXTRA=""; OVL="${{ steps.overlay.outputs.overlay_path }}"
+          if [ -n "$OVL" ]; then EXTRA="-DEXTRA_DTC_OVERLAY_FILE=$OVL"; fi
           west build \
             --board "${{ steps.cfg.outputs.board_target }}" \
             --pristine=always SlimeVR-Tracker-nRF \
