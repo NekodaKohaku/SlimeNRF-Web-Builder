@@ -120,6 +120,13 @@
     </div>
 
     <div id="recvNote" class="note" style="display:none;" data-i18n="recvNote"></div>
+    <div id="recvOpts" style="display:none;">
+      <div class="sec" data-i18n="secRecvLed"></div>
+      <div class="grid">
+        <div><label for="recvLed"><span data-i18n="recvLedPin"></span><span class="help" data-help="helpRecvLed">?</span></label><select id="recvLed"></select></div>
+        <div><label for="recvLedPol"><span data-i18n="ledPol"></span></label><select id="recvLedPol"><option value="high"></option><option value="low"></option></select></div>
+      </div>
+    </div>
     <div id="unsupported" class="note" style="display:none;"></div>
 
     <button id="go"></button>
@@ -160,6 +167,7 @@ const I18N = {
     pinsTitle:"腳位指定", diagramTitle:"接線示意圖", overlayTitle:"board overlay 預覽",
     build:"產生固件", unsupportedBtn:"此模組尚未支援",
     recvNote:"接收器（Dongle）不需接 IMU，選好模組即可編譯（USB bootloader .uf2）。",
+    secRecvLed:"接收器 LED（選填）", recvLedPin:"LED 腳位", recvLedDefault:"預設（P0.15）", recvLedNone:"無（不使用 LED）", helpRecvLed:"接收器狀態 LED 腳位。維持「預設（P0.15）」就用官方板預設；你的自訂 dongle 板 LED 不在 P0.15 時，選實際腳位＋極性覆蓋。nRF52840 任意 GPIO 皆可。",
     noDiagram:"此模組尚無接線圖", warnDup:"有腳位重複指定，請調整。",
     sending:"正在送出編譯要求…", queued:"排隊 / 準備環境中", building:"編譯中",
     buildHint:"（約 5–10 分鐘，請保持頁面開啟）", done:"完成！", download:"下載",
@@ -186,6 +194,7 @@ const I18N = {
     pinsTitle:"Pin assignment", diagramTitle:"Wiring diagram", overlayTitle:"Board overlay preview",
     build:"Build firmware", unsupportedBtn:"Module not supported yet",
     recvNote:"A dongle needs no IMU — just pick the module and build (USB bootloader .uf2).",
+    secRecvLed:"Dongle LED (optional)", recvLedPin:"LED pin", recvLedDefault:"Default (P0.15)", recvLedNone:"None (no LED)", helpRecvLed:"The dongle status LED pin. Keep \"Default (P0.15)\" to use the official board default. If your custom dongle's LED isn't on P0.15, pick the actual pin + polarity to override. Any GPIO works on nRF52840.",
     noDiagram:"No wiring diagram for this module yet", warnDup:"A pin is assigned twice — please fix.",
     sending:"Sending build request…", queued:"Queued / preparing", building:"Building",
     buildHint:"(about 5–10 min, keep this page open)", done:"Done!", download:"Download",
@@ -212,6 +221,7 @@ const I18N = {
     pinsTitle:"ピン割り当て", diagramTitle:"配線図", overlayTitle:"ボード overlay プレビュー",
     build:"ファームを生成", unsupportedBtn:"このモジュールは未対応",
     recvNote:"ドングルは IMU 不要。モジュールを選んでビルドするだけ（USB bootloader .uf2）。",
+    secRecvLed:"ドングル LED（任意）", recvLedPin:"LED ピン", recvLedDefault:"デフォルト（P0.15）", recvLedNone:"なし（LED 不使用）", helpRecvLed:"ドングルのステータス LED ピン。「デフォルト（P0.15）」のままで公式ボード既定。自作ドングルの LED が P0.15 以外なら実際のピン＋極性を選んで上書き。nRF52840 は任意 GPIO 可。",
     noDiagram:"このモジュールの配線図はまだありません", warnDup:"ピンが重複しています。修正してください。",
     sending:"ビルド要求を送信中…", queued:"順番待ち / 準備中", building:"ビルド中",
     buildHint:"（約5〜10分、このページは開いたままに）", done:"完了！", download:"ダウンロード",
@@ -253,9 +263,9 @@ function applyLang() {
   setOpt("battery", "liion", x.batteryLiion); setOpt("battery", "nimh", x.batteryNimh);
   setOpt("adc", "external", x.adcExternal); setOpt("adc", "internal", x.adcInternal);
   setOpt("ledpol", "high", x.ledPolHigh); setOpt("ledpol", "low", x.ledPolLow);
+  setOpt("recvLedPol", "high", x.ledPolHigh); setOpt("recvLedPol", "low", x.ledPolLow);
   document.querySelectorAll(".langbar button").forEach(b => b.classList.toggle("on", b.dataset.lang === LANG));
   populateModules();
-  onChange();
 }
 
 let MODULES = [];
@@ -267,7 +277,7 @@ function parsePin(p) {
 
 async function init() {
   MODULES = (await (await fetch("modules.json")).json()).modules;
-  ["sleep","output","battery","ledpol"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
+  ["sleep","output","battery","ledpol","recvLed","recvLedPol"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
   ["bus","imu","magconn"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); onChange(); }));
   document.getElementById("adc").addEventListener("change", () => { markDirty(); updateAdc(); render(); });
   ["adcPin","adcR1","adcR2"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
@@ -278,6 +288,7 @@ async function init() {
     applyLang();
   }));
   applyLang();
+  onChange();
 }
 
 function populateModules() {
@@ -332,7 +343,7 @@ function buildPins() {
   const x = t();
   pinFields(bus).concat(magPinFields()).forEach(([key, i18nKey]) => {
     const wrap = document.createElement("div");
-    const l = document.createElement("label"); l.textContent = x[i18nKey];
+    const l = document.createElement("label"); l.dataset.i18n = i18nKey; l.textContent = x[i18nKey];
     const s = document.createElement("select"); s.id = "pin_" + key; s.dataset.key = key;
     const none = document.createElement("option"); none.value = ""; none.textContent = "—"; s.appendChild(none);
     allowedPins(mod, key).forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = p; s.appendChild(o); });
@@ -340,6 +351,17 @@ function buildPins() {
     s.addEventListener("change", () => { markDirty(); render(); });
     wrap.appendChild(l); wrap.appendChild(s); host.appendChild(wrap);
   });
+}
+
+function populateRecvLed() {
+  const mod = currentModule();
+  const sel = document.getElementById("recvLed");
+  const prev = sel.value;
+  sel.innerHTML = "";
+  const none = document.createElement("option"); none.value = ""; none.dataset.i18n = "recvLedDefault"; none.textContent = t().recvLedDefault; sel.appendChild(none);
+  (mod.pins || []).forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = p; sel.appendChild(o); });
+  const off = document.createElement("option"); off.value = "none"; off.dataset.i18n = "recvLedNone"; off.textContent = t().recvLedNone; sel.appendChild(off);
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
 }
 
 function updateAdc() {
@@ -408,6 +430,7 @@ function onChange() {
 
   document.getElementById("trackerOpts").style.display = (!supported || isRecv) ? "none" : "";
   document.getElementById("recvNote").style.display = (supported && isRecv) ? "" : "none";
+  document.getElementById("recvOpts").style.display = (supported && isRecv) ? "" : "none";
   const un = document.getElementById("unsupported");
   if (!supported) { un.style.display = ""; un.textContent = (mod && mod.note) || x.unsupportedBtn; }
   else un.style.display = "none";
@@ -415,6 +438,7 @@ function onChange() {
   updateButton();
 
   if (supported) updateFlash();
+  if (supported && isRecv) populateRecvLed();
   if (supported && !isRecv) updateMagConn();
   if (supported && !isRecv) { buildPins(); updateAdc(); }
   render();
@@ -553,7 +577,7 @@ function collectConfig() {
     fileformat: fm === "bootloader" ? "uf2" : "hex",
     filename: parts.join("_"),
     bus, imu, mag_conn: mconn,
-    pins: isRecv ? {} : collectPins(),
+    pins: isRecv ? (document.getElementById("recvLed").value ? { led: document.getElementById("recvLed").value } : {}) : collectPins(),
     options: {
       magnetometer: (!isRecv && mconn !== "none") ? "enabled" : "disabled",
       mag_conn: mconn,
@@ -563,7 +587,7 @@ function collectConfig() {
       adc_pin: document.getElementById("adcPin").value,
       adc_r1: parseInt(document.getElementById("adcR1").value || "0", 10) || 0,
       adc_r2: parseInt(document.getElementById("adcR2").value || "0", 10) || 0,
-      led_polarity: document.getElementById("ledpol").value
+      led_polarity: (isRecv ? document.getElementById("recvLedPol") : document.getElementById("ledpol")).value
     }
   };
 }
