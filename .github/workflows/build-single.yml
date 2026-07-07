@@ -232,7 +232,9 @@ jobs:
           fi
           BUILDARGS=(-DNCS_TOOLCHAIN_VERSION=NONE -DBOARD_ROOT=../SlimeVR-Tracker-nRF)
           [ -n "$OVLS" ] && BUILDARGS+=("-DEXTRA_DTC_OVERLAY_FILE=$OVLS")
-          west build \
+          SYSB=""
+          [ "$FMT" = "hex" ] && SYSB="--no-sysbuild"   # 關 sysbuild/PM,app 直接照 0x0 輸出、無 MBR 保留
+          west build $SYSB \
             --board "${{ steps.cfg.outputs.board_target }}" \
             --pristine=always SlimeVR-Tracker-nRF \
             --build-dir SlimeVR-Tracker-nRF/build \
@@ -241,14 +243,17 @@ jobs:
           FMT="${{ steps.cfg.outputs.fileformat }}"
           SHA="${{ steps.clone.outputs.fw_sha }}"; DATE="$(date -u +%Y%m%d)"; RUN="${{ github.run_number }}"
           NAME="${{ steps.cfg.outputs.filename }}_g${SHA}_${DATE}_b${RUN}"
-          SRC="SlimeVR-Tracker-nRF/build/SlimeVR-Tracker-nRF/zephyr/zephyr.$FMT"
-          [ -f "$SRC" ] || { echo "missing build output $SRC" >&2; exit 1; }
+          SRC="SlimeVR-Tracker-nRF/build/zephyr/zephyr.$FMT"
+          [ -f "$SRC" ] || SRC="SlimeVR-Tracker-nRF/build/SlimeVR-Tracker-nRF/zephyr/zephyr.$FMT"
+          [ -f "$SRC" ] || SRC="$(find SlimeVR-Tracker-nRF/build -path "*/zephyr/zephyr.$FMT" | grep -v _sysbuild | head -1)"
+          [ -f "$SRC" ] || { echo "missing build output (zephyr.$FMT)" >&2; find SlimeVR-Tracker-nRF/build -name "zephyr.$FMT" || true; exit 1; }
           cp "$SRC" "out/${NAME}.${FMT}"
+          ZDIR="$(dirname "$SRC")"
 
           echo "===== BUILD OUTPUT OFFSET CHECK (debug) ====="
-          CFG="SlimeVR-Tracker-nRF/build/SlimeVR-Tracker-nRF/zephyr/.config"
+          CFG="$ZDIR/.config"
           grep -iE 'FLASH_LOAD_OFFSET|USE_DT_CODE_PARTITION' "$CFG" || true
-          DTS="SlimeVR-Tracker-nRF/build/SlimeVR-Tracker-nRF/zephyr/zephyr.dts"
+          DTS="$ZDIR/zephyr.dts"
           echo "--- code-partition / slot0 in merged DT ---"
           grep -nE 'code-partition|image-0|partition@0 ' "$DTS" 2>/dev/null | head || true
           echo "--- 腳位 overlay 是否套上 (int0-gpios / spi psel) ---"
