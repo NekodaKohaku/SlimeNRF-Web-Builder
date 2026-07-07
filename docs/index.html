@@ -92,7 +92,6 @@
         <div><label for="adc"><span data-i18n="adc"></span><span class="help" data-help="helpADC">?</span></label><select id="adc"><option value="external"></option><option value="internal"></option></select></div>
       </div>
       <div id="adcFields" class="grid" style="margin-top:12px;">
-        <div><label for="adcPin"><span data-i18n="adcPin"></span></label><select id="adcPin"></select></div>
         <div><label for="adcR1"><span data-i18n="adcR1"></span></label><input id="adcR1" type="number" min="0" value="0"></div>
         <div><label for="adcR2"><span data-i18n="adcR2"></span></label><input id="adcR2" type="number" min="0" value="0"></div>
       </div>
@@ -114,6 +113,7 @@
 
       <div class="sec" data-i18n="secPins"></div>
       <div id="pins" class="pins"></div>
+      <div id="adcPinRow" class="grid" style="margin-top:12px; display:none;"><div><label for="adcPin"><span data-i18n="adcPin"></span></label><select id="adcPin"></select></div></div>
       <div id="warn" class="warn"></div>
 
       <div class="sec" data-i18n="secDiagram"></div>
@@ -416,6 +416,7 @@ function updateAdc() {
   else { extOpt.disabled = false; }
   const ext = adcSel.value === "external" && ains.length > 0;
   document.getElementById("adcFields").style.display = ext ? "" : "none";
+  document.getElementById("adcPinRow").style.display = ext ? "" : "none";
 }
 
 function collectPins() {
@@ -490,7 +491,8 @@ const FUNC_META = {
   int:{label:"INT",color:"#4bb543"}, clk:{label:"CLK",color:"#17a2a2"},
   led:{label:"LED",color:"#d4537e"}, sw0:{label:"SW0",color:"#b0952a"}, vcc:{label:"VCC",color:"#c0398f"},
   tx:{label:"TX",color:"#6d6df0"}, rx:{label:"RX",color:"#8a63d2"}, pwr:{label:"PWR",color:"#c0392b"},
-  mag_sda:{label:"M-SDA",color:"#2f9e44"}, mag_scl:{label:"M-SCL",color:"#e0902a"}, mag_cs:{label:"M-CS",color:"#9c5a2a"}
+  mag_sda:{label:"M-SDA",color:"#2f9e44"}, mag_scl:{label:"M-SCL",color:"#e0902a"}, mag_cs:{label:"M-CS",color:"#9c5a2a"},
+  adc:{label:"AIN",color:"#c99a00"}
 };
 const SVGNS = "http://www.w3.org/2000/svg";
 function svgEl(n, a) { const e = document.createElementNS(SVGNS, n); for (const k in a) e.setAttribute(k, a[k]); return e; }
@@ -549,7 +551,9 @@ function render() {
   document.querySelectorAll("#pins select").forEach(s => { s.style.outline = ""; if (!s.disabled && s.value) { used[s.value] = (used[s.value]||0)+1; } });
   document.querySelectorAll("#pins select").forEach(s => { if (!s.disabled && s.value && used[s.value] > 1) s.style.outline = "2px solid var(--err)"; });
   const pins = collectPins();
-  drawBoard(pins);
+  const dispPins = Object.assign({}, pins);
+  if (document.getElementById("adc").value === "external" && document.getElementById("adcPin").value) dispPins.adc = document.getElementById("adcPin").value;
+  drawBoard(dispPins);
   document.getElementById("dts").textContent = renderOverlay(pins, document.getElementById("bus").value,
     document.getElementById("imu").value, magConn());
   refreshValidation();
