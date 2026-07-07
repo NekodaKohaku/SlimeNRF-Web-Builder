@@ -71,6 +71,36 @@ def mag_device_nodes(mcu, pins, mc):
     return L
 
 
+def ws2812_pinctrl(spi_node, led_pin):
+    p = psel("SPIM_MOSI", led_pin)
+    return [
+        f"\t{spi_node}_default {{ group1 {{ psels = <{p}>; }}; }};",
+        f"\t{spi_node}_sleep  {{ group1 {{ psels = <{p}>; low-power-enable; }}; }};",
+    ]
+
+
+def ws2812_node(spi_node):
+    return [
+        f"&{spi_node} {{",
+        "\tstatus = \"okay\";",
+        f"\tpinctrl-0 = <&{spi_node}_default>;",
+        f"\tpinctrl-1 = <&{spi_node}_sleep>;",
+        "\tpinctrl-names = \"default\", \"sleep\";",
+        "\t#address-cells = <1>;",
+        "\t#size-cells = <0>;",
+        "\tled_strip: ws2812@0 {",
+        "\t\tcompatible = \"worldsemi,ws2812-spi\";",
+        "\t\treg = <0>;",
+        "\t\tspi-max-frequency = <4000000>;",
+        "\t\tchain-length = <1>;",
+        "\t\tcolor-mapping = <LED_COLOR_ID_GREEN LED_COLOR_ID_RED LED_COLOR_ID_BLUE>;",
+        "\t\tspi-one-frame = <0x70>;",
+        "\t\tspi-zero-frame = <0x40>;",
+        "\t};",
+        "};",
+    ]
+
+
 def build_nrf52(bus, pins, opts):
     mc = (opts or {}).get("mag_conn", "none")
     L = ["&pinctrl {"]
@@ -87,7 +117,10 @@ def build_nrf52(bus, pins, opts):
                f"<{psel('SPIM_SCK', pins['sck'])}>")
         L.append(f"\tspi3_default {{ group1 {{ psels = {grp}; }}; }};")
         L.append(f"\tspi3_sleep  {{ group1 {{ psels = {grp}; low-power-enable; }}; }};")
-    if pins.get("led") and pins.get("led") != "none":
+    lt = (opts or {}).get("led_type", "single")
+    led_on = bool(pins.get("led")) and pins.get("led") != "none"
+    is_strip = led_on and lt == "strip"
+    if led_on and not is_strip:
         need(pins, "led", "LED")
         chans = [("PWM_OUT0", pins["led"])]
         if pins.get("led1"):
@@ -97,6 +130,8 @@ def build_nrf52(bus, pins, opts):
         psels = ", ".join(f"<{psel(f, p)}>" for f, p in chans)
         L.append(f"\tpwm0_default {{ group1 {{ psels = {psels}; nordic,drive-mode = <NRF_DRIVE_D0S1>; }}; }};")
         L.append(f"\tpwm0_sleep  {{ group1 {{ psels = {psels}; low-power-enable; }}; }};")
+    if is_strip:
+        L += ws2812_pinctrl("spi2", pins["led"])
     if pins.get("tx") and pins.get("rx"):
         ugrp = f"<{psel('UART_TX', pins['tx'])}>, <{psel('UART_RX', pins['rx'])}>"
         L.append(f"\tuart0_default: uart0_default {{ group1 {{ psels = {ugrp}; }}; }};")
@@ -120,7 +155,7 @@ def build_nrf52(bus, pins, opts):
         L.append("\tchosen { zephyr,console = &uart0; zephyr,shell-uart = &uart0; };")
     L.append("\tzephyr,user {")
     L.append(f"\t\tint0-gpios = {gpio(pins['int'], '0')};")
-    if pins.get("led") == "none":
+    if pins.get("led") == "none" or is_strip:
         L.append("\t\t/delete-property/ led-gpios;")
     elif pins.get("led"):
         led_flag = "GPIO_OPEN_DRAIN" if (opts or {}).get("led_polarity") == "low" else "GPIO_OPEN_SOURCE"
@@ -139,7 +174,7 @@ def build_nrf52(bus, pins, opts):
     if pins.get("sw0") and parse_pin(pins["sw0"]):
         q = parse_pin(pins["sw0"])
         L.append(f"&button0 {{ gpios = <&gpio{q[0]} {q[1]} (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>; }};")
-    if pins.get("led") and pins.get("led") != "none":
+    if led_on and not is_strip:
         pol = (opts or {}).get("led_polarity")
         ppol = "PWM_POLARITY_INVERTED" if pol == "low" else "PWM_POLARITY_NORMAL"
         if pol == "low":
@@ -156,12 +191,19 @@ def build_nrf52(bus, pins, opts):
                 L.append(f"\t\tpwm-led{c} = &pwm_led{c};")
             L.append("\t};")
             L.append("};")
+    if is_strip:
+        L += ws2812_node("spi2")
+        L.append('&pwm0 { status = "disabled"; };')
+        L.append("/ { aliases { led-strip = &led_strip; /delete-property/ pwm-led0; }; /delete-node/ pwmleds; };")
     L += mag_device_nodes("nrf52", pins, mc)
     return L
 
 
 def build_nrf54l(bus, pins, opts):
     mc = (opts or {}).get("mag_conn", "none")
+    lt = (opts or {}).get("led_type", "single")
+    led_on = bool(pins.get("led")) and pins.get("led") != "none"
+    is_strip54 = led_on and lt == "strip"
     L = ["&pinctrl {"]
     txq = parse_pin(pins.get("tx"))
     uart_node = "uart30" if (txq and txq[0] == 0) else "uart22"
@@ -186,6 +228,8 @@ def build_nrf54l(bus, pins, opts):
         mgrp = f"<{psel('TWIM_SDA', pins['mag_sda'])}>, <{psel('TWIM_SCL', pins['mag_scl'])}>"
         L.append(f"\ti2c0_default {{ group1 {{ psels = {mgrp}; bias-disable; }}; }};")
         L.append(f"\ti2c0_sleep  {{ group1 {{ psels = {mgrp}; bias-disable; low-power-enable; }}; }};")
+    if is_strip54:
+        L += ws2812_pinctrl("spi22", pins["led"])
     L.append("};")
     if bus == "spi":
         need(pins, "cs", "IMU CS")
@@ -219,7 +263,7 @@ def build_nrf54l(bus, pins, opts):
         L.append(f"\tchosen {{ zephyr,console = &{uart_node}; zephyr,shell-uart = &{uart_node}; }};")
     L.append("\tzephyr,user {")
     L.append(f"\t\tint0-gpios = {gpio(pins['int'], '0')};")
-    if pins.get("led") == "none":
+    if pins.get("led") == "none" or is_strip54:
         L.append("\t\t/delete-property/ led-gpios;")
     elif pins.get("led"):
         led_flag = "GPIO_ACTIVE_LOW" if (opts or {}).get("led_polarity") == "low" else "GPIO_ACTIVE_HIGH"
@@ -229,6 +273,9 @@ def build_nrf54l(bus, pins, opts):
     L.append("\t};")
     L += battery_divider(opts, AIN_NRF54L)
     L.append("};")
+    if is_strip54:
+        L += ws2812_node("spi22")
+        L.append("/ { aliases { led-strip = &led_strip; }; };")
     return L
 
 
@@ -264,7 +311,10 @@ def main():
         L = build_nrf54l(bus, pins, opts)
     else:
         L = build_nrf52(bus, pins, opts)
-    print("\n".join(L))
+    hdr = []
+    if opts.get("led_type") == "strip" and pins.get("led") not in (None, "", "none"):
+        hdr = ["#include <zephyr/dt-bindings/led/led.h>", ""]
+    print("\n".join(hdr + L))
 
 
 if __name__ == "__main__":
