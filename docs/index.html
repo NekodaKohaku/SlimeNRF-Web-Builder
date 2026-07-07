@@ -370,11 +370,15 @@ function allowedPins(mod, key) {
 }
 
 const REQUIRED_PINS = ["sck","mosi","miso","cs","sda","scl","led","led1","led2","adc","clk","sw0","vcc","tx","rx","pwr"];
+let _lastPinKey = "";
 function buildPins() {
   const mod = currentModule();
   const bus = document.getElementById("bus").value;
   const host = document.getElementById("pins");
-  const __prev = {}; document.querySelectorAll("#pins select").forEach(s => { if (s.value) __prev[s.dataset.key] = s.value; });
+  const _mk = (mod ? mod.id : "") + "/" + bus;
+  const __prev = {};
+  if (_mk === _lastPinKey) document.querySelectorAll("#pins select").forEach(s => { if (s.value) __prev[s.dataset.key] = s.value; });
+  _lastPinKey = _mk;
   host.innerHTML = "";
   const defs = (mod.defaults && mod.defaults[bus]) || {};
   const x = t();
