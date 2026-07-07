@@ -45,9 +45,14 @@
 <body>
 <div class="wrap">
   <div class="langbar">
+    <span style="flex:1; display:flex; gap:6px;">
+      <button id="exportBtn" data-i18n="exportCfg"></button>
+      <button id="importBtn" data-i18n="importCfg"></button>
+    </span>
     <button data-lang="zh">中文</button>
     <button data-lang="en">EN</button>
     <button data-lang="ja">日本語</button>
+    <input type="file" id="importFile" accept="application/json,.json" style="display:none">
   </div>
 
   <h1 data-i18n="title">SlimeNRF Firmware Builder</h1>
@@ -197,8 +202,9 @@ const I18N = {
     featVcc:"感測器電源", helpFeatVcc:"用一支 GPIO 直接供電給感測器，睡眠時可切斷省電。",
     featUart:"UART 日誌", helpFeatUart:"接外部序列晶片輸出 log，或透過 bootloader 燒錄（需 TX/RX 兩腳）。",
     featPwr:"電源自鎖", helpFeatPwr:"用 GPIO 拉住 MOSFET 維持整板電源（配合實體自鎖開關電路）。",
+    exportCfg:"匯出設定", importCfg:"匯入設定", importErr:"匯入失敗：檔案格式不正確。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
-    pinINT:"IMU INT", pinCLK:"IMU CLK（選填）", pinLED:"LED", pinLED1:"LED 通道2", pinLED2:"LED 通道3", pinSW0:"按鈕 SW0（選填）", pinVCC:"感測器電源（選填）", pinTX:"UART TX（選填）", pinRX:"UART RX（選填）", pinPWR:"電源自鎖（選填）"
+    pinINT:"IMU INT", pinCLK:"IMU CLK（選填）", pinLED:"LED 通道1", pinLED1:"LED 通道2", pinLED2:"LED 通道3", pinSW0:"按鈕 SW0（選填）", pinVCC:"感測器電源（選填）", pinTX:"UART TX（選填）", pinRX:"UART RX（選填）", pinPWR:"電源自鎖（選填）"
   },
   en: {
     title:"SlimeNRF Firmware Builder", subtitle:"Pick a module, map each pin, then build to get custom firmware.",
@@ -233,8 +239,9 @@ const I18N = {
     featVcc:"Sensor power", helpFeatVcc:"Power the sensor directly from a GPIO so it can be cut off during sleep to save power.",
     featUart:"UART log", helpFeatUart:"Output logs to an external serial chip, or flash via bootloader (needs TX/RX pins).",
     featPwr:"Power hold", helpFeatPwr:"Use a GPIO to latch a MOSFET and keep the whole board powered (with a self-latching switch circuit).",
+    exportCfg:"Export", importCfg:"Import", importErr:"Import failed: invalid file.",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
-    pinINT:"IMU INT", pinCLK:"IMU CLK (optional)", pinLED:"LED", pinLED1:"LED ch2", pinLED2:"LED ch3", pinSW0:"Button SW0 (optional)", pinVCC:"Sensor power (optional)", pinTX:"UART TX (optional)", pinRX:"UART RX (optional)", pinPWR:"Power hold (optional)"
+    pinINT:"IMU INT", pinCLK:"IMU CLK (optional)", pinLED:"LED ch1", pinLED1:"LED ch2", pinLED2:"LED ch3", pinSW0:"Button SW0 (optional)", pinVCC:"Sensor power (optional)", pinTX:"UART TX (optional)", pinRX:"UART RX (optional)", pinPWR:"Power hold (optional)"
   },
   ja: {
     title:"SlimeNRF ファームウェアビルダー", subtitle:"モジュールを選び各ピンを割り当て、ビルドを押すと専用ファームができます。",
@@ -269,8 +276,9 @@ const I18N = {
     featVcc:"センサー電源", helpFeatVcc:"GPIO から直接センサーへ給電し、スリープ時に遮断して省電力。",
     featUart:"UART ログ", helpFeatUart:"外部シリアルチップへログ出力、または bootloader 書き込み（TX/RX 2 ピン必要）。",
     featPwr:"電源ラッチ", helpFeatPwr:"GPIO で MOSFET をラッチし基板全体の電源を維持（自己保持スイッチ回路）。",
+    exportCfg:"エクスポート", importCfg:"インポート", importErr:"インポート失敗：ファイル形式が不正です。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
-    pinINT:"IMU INT", pinCLK:"IMU CLK（任意）", pinLED:"LED", pinLED1:"LED ch2", pinLED2:"LED ch3", pinSW0:"ボタン SW0（任意）", pinVCC:"センサー電源（任意）", pinTX:"UART TX（任意）", pinRX:"UART RX（任意）", pinPWR:"電源保持（任意）"
+    pinINT:"IMU INT", pinCLK:"IMU CLK（任意）", pinLED:"LED ch1", pinLED1:"LED ch2", pinLED2:"LED ch3", pinSW0:"ボタン SW0（任意）", pinVCC:"センサー電源（任意）", pinTX:"UART TX（任意）", pinRX:"UART RX（任意）", pinPWR:"電源保持（任意）"
   }
 };
 
@@ -303,7 +311,7 @@ function applyLang() {
   setOpt("ledch", "1", x.ledCh1); setOpt("ledch", "2", x.ledCh2); setOpt("ledch", "3", x.ledCh3);
   ["featLed","featSw0","featClk","featVcc","featUart","featPwr"].forEach(id => { setOpt(id, "enabled", x.featOn); setOpt(id, "disabled", x.featOff); });
   setOpt("recvLedPol", "high", x.ledPolHigh); setOpt("recvLedPol", "low", x.ledPolLow);
-  document.querySelectorAll(".langbar button").forEach(b => b.classList.toggle("on", b.dataset.lang === LANG));
+  document.querySelectorAll(".langbar button[data-lang]").forEach(b => b.classList.toggle("on", b.dataset.lang === LANG));
   populateModules();
 }
 
@@ -314,6 +322,43 @@ function parsePin(p) {
   return m ? { port: +m[1], pin: +m[2] } : null;
 }
 
+const SAVE_IDS = ["type","mod","bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featVcc","featUart","featPwr","recvLedPol","adcPin","adcR1","adcR2","recvLed"];
+function collectState() {
+  const st = { v: 1, ctrl: {}, pins: {} };
+  SAVE_IDS.forEach(id => { const e = document.getElementById(id); if (e) st.ctrl[id] = e.value; });
+  document.querySelectorAll("#pins select").forEach(s => { if (s.value) st.pins[s.dataset.key] = s.value; });
+  return st;
+}
+function persist() { try { localStorage.setItem("cfg", JSON.stringify(collectState())); } catch (e) {} }
+function setVal(id, v) {
+  const e = document.getElementById(id);
+  if (!e || v === undefined || v === null) return;
+  if (e.tagName === "SELECT" && ![...e.options].some(o => o.value === v)) return;
+  e.value = v;
+}
+function applyState(st) {
+  if (!st || !st.ctrl) return;
+  const c = st.ctrl;
+  setVal("type", c.type); populateModules();
+  setVal("mod", c.mod);
+  ["bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featVcc","featUart","featPwr","recvLedPol","adcR1","adcR2"].forEach(id => setVal(id, c[id]));
+  onChange();
+  Object.keys(st.pins || {}).forEach(k => setVal("pin_" + k, st.pins[k]));
+  ["adcPin","recvLed"].forEach(id => setVal(id, c[id]));
+  render();
+}
+function exportConfig() {
+  const blob = new Blob([JSON.stringify(collectState(), null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "slimenrf-config.json"; a.click();
+  URL.revokeObjectURL(a.href);
+}
+function importConfig(e) {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { try { applyState(JSON.parse(r.result)); persist(); } catch (err) { alert(t().importErr); } };
+  r.readAsText(f);
+}
 async function init() {
   MODULES = (await (await fetch("modules.json")).json()).modules;
   ["sleep","output","battery","ledpol","extra","recvLed","recvLedPol"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
@@ -322,12 +367,16 @@ async function init() {
   ["adcPin","adcR1","adcR2"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
   document.getElementById("type").addEventListener("change", () => { markDirty(); populateModules(); onChange(); });
   document.getElementById("mod").addEventListener("change", () => { markDirty(); onChange(); });
-  document.querySelectorAll(".langbar button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".langbar button[data-lang]").forEach(b => b.addEventListener("click", () => {
     LANG = b.dataset.lang; try { localStorage.setItem("lang", LANG); } catch (e) {}
     applyLang();
   }));
+  document.getElementById("exportBtn").addEventListener("click", exportConfig);
+  document.getElementById("importBtn").addEventListener("click", () => document.getElementById("importFile").click());
+  document.getElementById("importFile").addEventListener("change", importConfig);
   applyLang();
-  onChange();
+  let saved = null; try { saved = JSON.parse(localStorage.getItem("cfg") || "null"); } catch (e) {}
+  if (saved && saved.ctrl) { try { applyState(saved); } catch (e) { try { localStorage.removeItem("cfg"); } catch (_) {} onChange(); } } else onChange();
 }
 
 function populateModules() {
@@ -373,19 +422,14 @@ function updateFeatVis() {
 function pinFields(bus) {
   const base = bus === "i2c" ? [["sda","pinSDA"],["scl","pinSCL"]]
                              : [["sck","pinSCK"],["mosi","pinMOSI"],["miso","pinMISO"],["cs","pinCS"]];
-  return base.concat([["int","pinINT"],["clk","pinCLK"],["led","pinLED"],["led1","pinLED1"],["led2","pinLED2"],["sw0","pinSW0"],["vcc","pinVCC"],["tx","pinTX"],["rx","pinRX"],["pwr","pinPWR"]]);
-}
-function pinActive(key) {
-  if (["sck","mosi","miso","cs","sda","scl","int"].indexOf(key) >= 0) return true;
-  if (key === "clk") return featOn("featClk");
-  if (key === "led") return featOn("featLed");
-  if (key === "led1") return featOn("featLed") && ledChannels() >= 2;
-  if (key === "led2") return featOn("featLed") && ledChannels() >= 3;
-  if (key === "sw0") return featOn("featSw0");
-  if (key === "vcc") return featOn("featVcc");
-  if (key === "tx" || key === "rx") return featOn("featUart");
-  if (key === "pwr") return featOn("featPwr");
-  return true;
+  const f = base.concat([["int","pinINT"]]);
+  if (featOn("featClk")) f.push(["clk","pinCLK"]);
+  if (featOn("featLed")) ledFields().forEach(x => f.push(x));
+  if (featOn("featSw0")) f.push(["sw0","pinSW0"]);
+  if (featOn("featVcc")) f.push(["vcc","pinVCC"]);
+  if (featOn("featUart")) f.push(["tx","pinTX"], ["rx","pinRX"]);
+  if (featOn("featPwr")) f.push(["pwr","pinPWR"]);
+  return f;
 }
 
 function magPinFields() {
@@ -427,7 +471,6 @@ function buildPins() {
     if (__prev[key] !== undefined && [...s.options].some(o => o.value === __prev[key])) s.value = __prev[key];
     else if (defs[key]) s.value = defs[key];
     else if (REQUIRED_PINS.includes(key) && s.options.length) s.value = s.options[0].value;
-    if (!pinActive(key)) { s.disabled = true; wrap.classList.add("off"); }
     s.addEventListener("change", () => { markDirty(); render(); });
     wrap.appendChild(l); wrap.appendChild(s); host.appendChild(wrap);
   });
@@ -585,11 +628,12 @@ function drawBoard(pins) {
 }
 
 function render() {
+  persist();
   const type = document.getElementById("type").value;
   if (type === "receiver") { document.getElementById("dts").textContent = ""; drawBoard({}); refreshValidation(); return; }
   const used = {};
-  document.querySelectorAll("#pins select").forEach(s => { s.style.outline = ""; if (s.value) { used[s.value] = (used[s.value]||0)+1; } });
-  document.querySelectorAll("#pins select").forEach(s => { if (s.value && used[s.value] > 1) s.style.outline = "2px solid var(--err)"; });
+  document.querySelectorAll("#pins select").forEach(s => { s.style.outline = ""; if (!s.disabled && s.value) { used[s.value] = (used[s.value]||0)+1; } });
+  document.querySelectorAll("#pins select").forEach(s => { if (!s.disabled && s.value && used[s.value] > 1) s.style.outline = "2px solid var(--err)"; });
   const pins = collectPins();
   drawBoard(pins);
   document.getElementById("dts").textContent = renderOverlay(pins, document.getElementById("bus").value,
