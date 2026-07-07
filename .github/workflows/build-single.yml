@@ -149,6 +149,8 @@ jobs:
           FMT='${{ steps.cfg.outputs.fileformat }}'
           BOARD='${{ steps.cfg.outputs.board_target }}'
           if [ "$FMT" = "hex" ]; then
+            # board defconfig 的 FLASH_LOAD_OFFSET=0x1000 蓋不過,直接改板子 defconfig -> 0x0 (SWD 直燒、無 bootloader)
+            find boards -name '*_defconfig' -exec sed -i 's/CONFIG_FLASH_LOAD_OFFSET=0x1000/CONFIG_FLASH_LOAD_OFFSET=0x0/g' {} + 2>/dev/null || true
             append 'CONFIG_USE_DT_CODE_PARTITION=n'
             append 'CONFIG_FLASH_LOAD_OFFSET=0'
             append 'CONFIG_BUILD_OUTPUT_UF2=n'
