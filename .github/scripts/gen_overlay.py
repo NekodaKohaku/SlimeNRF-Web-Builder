@@ -89,9 +89,14 @@ def build_nrf52(bus, pins, opts):
         L.append(f"\tspi3_sleep  {{ group1 {{ psels = {grp}; low-power-enable; }}; }};")
     if pins.get("led") and pins.get("led") != "none":
         need(pins, "led", "LED")
-        L.append(f"\tpwm0_default {{ group1 {{ psels = <{psel('PWM_OUT0', pins['led'])}>; "
-                 f"nordic,drive-mode = <NRF_DRIVE_D0S1>; }}; }};")
-        L.append(f"\tpwm0_sleep  {{ group1 {{ psels = <{psel('PWM_OUT0', pins['led'])}>; low-power-enable; }}; }};")
+        chans = [("PWM_OUT0", pins["led"])]
+        if pins.get("led1"):
+            chans.append(("PWM_OUT1", pins["led1"]))
+        if pins.get("led2"):
+            chans.append(("PWM_OUT2", pins["led2"]))
+        psels = ", ".join(f"<{psel(f, p)}>" for f, p in chans)
+        L.append(f"\tpwm0_default {{ group1 {{ psels = {psels}; nordic,drive-mode = <NRF_DRIVE_D0S1>; }}; }};")
+        L.append(f"\tpwm0_sleep  {{ group1 {{ psels = {psels}; low-power-enable; }}; }};")
     if pins.get("tx") and pins.get("rx"):
         ugrp = f"<{psel('UART_TX', pins['tx'])}>, <{psel('UART_RX', pins['rx'])}>"
         L.append(f"\tuart0_default {{ group1 {{ psels = {ugrp}; }}; }};")
@@ -134,8 +139,23 @@ def build_nrf52(bus, pins, opts):
     if pins.get("sw0") and parse_pin(pins["sw0"]):
         q = parse_pin(pins["sw0"])
         L.append(f"&button0 {{ gpios = <&gpio{q[0]} {q[1]} (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>; }};")
-    if pins.get("led") and pins.get("led") != "none" and (opts or {}).get("led_polarity") == "low":
-        L.append("&pwm_led0 { pwms = <&pwm0 0 PWM_MSEC(1) PWM_POLARITY_INVERTED>; };")
+    if pins.get("led") and pins.get("led") != "none":
+        pol = (opts or {}).get("led_polarity")
+        ppol = "PWM_POLARITY_INVERTED" if pol == "low" else "PWM_POLARITY_NORMAL"
+        if pol == "low":
+            L.append("&pwm_led0 { pwms = <&pwm0 0 PWM_MSEC(1) PWM_POLARITY_INVERTED>; };")
+        extra = [c for c in (1, 2) if pins.get(f"led{c}")]
+        if extra:
+            L.append("/ {")
+            L.append("\tpwmleds {")
+            for c in extra:
+                L.append(f"\t\tpwm_led{c}: pwm_led_{c} {{ pwms = <&pwm0 {c} PWM_MSEC(1) {ppol}>; }};")
+            L.append("\t};")
+            L.append("\taliases {")
+            for c in extra:
+                L.append(f"\t\tpwm-led{c} = &pwm_led{c};")
+            L.append("\t};")
+            L.append("};")
     L += mag_device_nodes("nrf52", pins, mc)
     return L
 
