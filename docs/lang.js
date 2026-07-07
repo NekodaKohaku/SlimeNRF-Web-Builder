@@ -24,7 +24,7 @@ const I18N = {
     helpIMU:"你板子上用的慣性感測器晶片。", helpMag:"磁力計晶片，沒有就選無。", helpBus:"IMU 走 SPI 或 I2C，依你的接線。", helpSleep:"啟用後靜止進低功耗、動作喚醒，較省電。", helpFlash:"Bootloader：韌體疊在 bootloader 之後（0x1000），同時產出 .uf2（USB 拖放）與 .hex（SWD 保留 bootloader）；需板子已有 Adafruit bootloader。直接 SWD：0x0 起的完整映像、無 bootloader，用 SWD 直接燒 .hex。Dongle 需 USB，固定 Bootloader；無 USB 的模組只能直接 SWD。", helpBattery:"鋰電池用原廠曲線；選鎳氫 NiMH 時，編譯前會自動幫官方原始碼套用 NiMH 電量曲線補丁。",
     adc:"電池量測", adcExternal:"外部 AIN 腳", adcInternal:"內建 VDDHDIV5", adcPin:"ADC 腳（AIN）", adcR1:"上臂電阻 R1 (kΩ)", adcR2:"下臂電阻 R2 (kΩ)", helpADC:"電池電壓量測來源。外部 AIN 腳可搭配分壓量測鋰電；電壓直接進 ADC（無分壓）兩個電阻留 0。內建 VDDHDIV5 是晶片內部量測。",
     ledPol:"LED 極性", ledPolHigh:"接地（一般）", ledPolLow:"接 VCC（反向）", helpLedPol:"LED 接法：GPIO→電阻→LED→地 選「接地」；GPIO→LED→電阻→VCC 選「接 VCC」（反向點亮）。",
-    ledCh:"LED 顏色/通道", ledCh1:"單色", ledCh2:"雙色", ledCh3:"RGB 三色", helpLedCh:"選幾色就接幾支 PWM LED 腳：單色 1 支、雙色 2 支、RGB 三色 3 支（共陽/共陰皆可，極性沿用上面設定，三通道共用）。多通道僅 nRF52（MS88）支援；ME54 目前限單色。顏色順序固定：通道1＝紅、通道2＝綠、通道3＝藍，請把對應顏色的 LED 接到對應通道。",
+    ledCh:"LED 種類", ledCh1:"單色", ledCh2:"雙色", ledCh3:"RGB 三色", ledCh4:"可定址 LED", helpLedCh:"LED 種類。單色＝1 支腳；雙色/RGB＝2~3 支 PWM 腳(共陽/共陰皆可,極性沿用上面設定);可定址＝WS2812 單線全彩,只吃 1 支 data 腳(GRB 色序,底層用一個空閒 SPI 產生時序)。雙色/RGB 僅 nRF52;ME54 支援單色與可定址。",
     extraAct:"SW0 額外功能", extraActOff:"停用", extraActOn:"啟用", helpExtraAct:"需有接 SW0 才有作用。停用（預設）：連按回報給 SlimeVR 伺服器由伺服器決定（暫無功能）。啟用：連按由本機執行——2 下校正、3 下配對、4/5 下 DFU。長按關機不受此設定影響。",
     featOn:"啟用", featOff:"停用",
     featLed:"狀態 LED", helpFeatLed:"狀態 LED，顯示配對/錯誤/充電/電量。停用則整板不裝 LED。打開後可設顏色通道、極性與腳位。",
@@ -35,7 +35,7 @@ const I18N = {
     featPwr:"電源自鎖", helpFeatPwr:"用 GPIO 拉住 MOSFET 維持整板電源（配合實體自鎖開關電路）。",
     exportCfg:"匯出設定", importCfg:"匯入設定", importErr:"匯入失敗：檔案格式不正確。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
-    pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED 通道1", pinLED1:"LED 通道2", pinLED2:"LED 通道3", pinSW0:"按鈕 SW0", pinVCC:"感測器電源", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"電源自鎖"
+    pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED 通道1", pinLED1:"LED 通道2", pinLED2:"LED 通道3", pinLEDData:"LED Data (WS2812)", pinSW0:"按鈕 SW0", pinVCC:"感測器電源", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"電源自鎖"
   },
   en: {
     _name: "EN",
@@ -62,7 +62,7 @@ const I18N = {
     helpIMU:"The IMU chip on your board.", helpMag:"Magnetometer chip, or None.", helpBus:"IMU on SPI or I2C, per your wiring.", helpSleep:"Low-power when idle, wake on motion — saves battery.", helpFlash:"Bootloader: app sits after the bootloader (0x1000); outputs both .uf2 (USB drag-drop) and .hex (SWD, keeps bootloader). Needs the Adafruit bootloader already on the chip. Direct SWD: full image from 0x0, no bootloader — flash .hex via SWD. A dongle needs USB so it's fixed to Bootloader; a module without USB can only use Direct SWD.", helpBattery:"Li-ion uses the factory curve; choosing NiMH patches the official source with a NiMH curve at build time.",
     adc:"Battery sense", adcExternal:"External AIN pin", adcInternal:"Internal VDDHDIV5", adcPin:"ADC pin (AIN)", adcR1:"R1 top (kΩ)", adcR2:"R2 bottom (kΩ)", helpADC:"Battery voltage source. External AIN pin can use a divider for Li-ion; leave both resistors 0 if voltage goes straight to ADC. Internal VDDHDIV5 uses the chip's internal measurement.",
     ledPol:"LED polarity", ledPolHigh:"To GND (normal)", ledPolLow:"To VCC (inverted)", helpLedPol:"LED wiring: GPIO->R->LED->GND pick To GND; GPIO->LED->R->VCC pick To VCC (inverted).",
-    ledCh:"LED colors/channels", ledCh1:"Single", ledCh2:"Dual", ledCh3:"RGB (tri)", helpLedCh:"Number of colors = number of PWM LED pins: single 1, dual 2, RGB 3 (common anode/cathode both fine; polarity above is shared by all channels). Multi-channel is nRF52 (MS88) only; ME54 is single-color for now. Fixed color order: ch1=red, ch2=green, ch3=blue — wire each color LED to its channel.",
+    ledCh:"LED type", ledCh1:"Single", ledCh2:"Dual", ledCh3:"RGB (tri)", ledCh4:"Addressable", helpLedCh:"LED type. Single = 1 pin; Dual/RGB = 2-3 PWM pins (common anode/cathode, shares polarity above); Addressable = WS2812 single-wire full color, 1 data pin only (GRB order, driven by a spare SPI). Dual/RGB is nRF52 only; ME54 supports single and addressable.",
     extraAct:"SW0 extra functions", extraActOff:"Off", extraActOn:"On", helpExtraAct:"Only works if SW0 is wired. Off (default): presses reported to the SlimeVR server, which decides (no function yet). On: presses act locally — 2x calibrate, 3x pair, 4/5x DFU. Long-press shutdown unaffected.",
     featOn:"On", featOff:"Off",
     featLed:"Status LED", helpFeatLed:"Status LED for pairing/error/charging/battery. Off = no LED at all. When on you can set color channels, polarity and pins.",
@@ -73,7 +73,7 @@ const I18N = {
     featPwr:"Power hold", helpFeatPwr:"Use a GPIO to latch a MOSFET and keep the whole board powered (with a self-latching switch circuit).",
     exportCfg:"Export", importCfg:"Import", importErr:"Import failed: invalid file.",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
-    pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED ch1", pinLED1:"LED ch2", pinLED2:"LED ch3", pinSW0:"Button SW0", pinVCC:"Sensor power", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"Power hold"
+    pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED ch1", pinLED1:"LED ch2", pinLED2:"LED ch3", pinLEDData:"LED data (WS2812)", pinSW0:"Button SW0", pinVCC:"Sensor power", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"Power hold"
   },
   ja: {
     _name: "日本語",
@@ -100,7 +100,7 @@ const I18N = {
     helpIMU:"基板の IMU チップ。", helpMag:"磁気センサー、なければ「なし」。", helpBus:"配線に応じて SPI か I2C。", helpSleep:"静止時は低消費、動作で復帰し省電力。", helpFlash:"Bootloader：アプリを bootloader の後ろ（0x1000）に配置し、.uf2（USB ドラッグ）と .hex（SWD、bootloader 保持）を両方出力。Adafruit bootloader が必要。直接 SWD：0x0 からの単体イメージ、bootloader なし、SWD で .hex を書き込み。ドングルは USB 必須のため Bootloader 固定、USB なしのモジュールは直接 SWD のみ。", helpBattery:"Li-ion は既定カーブ。NiMH を選ぶとビルド時に公式ソースへ NiMH カーブのパッチを適用。",
     adc:"電池計測", adcExternal:"外部 AIN ピン", adcInternal:"内蔵 VDDHDIV5", adcPin:"ADC ピン (AIN)", adcR1:"R1 上側 (kΩ)", adcR2:"R2 下側 (kΩ)", helpADC:"電池電圧の計測元。外部 AIN ピンは分圧で Li-ion 計測可。分圧なし（直接 ADC）は両抵抗を 0。内蔵 VDDHDIV5 はチップ内部計測。",
     ledPol:"LED 極性", ledPolHigh:"GND 側（通常）", ledPolLow:"VCC 側（反転）", helpLedPol:"LED 配線：GPIO→R→LED→GND は「GND 側」、GPIO→LED→R→VCC は「VCC 側」（反転点灯）。",
-    ledCh:"LED 色数/チャンネル", ledCh1:"単色", ledCh2:"2色", ledCh3:"RGB（3色）", helpLedCh:"色数だけ PWM LED ピンを接続：単色1本、2色2本、RGB3本（アノード/カソード共通どちらも可、極性は上の設定を全チャンネル共用）。多チャンネルは nRF52（MS88）のみ；ME54 は現状単色。色順は固定：ch1=赤・ch2=緑・ch3=青。各色 LED を対応チャンネルへ。",
+    ledCh:"LED 種類", ledCh1:"単色", ledCh2:"2色", ledCh3:"RGB（3色）", ledCh4:"アドレサブル", helpLedCh:"LED 種類。単色＝1本;2色/RGB＝PWM 2〜3本(アノード/カソード共通、極性は上を共用);アドレサブル＝WS2812 単線フルカラー、data 1本のみ(GRB順、空き SPI で生成)。2色/RGB は nRF52 のみ;ME54 は単色とアドレサブル対応。",
     extraAct:"SW0 拡張機能", extraActOff:"無効", extraActOn:"有効", helpExtraAct:"SW0 を接続時のみ有効。無効（既定）：連打はサーバーへ送信しサーバーが決定（現状機能なし）。有効：連打は本体で実行——2回 校正、3回 ペアリング、4/5回 DFU。長押しシャットダウンは影響なし。",
     featOn:"有効", featOff:"無効",
     featLed:"ステータス LED", helpFeatLed:"ペアリング/エラー/充電/電池を表示。無効なら LED なし。有効時に色数・極性・ピンを設定。",
@@ -111,6 +111,6 @@ const I18N = {
     featPwr:"電源ラッチ", helpFeatPwr:"GPIO で MOSFET をラッチし基板全体の電源を維持（自己保持スイッチ回路）。",
     exportCfg:"エクスポート", importCfg:"インポート", importErr:"インポート失敗：ファイル形式が不正です。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
-    pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED ch1", pinLED1:"LED ch2", pinLED2:"LED ch3", pinSW0:"ボタン SW0", pinVCC:"センサー電源", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"電源保持"
+    pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED ch1", pinLED1:"LED ch2", pinLED2:"LED ch3", pinLEDData:"LED データ (WS2812)", pinSW0:"ボタン SW0", pinVCC:"センサー電源", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"電源保持"
   }
 };

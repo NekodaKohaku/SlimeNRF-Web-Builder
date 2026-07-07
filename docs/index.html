@@ -102,7 +102,7 @@
         <div><label for="sleep"><span data-i18n="sleep"></span><span class="help" data-help="helpSleep">?</span></label><select id="sleep"><option value="disabled"></option><option value="enabled"></option></select></div>
         <div><label for="output"><span data-i18n="flash"></span><span class="help" data-help="helpFlash">?</span></label><select id="output"><option value="bootloader"></option><option value="swd"></option></select></div>
         <div><label for="featLed"><span data-i18n="featLed"></span><span class="help" data-help="helpFeatLed">?</span></label><select id="featLed"><option value="enabled"></option><option value="disabled"></option></select></div>
-        <div id="wrapLedch"><label for="ledch"><span data-i18n="ledCh"></span><span class="help" data-help="helpLedCh">?</span></label><select id="ledch"><option value="1"></option><option value="2"></option><option value="3"></option></select></div>
+        <div id="wrapLedch"><label for="ledch"><span data-i18n="ledCh"></span><span class="help" data-help="helpLedCh">?</span></label><select id="ledch"><option value="single"></option><option value="dual"></option><option value="rgb"></option><option value="strip"></option></select></div>
         <div id="wrapLedpol"><label for="ledpol"><span data-i18n="ledPol"></span><span class="help" data-help="helpLedPol">?</span></label><select id="ledpol"><option value="high"></option><option value="low"></option></select></div>
         <div><label for="featSw0"><span data-i18n="featSw0"></span><span class="help" data-help="helpFeatSw0">?</span></label><select id="featSw0"><option value="disabled"></option><option value="enabled"></option></select></div>
         <div id="wrapExtra"><label for="extra"><span data-i18n="extraAct"></span><span class="help" data-help="helpExtraAct">?</span></label><select id="extra"><option value="disabled"></option><option value="enabled"></option></select></div>
@@ -205,7 +205,7 @@ function applyLang() {
   setOpt("extra", "disabled", x.extraActOff); setOpt("extra", "enabled", x.extraActOn);
   setOpt("adc", "external", x.adcExternal); setOpt("adc", "internal", x.adcInternal);
   setOpt("ledpol", "high", x.ledPolHigh); setOpt("ledpol", "low", x.ledPolLow);
-  setOpt("ledch", "1", x.ledCh1); setOpt("ledch", "2", x.ledCh2); setOpt("ledch", "3", x.ledCh3);
+  setOpt("ledch", "single", x.ledCh1); setOpt("ledch", "dual", x.ledCh2); setOpt("ledch", "rgb", x.ledCh3); setOpt("ledch", "strip", x.ledCh4);
   ["featLed","featSw0","featClk","featVcc","featUart","featPwr"].forEach(id => { setOpt(id, "enabled", x.featOn); setOpt(id, "disabled", x.featOff); });
   setOpt("recvLedPol", "high", x.ledPolHigh); setOpt("recvLedPol", "low", x.ledPolLow);
   { const __ls = document.getElementById("langSelect"); if (__ls) __ls.value = LANG; }
@@ -310,29 +310,35 @@ function populateModules() {
 
 function currentModule() { return MODULES.find(m => m.id === document.getElementById("mod").value); }
 
-function ledChannels() {
+function ledType() {
   const mod = currentModule();
-  if (!mod || mod.mcu === "nrf54l15") return 1;
-  return parseInt(document.getElementById("ledch").value || "1", 10) || 1;
+  let t = document.getElementById("ledch").value || "single";
+  if (mod && mod.mcu === "nrf54l15" && (t === "dual" || t === "rgb")) t = "single";
+  return t;
+}
+function ledChannels() {
+  const t = ledType();
+  return t === "rgb" ? 3 : t === "dual" ? 2 : 1;
 }
 function ledFields() {
-  const n = ledChannels();
+  const t = ledType();
+  if (t === "strip") return [["led","pinLEDData"]];
   const f = [["led","pinLED"]];
-  if (n >= 2) f.push(["led1","pinLED1"]);
-  if (n >= 3) f.push(["led2","pinLED2"]);
+  if (t === "dual" || t === "rgb") f.push(["led1","pinLED1"]);
+  if (t === "rgb") f.push(["led2","pinLED2"]);
   return f;
 }
 function updateLedCh() {
   const mod = currentModule();
   const sel = document.getElementById("ledch");
   const nrf54 = !!(mod && mod.mcu === "nrf54l15");
-  ["2","3"].forEach(v => { const o = sel.querySelector('option[value="' + v + '"]'); if (o) o.disabled = nrf54; });
-  if (nrf54 && sel.value !== "1") sel.value = "1";
+  ["dual","rgb"].forEach(v => { const o = sel.querySelector('option[value="' + v + '"]'); if (o) o.disabled = nrf54; });
+  if (nrf54 && (sel.value === "dual" || sel.value === "rgb")) sel.value = "single";
 }
 function featOn(id) { const e = document.getElementById(id); return !!(e && e.value === "enabled"); }
 function updateFeatVis() {
   const set = (id, on) => { const w = document.getElementById(id); if (!w) return; const el = w.querySelector("select"); if (el) el.disabled = !on; w.classList.toggle("off", !on); };
-  set("wrapLedch", featOn("featLed")); set("wrapLedpol", featOn("featLed")); set("wrapExtra", featOn("featSw0"));
+  set("wrapLedch", featOn("featLed")); set("wrapLedpol", featOn("featLed") && ledType() !== "strip"); set("wrapExtra", featOn("featSw0"));
 }
 function pinFields(bus) {
   const base = bus === "i2c" ? [["sda","pinSDA"],["scl","pinSCL"]]
@@ -633,7 +639,8 @@ function collectConfig() {
       adc_r1: parseInt(document.getElementById("adcR1").value || "0", 10) || 0,
       adc_r2: parseInt(document.getElementById("adcR2").value || "0", 10) || 0,
       led_polarity: (isRecv ? document.getElementById("recvLedPol") : document.getElementById("ledpol")).value,
-      led_channels: isRecv ? 1 : ledChannels()
+      led_channels: isRecv ? 1 : ledChannels(),
+      led_type: isRecv ? "single" : ledType()
     }
   };
 }
