@@ -35,7 +35,7 @@ const I18N = {
     featPwr:"電源自鎖", helpFeatPwr:"用 GPIO 拉住 MOSFET 維持整板電源（配合實體自鎖開關電路）。",
     exportCfg:"匯出設定", importCfg:"匯入設定", importErr:"匯入失敗：檔案格式不正確。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
-    pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED 通道1", pinLED1:"LED 通道2", pinLED2:"LED 通道3", pinLEDData:"LED Data (WS2812)", pinSW0:"按鈕 SW0", pinVCC:"感測器電源", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"電源自鎖"
+    pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED 通道1", pinLED1:"LED 通道2", pinLED2:"LED 通道3", pinLEDData:"LED Data (WS2812)", pinSW0:"按鈕 SW0", pinVCC:"感測器 VDD", pinGND:"感測器 GND", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"電源自鎖"
   },
   en: {
     _name: "EN",
@@ -73,7 +73,7 @@ const I18N = {
     featPwr:"Power hold", helpFeatPwr:"Use a GPIO to latch a MOSFET and keep the whole board powered (with a self-latching switch circuit).",
     exportCfg:"Export", importCfg:"Import", importErr:"Import failed: invalid file.",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
-    pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED ch1", pinLED1:"LED ch2", pinLED2:"LED ch3", pinLEDData:"LED data (WS2812)", pinSW0:"Button SW0", pinVCC:"Sensor power", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"Power hold"
+    pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED ch1", pinLED1:"LED ch2", pinLED2:"LED ch3", pinLEDData:"LED data (WS2812)", pinSW0:"Button SW0", pinVCC:"Sensor VDD", pinGND:"Sensor GND", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"Power hold"
   },
   ja: {
     _name: "日本語",
@@ -111,6 +111,6 @@ const I18N = {
     featPwr:"電源ラッチ", helpFeatPwr:"GPIO で MOSFET をラッチし基板全体の電源を維持（自己保持スイッチ回路）。",
     exportCfg:"エクスポート", importCfg:"インポート", importErr:"インポート失敗：ファイル形式が不正です。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
-    pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED ch1", pinLED1:"LED ch2", pinLED2:"LED ch3", pinLEDData:"LED データ (WS2812)", pinSW0:"ボタン SW0", pinVCC:"センサー電源", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"電源保持"
+    pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED ch1", pinLED1:"LED ch2", pinLED2:"LED ch3", pinLEDData:"LED データ (WS2812)", pinSW0:"ボタン SW0", pinVCC:"センサー VDD", pinGND:"センサー GND", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"電源保持"
   }
 };

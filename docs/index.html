@@ -107,7 +107,6 @@
         <div><label for="featSw0"><span data-i18n="featSw0"></span><span class="help" data-help="helpFeatSw0">?</span></label><select id="featSw0"><option value="disabled"></option><option value="enabled"></option></select></div>
         <div id="wrapExtra"><label for="extra"><span data-i18n="extraAct"></span><span class="help" data-help="helpExtraAct">?</span></label><select id="extra"><option value="disabled"></option><option value="enabled"></option></select></div>
         <div><label for="featClk"><span data-i18n="featClk"></span><span class="help" data-help="helpFeatClk">?</span></label><select id="featClk"><option value="disabled"></option><option value="enabled"></option></select></div>
-        <div><label for="featVcc"><span data-i18n="featVcc"></span><span class="help" data-help="helpFeatVcc">?</span></label><select id="featVcc"><option value="disabled"></option><option value="enabled"></option></select></div>
         <div><label for="featUart"><span data-i18n="featUart"></span><span class="help" data-help="helpFeatUart">?</span></label><select id="featUart"><option value="disabled"></option><option value="enabled"></option></select></div>
         <div><label for="featPwr"><span data-i18n="featPwr"></span><span class="help" data-help="helpFeatPwr">?</span></label><select id="featPwr"><option value="disabled"></option><option value="enabled"></option></select></div>
       </div>
@@ -206,7 +205,7 @@ function applyLang() {
   setOpt("adc", "external", x.adcExternal); setOpt("adc", "internal", x.adcInternal);
   setOpt("ledpol", "high", x.ledPolHigh); setOpt("ledpol", "low", x.ledPolLow);
   setOpt("ledch", "single", x.ledCh1); setOpt("ledch", "dual", x.ledCh2); setOpt("ledch", "rgb", x.ledCh3); setOpt("ledch", "strip", x.ledCh4);
-  ["featLed","featSw0","featClk","featVcc","featUart","featPwr"].forEach(id => { setOpt(id, "enabled", x.featOn); setOpt(id, "disabled", x.featOff); });
+  ["featLed","featSw0","featClk","featUart","featPwr"].forEach(id => { setOpt(id, "enabled", x.featOn); setOpt(id, "disabled", x.featOff); });
   setOpt("recvLedPol", "high", x.ledPolHigh); setOpt("recvLedPol", "low", x.ledPolLow);
   { const __ls = document.getElementById("langSelect"); if (__ls) __ls.value = LANG; }
   populateModules();
@@ -219,7 +218,7 @@ function parsePin(p) {
   return m ? { port: +m[1], pin: +m[2] } : null;
 }
 
-const SAVE_IDS = ["type","mod","bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featVcc","featUart","featPwr","recvLedPol","adcR1","adcR2","recvLed"];
+const SAVE_IDS = ["type","mod","bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featUart","featPwr","recvLedPol","adcR1","adcR2","recvLed"];
 function collectState() {
   const st = { v: 1, ctrl: {}, pins: {} };
   SAVE_IDS.forEach(id => { const e = document.getElementById(id); if (e) st.ctrl[id] = e.value; });
@@ -238,7 +237,7 @@ function applyState(st) {
   if (!st || !st.ctrl) return;
   const c = st.ctrl;
   setVal("mod", c.mod);
-  ["bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featVcc","featUart","featPwr","recvLedPol","adcR1","adcR2"].forEach(id => setVal(id, c[id]));
+  ["bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featUart","featPwr","recvLedPol","adcR1","adcR2"].forEach(id => setVal(id, c[id]));
   onChange();
   Object.keys(st.pins || {}).forEach(k => setVal("pin_" + k, st.pins[k]));
   ["recvLed"].forEach(id => setVal(id, c[id]));
@@ -275,7 +274,7 @@ function importConfig(e) {
 async function init() {
   MODULES = (await (await fetch("modules.json")).json()).modules;
   ["sleep","output","ledpol","extra","recvLed","recvLedPol"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
-  ["bus","imu","magconn","battery","ledch","featLed","featSw0","featClk","featVcc","featUart","featPwr"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); onChange(); }));
+  ["bus","imu","magconn","battery","ledch","featLed","featSw0","featClk","featUart","featPwr"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); onChange(); }));
   document.getElementById("adc").addEventListener("change", () => { markDirty(); onChange(); });
   ["adcR1","adcR2"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
   document.getElementById("type").addEventListener("change", () => { markDirty(); switchType(document.getElementById("type").value); });
@@ -347,7 +346,7 @@ function pinFields(bus) {
   if (featOn("featClk")) f.push(["clk","pinCLK"]);
   if (featOn("featLed")) ledFields().forEach(x => f.push(x));
   if (featOn("featSw0")) f.push(["sw0","pinSW0"]);
-  if (featOn("featVcc")) f.push(["vcc","pinVCC"]);
+  f.push(["vcc","pinVCC"], ["gnd","pinGND"]);
   if (featOn("featUart")) f.push(["tx","pinTX"], ["rx","pinRX"]);
   if (featOn("featPwr")) f.push(["pwr","pinPWR"]);
   if (document.getElementById("adc").value === "external" && document.getElementById("battery").value !== "none") f.push(["adc","adcPin"]);
@@ -375,7 +374,7 @@ function allowedPins(mod, key) {
   return pins.filter(p => { const m = /^P(\d)\./.exec(p); return m && allow.indexOf(m[1]) >= 0; });
 }
 
-const REQUIRED_PINS = ["sck","mosi","miso","cs","sda","scl","led","led1","led2","adc","clk","sw0","vcc","tx","rx","pwr"];
+const REQUIRED_PINS = ["sck","mosi","miso","cs","sda","scl","led","led1","led2","adc","clk","sw0","tx","rx","pwr"];
 let _lastPinKey = "";
 function buildPins() {
   const mod = currentModule();
@@ -392,7 +391,8 @@ function buildPins() {
     const wrap = document.createElement("div");
     const l = document.createElement("label"); l.dataset.i18n = i18nKey; l.textContent = x[i18nKey];
     const s = document.createElement("select"); s.id = "pin_" + key; s.dataset.key = key;
-    if (!REQUIRED_PINS.includes(key)) { const none = document.createElement("option"); none.value = ""; none.textContent = "—"; s.appendChild(none); }
+    if (key === "vcc" || key === "gnd") { const rail = key === "vcc" ? "VDD" : "GND"; const o = document.createElement("option"); o.value = rail; o.textContent = rail; s.appendChild(o); }
+    else if (!REQUIRED_PINS.includes(key)) { const none = document.createElement("option"); none.value = ""; none.textContent = "—"; s.appendChild(none); }
     const optPins = (key === "adc") ? ((mod.analog_pins) || []) : allowedPins(mod, key);
     optPins.forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = p; s.appendChild(o); });
     if (__prev[key] !== undefined && [...s.options].some(o => o.value === __prev[key])) s.value = __prev[key];
@@ -429,7 +429,12 @@ function updateAdc() {
 
 function collectPins() {
   const pins = {};
-  document.querySelectorAll("#pins select").forEach(s => { if (!s.disabled && s.value) pins[s.dataset.key] = s.value; });
+  document.querySelectorAll("#pins select").forEach(s => {
+    if (s.disabled || !s.value) return;
+    const k = s.dataset.key, v = s.value;
+    if ((k === "vcc" && v === "VDD") || (k === "gnd" && v === "GND")) return;
+    pins[k] = v;
+  });
   if (!featOn("featLed")) pins.led = "none";
   return pins;
 }
@@ -497,7 +502,7 @@ const FUNC_META = {
   sck:{label:"SCK",color:"#e0902a"}, mosi:{label:"MOSI",color:"#2f9e44"},
   miso:{label:"MISO",color:"#3b82c4"}, cs:{label:"CS",color:"#9c5a2a"},
   int:{label:"INT",color:"#4bb543"}, clk:{label:"CLK",color:"#17a2a2"},
-  led:{label:"LED",color:"#d4537e"}, led1:{label:"LED2",color:"#2f9e44"}, led2:{label:"LED3",color:"#3b82c4"}, sw0:{label:"SW0",color:"#b0952a"}, vcc:{label:"VCC",color:"#c0398f"},
+  led:{label:"LED",color:"#d4537e"}, led1:{label:"LED2",color:"#2f9e44"}, led2:{label:"LED3",color:"#3b82c4"}, sw0:{label:"SW0",color:"#b0952a"}, vcc:{label:"VDD",color:"#c0398f"}, gnd:{label:"GND",color:"#555a63"},
   tx:{label:"TX",color:"#6d6df0"}, rx:{label:"RX",color:"#8a63d2"}, pwr:{label:"PWR",color:"#c0392b"},
   mag_sda:{label:"M-SDA",color:"#2f9e44"}, mag_scl:{label:"M-SCL",color:"#e0902a"}, mag_cs:{label:"M-CS",color:"#9c5a2a"},
   adc:{label:"AIN",color:"#c99a00"}
@@ -515,7 +520,12 @@ function drawBoard(pins) {
     tx.textContent = t().noDiagram; svg.appendChild(tx); return;
   }
   const g2f = {};
-  for (const key in (pins || {})) { if (FUNC_META[key] && pins[key]) g2f[pins[key]] = FUNC_META[key]; }
+  for (const key in (pins || {})) {
+    if (!pins[key]) continue;
+    let meta = FUNC_META[key];
+    if (key === "led" && ledType() === "strip") meta = { label: "DATA", color: "#d4537e" };
+    if (meta) g2f[pins[key]] = meta;
+  }
 
   const BX = 150, BW = 220, BY = 24, BH = 306;
   const a = (dx, dy) => (BX + dx) + " " + (BY + dy);
