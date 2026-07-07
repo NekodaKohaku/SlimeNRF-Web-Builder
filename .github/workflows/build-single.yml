@@ -228,11 +228,32 @@ jobs:
             -- "${BUILDARGS[@]}"
 
           FMT="${{ steps.cfg.outputs.fileformat }}"
-          SHA="${{ steps.clone.outputs.fw_sha }}"; DATE="$(date -u +%Y%m%d)"
-          NAME="${{ steps.cfg.outputs.filename }}_g${SHA}_${DATE}"
+          SHA="${{ steps.clone.outputs.fw_sha }}"; DATE="$(date -u +%Y%m%d)"; RUN="${{ github.run_number }}"
+          NAME="${{ steps.cfg.outputs.filename }}_g${SHA}_${DATE}_b${RUN}"
           SRC="SlimeVR-Tracker-nRF/build/SlimeVR-Tracker-nRF/zephyr/zephyr.$FMT"
           [ -f "$SRC" ] || { echo "missing build output $SRC" >&2; exit 1; }
           cp "$SRC" "out/${NAME}.${FMT}"
+
+          echo "===== BUILD OUTPUT OFFSET CHECK (debug) ====="
+          CFG="SlimeVR-Tracker-nRF/build/SlimeVR-Tracker-nRF/zephyr/.config"
+          grep -iE 'FLASH_LOAD_OFFSET|USE_DT_CODE_PARTITION' "$CFG" || true
+          DTS="SlimeVR-Tracker-nRF/build/SlimeVR-Tracker-nRF/zephyr/zephyr.dts"
+          echo "--- code-partition / slot0 in merged DT ---"
+          grep -nE 'code-partition|image-0|partition@0 ' "$DTS" 2>/dev/null | head || true
+          echo "--- hex lowest address ---"
+          python3 - "$SRC" <<'PYEOF'
+          import sys
+          f=sys.argv[1]; base=0; lo=1<<32
+          for line in open(f):
+              line=line.strip()
+              if not line.startswith(":"): continue
+              ll=int(line[1:3],16); a=int(line[3:7],16); t=int(line[7:9],16); p=line[9:9+ll*2]
+              if t==4: base=int(p,16)<<16
+              elif t==2: base=int(p,16)<<4
+              elif t==0: lo=min(lo, base+a)
+          print("lowest load address = 0x%08X %s" % (lo, "(OK 0x0)" if lo==0 else "(!! still 0x%X)"%lo))
+          PYEOF
+          echo "============================================="
 
           EXTRA_HEX=""
           if [ "$FMT" = "uf2" ]; then
