@@ -74,8 +74,8 @@ def mag_device_nodes(mcu, pins, mc):
 def ws2812_pinctrl(spi_node, led_pin):
     p = psel("SPIM_MOSI", led_pin)
     return [
-        f"\t{spi_node}_default {{ group1 {{ psels = <{p}>; }}; }};",
-        f"\t{spi_node}_sleep  {{ group1 {{ psels = <{p}>; low-power-enable; }}; }};",
+        f"\t{spi_node}_default: {spi_node}_default {{ group1 {{ psels = <{p}>; }}; }};",
+        f"\t{spi_node}_sleep: {spi_node}_sleep {{ group1 {{ psels = <{p}>; low-power-enable; }}; }};",
     ]
 
 
@@ -238,8 +238,8 @@ def build_nrf54l(bus, pins, opts):
         if pins.get("led2"):
             chans.append(("PWM_OUT2", pins["led2"]))
         psels = ", ".join(f"<{psel(f, p)}>" for f, p in chans)
-        L.append(f"\tpwm20_default {{ group1 {{ psels = {psels}; }}; }};")
-        L.append(f"\tpwm20_sleep  {{ group1 {{ psels = {psels}; low-power-enable; }}; }};")
+        L.append(f"\tpwm20_default: pwm20_default {{ group1 {{ psels = {psels}; }}; }};")
+        L.append(f"\tpwm20_sleep: pwm20_sleep {{ group1 {{ psels = {psels}; low-power-enable; }}; }};")
     if is_strip54:
         L += ws2812_pinctrl("spi22", pins["led"])
     L.append("};")
