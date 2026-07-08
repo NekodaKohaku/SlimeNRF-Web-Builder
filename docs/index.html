@@ -365,6 +365,12 @@ function allowedPins(mod, key) {
   const pins = mod.pins || [];
   if (mod.mcu !== "nrf54l15") return pins;
   if (key === "sck" || key === "scl" || key === "mag_scl") return pins.filter(p => NRF54L_CLOCK_PINS.includes(p));
+  if (key === "rx") {
+    const txv = ((document.getElementById("pin_tx") || {}).value) || "";
+    const txp = (txv.match(/^P(\d)/) || [])[1];
+    const allowR = txp ? [txp] : (NRF54L_PORTS.rx || ["0", "1"]);
+    return pins.filter(p => { const m = /^P(\d)\./.exec(p); return m && allowR.includes(m[1]); });
+  }
   const allow = NRF54L_PORTS[key];
   if (!allow) return pins;
   return pins.filter(p => { const m = /^P(\d)\./.exec(p); return m && allow.indexOf(m[1]) >= 0; });
@@ -395,7 +401,7 @@ function buildPins() {
     else if (key === "adc" && mod.adc_default && [...s.options].some(o => o.value === mod.adc_default)) s.value = mod.adc_default;
     else if (defs[key]) s.value = defs[key];
     else if (REQUIRED_PINS.includes(key) && s.options.length) s.value = s.options[0].value;
-    s.addEventListener("change", () => { markDirty(); render(); });
+    s.addEventListener("change", () => { markDirty(); if (s.dataset.key === "tx" && currentModule() && currentModule().mcu === "nrf54l15") { buildPins(); } render(); });
     wrap.appendChild(l); wrap.appendChild(s); host.appendChild(wrap);
   });
 }
