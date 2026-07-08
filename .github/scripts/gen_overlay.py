@@ -206,6 +206,7 @@ def build_nrf54l(bus, pins, opts):
     lt = (opts or {}).get("led_type", "single")
     led_on = bool(pins.get("led")) and pins.get("led") != "none"
     is_strip54 = led_on and lt == "strip"
+    _multi54 = led_on and not is_strip54 and bool(pins.get("led1") or pins.get("led2"))
     L = ["&pinctrl {"]
     txq = parse_pin(pins.get("tx"))
     uart_node = "uart30" if (txq and txq[0] == 0) else "uart22"
@@ -230,6 +231,15 @@ def build_nrf54l(bus, pins, opts):
         mgrp = f"<{psel('TWIM_SDA', pins['mag_sda'])}>, <{psel('TWIM_SCL', pins['mag_scl'])}>"
         L.append(f"\ti2c0_default {{ group1 {{ psels = {mgrp}; bias-disable; }}; }};")
         L.append(f"\ti2c0_sleep  {{ group1 {{ psels = {mgrp}; bias-disable; low-power-enable; }}; }};")
+    if _multi54:
+        chans = [("PWM_OUT0", pins["led"])]
+        if pins.get("led1"):
+            chans.append(("PWM_OUT1", pins["led1"]))
+        if pins.get("led2"):
+            chans.append(("PWM_OUT2", pins["led2"]))
+        psels = ", ".join(f"<{psel(f, p)}>" for f, p in chans)
+        L.append(f"\tpwm20_default {{ group1 {{ psels = {psels}; }}; }};")
+        L.append(f"\tpwm20_sleep  {{ group1 {{ psels = {psels}; low-power-enable; }}; }};")
     if is_strip54:
         L += ws2812_pinctrl("spi22", pins["led"])
     L.append("};")
@@ -247,7 +257,7 @@ def build_nrf54l(bus, pins, opts):
         L.append(f'&{uart_node} {{ status = "okay"; pinctrl-0 = <&{uart_node}_default>; pinctrl-1 = <&{uart_node}_sleep>; pinctrl-names = "default", "sleep"; current-speed = <115200>; }};')
     need(pins, "int", "IMU INT")
     ports = set()
-    for key in ("int", "cs", "pwr", "tx", "rx", "led", "vcc", "gnd"):
+    for key in ("int", "cs", "pwr", "tx", "rx", "led", "led1", "led2", "clk", "sw0", "vcc", "gnd"):
         q = parse_pin(pins.get(key))
         if q:
             ports.add(q[0])
@@ -268,8 +278,13 @@ def build_nrf54l(bus, pins, opts):
     if pins.get("led") == "none" or is_strip54:
         L.append("\t\t/delete-property/ led-gpios;")
     elif pins.get("led"):
-        led_flag = "GPIO_ACTIVE_LOW" if (opts or {}).get("led_polarity") == "low" else "GPIO_ACTIVE_HIGH"
+        if _multi54:
+            led_flag = "GPIO_OPEN_DRAIN" if (opts or {}).get("led_polarity") == "low" else "GPIO_OPEN_SOURCE"
+        else:
+            led_flag = "GPIO_ACTIVE_LOW" if (opts or {}).get("led_polarity") == "low" else "GPIO_ACTIVE_HIGH"
         L.append(f"\t\tled-gpios = {gpio(pins['led'], led_flag)};")
+    if pins.get("clk"):
+        L.append(f"\t\tclk-gpios = {gpio(pins['clk'], 'GPIO_OPEN_DRAIN')};")
     if parse_pin(pins.get("vcc")):
         L.append(f"\t\tvcc-gpios = {gpio(pins['vcc'], '0')};")
     if parse_pin(pins.get("gnd")):
@@ -279,6 +294,31 @@ def build_nrf54l(bus, pins, opts):
     L.append("\t};")
     L += battery_divider(opts, AIN_NRF54L)
     L.append("};")
+    if pins.get("sw0") and parse_pin(pins["sw0"]):
+        q = parse_pin(pins["sw0"])
+        L.append("/ {")
+        L.append("\tbuttons {")
+        L.append("\t\tcompatible = \"gpio-keys\";")
+        L.append(f"\t\tbutton0: button_0 {{ gpios = <&gpio{q[0]} {q[1]} (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>; label = \"sw0\"; }};")
+        L.append("\t};")
+        L.append("\taliases { sw0 = &button0; };")
+        L.append("};")
+    if _multi54:
+        L.append('&pwm20 { status = "okay"; pinctrl-0 = <&pwm20_default>; pinctrl-1 = <&pwm20_sleep>; pinctrl-names = "default", "sleep"; };')
+        pol = (opts or {}).get("led_polarity")
+        ppol = "PWM_POLARITY_INVERTED" if pol == "low" else "PWM_POLARITY_NORMAL"
+        chans = [0] + [c for c in (1, 2) if pins.get(f"led{c}")]
+        L.append("/ {")
+        L.append("\tpwmleds {")
+        L.append("\t\tcompatible = \"pwm-leds\";")
+        for c in chans:
+            L.append(f"\t\tpwm_led{c}: pwm_led_{c} {{ pwms = <&pwm20 {c} PWM_MSEC(1) {ppol}>; }};")
+        L.append("\t};")
+        L.append("\taliases {")
+        for c in chans:
+            L.append(f"\t\tpwm-led{c} = &pwm_led{c};")
+        L.append("\t};")
+        L.append("};")
     if is_strip54:
         L += ws2812_node("spi22")
         L.append("/ { aliases { led-strip = &led_strip; }; };")
