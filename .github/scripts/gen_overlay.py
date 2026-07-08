@@ -210,6 +210,20 @@ def build_nrf54l(bus, pins, opts):
     L = ["&pinctrl {"]
     txq = parse_pin(pins.get("tx"))
     uart_node = "uart30" if (txq and txq[0] == 0) else "uart22"
+    strip_spi = "spi22"
+    if is_strip54:
+        used_serial = set()
+        used_serial.add("20" if bus == "spi" else "21")   # IMU: spi20 (SPI) / i2c21 (I2C)
+        if mc == "spi" and pins.get("mag_cs"):
+            used_serial.add("20")
+        if mc in ("i2c", "i2c_shared"):
+            used_serial.add("21")
+        if pins.get("tx") and pins.get("rx"):
+            used_serial.add(uart_node[-2:])
+        for cand in ("22", "21", "23", "20"):
+            if cand not in used_serial:
+                strip_spi = "spi" + cand
+                break
     if bus == "i2c":
         need(pins, "sda", "IMU SDA"); need(pins, "scl", "IMU SCL")
         grp = f"<{psel('TWIM_SDA', pins['sda'])}>, <{psel('TWIM_SCL', pins['scl'])}>"
@@ -241,7 +255,7 @@ def build_nrf54l(bus, pins, opts):
         L.append(f"\tpwm20_default: pwm20_default {{ group1 {{ psels = {psels}; }}; }};")
         L.append(f"\tpwm20_sleep: pwm20_sleep {{ group1 {{ psels = {psels}; low-power-enable; }}; }};")
     if is_strip54:
-        L += ws2812_pinctrl("spi22", pins["led"])
+        L += ws2812_pinctrl(strip_spi, pins["led"])
     L.append("};")
     if bus == "spi":
         need(pins, "cs", "IMU CS")
@@ -320,7 +334,7 @@ def build_nrf54l(bus, pins, opts):
         L.append("\t};")
         L.append("};")
     if is_strip54:
-        L += ws2812_node("spi22")
+        L += ws2812_node(strip_spi)
         L.append("/ { aliases { led-strip = &led_strip; }; };")
     return L
 
