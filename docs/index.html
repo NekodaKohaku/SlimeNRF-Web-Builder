@@ -66,15 +66,7 @@
     <div id="trackerOpts">
       <div class="sec" data-i18n="secSensor"></div>
       <div class="grid">
-        <div><label for="imu"><span data-i18n="imu"></span><span class="help" data-help="helpIMU">?</span></label><select id="imu">
-          <option value="ICM42688">ICM-42688-P</option>
-          <option value="ICM45686">ICM-45686</option>
-          <option value="LSM6DSV" selected>LSM6DSV</option>
-          <option value="LSM6DSO">LSM6DSO</option>
-          <option value="LSM6DSM">LSM6DSM</option>
-          <option value="ISM330BX">ISM330BX</option>
-          <option value="BMI270">BMI270</option>
-        </select></div>
+        <div><label for="imu"><span data-i18n="imu"></span><span class="help" data-help="helpIMU">?</span></label><select id="imu"><option value="auto"></option></select></div>
         <div><label for="bus"><span data-i18n="bus"></span><span class="help" data-help="helpBus">?</span></label><select id="bus"><option value="spi">SPI</option><option value="i2c">I2C</option></select></div>
       </div>
       <div class="grid" style="margin-top:12px;">
@@ -204,6 +196,7 @@ function applyLang() {
   setOpt("extra", "disabled", x.extraActOff); setOpt("extra", "enabled", x.extraActOn);
   setOpt("adc", "external", x.adcExternal); setOpt("adc", "internal", x.adcInternal);
   setOpt("ledpol", "high", x.ledPolHigh); setOpt("ledpol", "low", x.ledPolLow);
+  setOpt("imu", "auto", x.imuAuto);
   setOpt("ledch", "single", x.ledCh1); setOpt("ledch", "dual", x.ledCh2); setOpt("ledch", "rgb", x.ledCh3); setOpt("ledch", "strip", x.ledCh4);
   ["featLed","featSw0","featClk","featUart","featPwr"].forEach(id => { setOpt(id, "enabled", x.featOn); setOpt(id, "disabled", x.featOff); });
   setOpt("recvLedPol", "high", x.ledPolHigh); setOpt("recvLedPol", "low", x.ledPolLow);
@@ -622,7 +615,7 @@ function collectConfig() {
   const noBusVariant = mod.mcu === "nrf54l15";
   const board_target = (isRecv || noBusVariant) ? mod.base_board : (mod.base_board + "/" + bus);
   const parts = ["SlimeNRF", mod.id, isRecv ? "Receiver" : "Tracker"];
-  if (!isRecv) { parts.push(imu); parts.push(bus.toUpperCase()); if (mconn !== "none") parts.push("Mag"); }
+  if (!isRecv) { parts.push(bus.toUpperCase()); if (mconn !== "none") parts.push("Mag"); }
   const fm = flashMethod();
   return {
     module: mod.id,
