@@ -594,10 +594,9 @@ function magConn() {
 }
 function updateMagConn() {
   const sel = document.getElementById("magconn");
-  const imu = document.getElementById("imu").value;
   const bus = document.getElementById("bus").value;
   const opt = v => sel.querySelector('option[value="' + v + '"]');
-  opt("aux").disabled = !(bus === "spi" && MAG_AUX_IMUS.indexOf(imu) >= 0);
+  opt("aux").disabled = (bus !== "spi");
   opt("i2c_shared").disabled = bus !== "i2c";
   opt("spi").disabled = bus !== "spi";
   const cur = sel.querySelector('option[value="' + sel.value + '"]');
