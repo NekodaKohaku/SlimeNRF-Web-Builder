@@ -354,15 +354,17 @@ function magPinFields() {
   return [];
 }
 
+const NRF54L_CLOCK_PINS = ["P1.03", "P1.04", "P1.08", "P1.11", "P1.12"];
 const NRF54L_PORTS = {
   sck:["1"], mosi:["1"], miso:["1"], sda:["1"], scl:["1"],
-  cs:["0","1"], int:["0","1"], led:["1"], sw0:["0","1"],
-  vcc:["0","1"], pwr:["0","1"], clk:["0","1"], tx:["0","1"], rx:["0","1"],
+  cs:["0","1"], int:["0","1"], led:["1"], led1:["1"], led2:["1"], sw0:["0","1"],
+  vcc:["0","1"], gnd:["0","1"], pwr:["0","1"], clk:["0","1"], tx:["0","1"], rx:["0","1"],
   mag_sda:["1"], mag_scl:["1"], mag_cs:["0","1"]
 };
 function allowedPins(mod, key) {
   const pins = mod.pins || [];
   if (mod.mcu !== "nrf54l15") return pins;
+  if (key === "sck" || key === "scl" || key === "mag_scl") return pins.filter(p => NRF54L_CLOCK_PINS.includes(p));
   const allow = NRF54L_PORTS[key];
   if (!allow) return pins;
   return pins.filter(p => { const m = /^P(\d)\./.exec(p); return m && allow.indexOf(m[1]) >= 0; });
