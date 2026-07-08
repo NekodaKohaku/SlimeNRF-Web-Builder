@@ -310,10 +310,7 @@ function populateModules() {
 function currentModule() { return MODULES.find(m => m.id === document.getElementById("mod").value); }
 
 function ledType() {
-  const mod = currentModule();
-  let t = document.getElementById("ledch").value || "single";
-  if (mod && mod.mcu === "nrf54l15" && (t === "dual" || t === "rgb")) t = "single";
-  return t;
+  return document.getElementById("ledch").value || "single";
 }
 function ledChannels() {
   const t = ledType();
@@ -328,11 +325,8 @@ function ledFields() {
   return f;
 }
 function updateLedCh() {
-  const mod = currentModule();
   const sel = document.getElementById("ledch");
-  const nrf54 = !!(mod && mod.mcu === "nrf54l15");
-  ["dual","rgb"].forEach(v => { const o = sel.querySelector('option[value="' + v + '"]'); if (o) o.disabled = nrf54; });
-  if (nrf54 && (sel.value === "dual" || sel.value === "rgb")) sel.value = "single";
+  ["dual","rgb"].forEach(v => { const o = sel.querySelector('option[value="' + v + '"]'); if (o) o.disabled = false; });
 }
 function featOn(id) { const e = document.getElementById(id); return !!(e && e.value === "enabled"); }
 function updateFeatVis() {
