@@ -397,7 +397,9 @@ function buildPins() {
     const s = document.createElement("select"); s.id = "pin_" + key; s.dataset.key = key;
     if (key === "vcc" || key === "gnd") { const rail = key === "vcc" ? "VDD" : "GND"; const o = document.createElement("option"); o.value = rail; o.textContent = rail; s.appendChild(o); }
     else if (!REQUIRED_PINS.includes(key)) { const none = document.createElement("option"); none.value = ""; none.textContent = "—"; s.appendChild(none); }
-    const optPins = (key === "adc") ? ((mod.analog_pins) || []) : allowedPins(mod, key);
+    const optPins = ((key === "adc") ? ((mod.analog_pins) || []) : allowedPins(mod, key)).slice();
+    const _nm = pinNumMap(mod);
+    optPins.sort((a, b) => (parseInt(_nm[a] || 9999, 10)) - (parseInt(_nm[b] || 9999, 10)));
     optPins.forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = pinDisp(mod, p); s.appendChild(o); });
     if (__prev[key] !== undefined && [...s.options].some(o => o.value === __prev[key])) s.value = __prev[key];
     else if (key === "adc" && mod.adc_default && [...s.options].some(o => o.value === mod.adc_default)) s.value = mod.adc_default;
@@ -414,7 +416,9 @@ function populateRecvLed() {
   const prev = sel.value;
   sel.innerHTML = "";
   const off = document.createElement("option"); off.value = "none"; off.textContent = "—"; sel.appendChild(off);
-  (mod.pins || []).forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = pinDisp(mod, p); sel.appendChild(o); });
+  const _nmR = pinNumMap(mod);
+  (mod.pins || []).slice().sort((a, b) => (parseInt(_nmR[a] || 9999, 10)) - (parseInt(_nmR[b] || 9999, 10)))
+    .forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = pinDisp(mod, p); sel.appendChild(o); });
   if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
   else if ([...sel.options].some(o => o.value === "P0.15")) sel.value = "P0.15";
 }
