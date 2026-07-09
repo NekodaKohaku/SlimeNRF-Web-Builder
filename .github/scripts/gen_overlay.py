@@ -284,6 +284,7 @@ def build_nrf54l(bus, pins, opts):
         L.append(f'&{n} {{ status = "okay"; }};')
     if (opts or {}).get("adc") == "external" and (opts or {}).get("adc_pin") in AIN_NRF54L:
         L.append('&adc { status = "okay"; };')
+    L.append('&temp { status = "okay"; };')
     L.append("/ {")
     if pins.get("tx") and pins.get("rx"):
         L.append(f"\tchosen {{ zephyr,console = &{uart_node}; zephyr,shell-uart = &{uart_node}; }};")

@@ -195,6 +195,7 @@ jobs:
           fi
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_pwr.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_temp.py"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_batt.py"
           tail -n 10 prj.conf
 
       - name: Apply receiver options
