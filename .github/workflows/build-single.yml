@@ -214,8 +214,7 @@ jobs:
         run: |
           set -euo pipefail
           cd zephyr-workspace/SlimeVR-Tracker-nRF
-          sed -i 's/^#CONFIG_NRFX_TIMER1=y/CONFIG_NRFX_TIMER1=y/' prj.conf
-          grep -q '^CONFIG_NRFX_TIMER1=y' prj.conf || printf '\n\nCONFIG_NRFX_TIMER1=y\n' >> prj.conf
+          # CONFIG_NRFX_TIMER1 removed: undefined symbol on NCS 3.2; timer.c uses raw TIMER1 + IRQ_DIRECT_CONNECT
           sed -i 's|^[[:space:]]*//[[:space:]]*\(IRQ_DIRECT_CONNECT(TIMER1_IRQn.*\)|\1|' src/connection/timer.c
           sed -i 's|^[[:space:]]*//[[:space:]]*\(irq_enable(TIMER1_IRQn.*\)|\1|' src/connection/timer.c
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_recvdebug.py"   # TEMP dongle-side rx/fwd debug
