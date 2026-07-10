@@ -346,10 +346,10 @@ def build_nrf54l(bus, pins, opts):
 
 
 def build_receiver(pins, opts):
-    L = []
+    L = ['&timer1 { status = "okay"; };']  # NCS 3.2: enabling timer1 in DT auto-selects NRFX_TIMER1 (receiver timer.c uses nrfx_timer instance 1)
     led = pins.get("led")
     if led == "none":
-        return ["/ {", "\tzephyr,user { /delete-property/ led-gpios; };", "};"]
+        return L + ["/ {", "\tzephyr,user { /delete-property/ led-gpios; };", "};"]
     if led and parse_pin(led):
         pol = (opts or {}).get("led_polarity")
         led_flag = "GPIO_OPEN_DRAIN" if pol == "low" else "GPIO_OPEN_SOURCE"
