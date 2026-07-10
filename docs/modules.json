@@ -211,7 +211,7 @@
       "repository_revision": "main",
       "sdk_url": "https://github.com/nrfconnect/sdk-nrf.git",
       "sdk_revision": "v3.4-branch",
-      "zephyr_sdk_version": "0.17.4",
+      "zephyr_sdk_version": "1.0.1",
       "note": "使用官方 test54l 板 + nRF54L 專用 overlay，透過 SWD 燒 .hex。",
       "pins": [
         "P0.00",
