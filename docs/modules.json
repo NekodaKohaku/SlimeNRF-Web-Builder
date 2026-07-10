@@ -7,7 +7,7 @@
       "mcu": "nrf52840",
       "has_usb": false,
       "flash_default": "swd",
-      "note": "共用板 nRF52840 版。SPI 腳已預填為你的實際接線（SCK P0.12 / MOSI P1.09 / MISO P0.08 / CS P0.24 / INT P1.00 / LED P0.06 / SW0 P1.15）。第二版再加：電池 ADC 改 AIN2(P0.04)+RC、UART log(TX P0.26/RX P0.31)、PWREN 自鎖(P1.13)。SWD 燒 .hex。",
+      "note": "共用板 nRF52840 版。追蹤器韌體預設走 UART log（TX P0.10 / RX P0.09，NFC 腳已自動釋放；USB 已關以免 console 被 USB 綁）。要改腳自己選，配置器會擋撞腳。SWD 燒 .hex。",
       "fileformat": "hex",
       "base_board": "promicro_uf2/nrf52840",
       "repository_url": "https://github.com/SlimeVR/SlimeVR-Tracker-nRF.git",
@@ -141,7 +141,7 @@
           ],
           [
             "20",
-            "RST(P0.18)"
+            "RST"
           ],
           [
             "19",
