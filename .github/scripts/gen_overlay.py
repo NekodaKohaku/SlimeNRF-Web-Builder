@@ -338,6 +338,7 @@ def build_nrf54l(bus, pins, opts):
     if is_strip54:
         L += ws2812_node(strip_spi)
         L.append("/ { aliases { led-strip = &led_strip; }; };")
+    L.append('&uicr { nfct-pins-as-gpios; };')  # flash-time NFC-pin release (Nordic-recommended for nRF54L secure builds); test54l_board.c PADCONFIG=0 stays as runtime fallback
     return L
 
 
