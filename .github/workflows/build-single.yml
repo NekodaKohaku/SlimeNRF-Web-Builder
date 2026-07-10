@@ -263,7 +263,7 @@ jobs:
           echo "===== OFFSET CHECK (debug) ====="
           grep -iE 'FLASH_LOAD_OFFSET|USE_DT_CODE_PARTITION' "$ZDIR/.config" 2>/dev/null || true
           grep -nE 'code-partition|image-0|partition@0 ' "$ZDIR/zephyr.dts" 2>/dev/null | head || true
-          python3 - "$SRC" <<'PYEOF'
+          if [ "$FMT" = "hex" ]; then python3 - "$SRC" <<'PYEOF'
           import sys
           f=sys.argv[1]; base=0; lo=1<<32
           for line in open(f):
@@ -275,6 +275,7 @@ jobs:
               elif t==0: lo=min(lo, base+a)
           print("lowest load address = 0x%08X %s" % (lo, "(OK 0x0)" if lo==0 else "(!! 0x%X)"%lo))
           PYEOF
+          fi
           echo "==============================="
 
 
