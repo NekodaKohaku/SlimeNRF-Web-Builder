@@ -207,7 +207,7 @@ def build_nrf54l(bus, pins, opts):
     lt = (opts or {}).get("led_type", "single")
     led_on = bool(pins.get("led")) and pins.get("led") != "none"
     is_strip54 = led_on and lt == "strip"
-    _multi54 = led_on and not is_strip54 and bool(pins.get("led1") or pins.get("led2"))
+    _pwm54 = led_on and not is_strip54  # any non-strip LED drives PWM (pwm20) so brightness/fade patterns match nRF52; single LED uses PWM_OUT0 only
     L = ["&pinctrl {"]
     txq = parse_pin(pins.get("tx"))
     uart_node = "uart30" if (txq and txq[0] == 0) else "uart22"
@@ -246,7 +246,7 @@ def build_nrf54l(bus, pins, opts):
         mgrp = f"<{psel('TWIM_SDA', pins['mag_sda'])}>, <{psel('TWIM_SCL', pins['mag_scl'])}>"
         L.append(f"\ti2c0_default {{ group1 {{ psels = {mgrp}; bias-disable; }}; }};")
         L.append(f"\ti2c0_sleep  {{ group1 {{ psels = {mgrp}; bias-disable; low-power-enable; }}; }};")
-    if _multi54:
+    if _pwm54:
         chans = [("PWM_OUT0", pins["led"])]
         if pins.get("led1"):
             chans.append(("PWM_OUT1", pins["led1"]))
@@ -294,7 +294,7 @@ def build_nrf54l(bus, pins, opts):
     if pins.get("led") == "none" or is_strip54:
         L.append("\t\t/delete-property/ led-gpios;")
     elif pins.get("led"):
-        if _multi54:
+        if _pwm54:
             led_flag = "GPIO_OPEN_DRAIN" if (opts or {}).get("led_polarity") == "low" else "GPIO_OPEN_SOURCE"
         else:
             led_flag = "GPIO_ACTIVE_LOW" if (opts or {}).get("led_polarity") == "low" else "GPIO_ACTIVE_HIGH"
@@ -319,7 +319,7 @@ def build_nrf54l(bus, pins, opts):
         L.append("\t};")
         L.append("\taliases { sw0 = &button0; };")
         L.append("};")
-    if _multi54:
+    if _pwm54:
         L.append('&pwm20 { status = "okay"; pinctrl-0 = <&pwm20_default>; pinctrl-1 = <&pwm20_sleep>; pinctrl-names = "default", "sleep"; };')
         pol = (opts or {}).get("led_polarity")
         ppol = "PWM_POLARITY_INVERTED" if pol == "low" else "PWM_POLARITY_NORMAL"
