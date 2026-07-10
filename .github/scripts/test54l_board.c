@@ -7,6 +7,7 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/dt-bindings/gpio/gpio.h>
 #include <hal/nrf_gpio.h>
+#include <nrf.h>
 
 #define ZEPHYR_USER_NODE DT_PATH(zephyr_user)
 
@@ -26,6 +27,12 @@
 
 static int board_test54l_init(void)
 {
+	/* P1.02 (NFC1) / P1.03 (NFC2) default to NFC mode on nRF54L15 and cannot be
+	 * used as GPIO/SPIM until NFC is disabled. Free them here, before SPIM init. */
+#if defined(NRF_NFCT)
+	NRF_NFCT->PADCONFIG = 0;
+#endif
+
 	/* Hold the external power latch as early as possible. */
 #if DT_NODE_HAS_PROP(ZEPHYR_USER_NODE, pwr_gpios)
 	nrf_gpio_cfg(NRF_GPIO_PIN_MAP(PWR_GPIO_PORT_NUM, PWR_GPIO_PIN), NRF_GPIO_PIN_DIR_OUTPUT, NRF_GPIO_PIN_INPUT_DISCONNECT, NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_S0S1, NRF_GPIO_PIN_NOSENSE);
