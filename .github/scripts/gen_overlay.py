@@ -198,6 +198,7 @@ def build_nrf52(bus, pins, opts):
         L.append('&pwm0 { status = "disabled"; };')
         L.append("/ { aliases { led-strip = &led_strip; /delete-property/ pwm-led0; }; /delete-node/ pwmleds; };")
     L += mag_device_nodes("nrf52", pins, mc)
+    L.append('&uicr { nfct-pins-as-gpios; };')  # free NFC pins P0.09/P0.10 as GPIO (nRF52 tracker only; Kconfig NFCT_PINS_AS_GPIOS removed in Zephyr 4.x)
     return L
 
 

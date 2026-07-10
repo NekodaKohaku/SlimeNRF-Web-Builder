@@ -162,6 +162,9 @@ jobs:
               cp "$GITHUB_WORKSPACE/.github/scripts/test54l_board.c" boards/nordic/test54l/board.c && echo "test54l board.c -> reads DT vcc/gnd-gpios"
               ;;
             *)
+              # nRF52 (has_usb=false modules): disable USB so USB_EXISTS is false and the
+              # SlimeNRF console is not USB-insertion-gated -> it auto-starts over UART/RTT.
+              append 'CONFIG_USB_DEVICE_STACK=n'
               append 'CONFIG_GPIO_AS_PINRESET=y'
               ;;
           esac
