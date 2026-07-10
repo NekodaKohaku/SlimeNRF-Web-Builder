@@ -7,7 +7,7 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/dt-bindings/gpio/gpio.h>
 #include <hal/nrf_gpio.h>
-#include <nrf.h>
+#include <hal/nrf_nfct.h>
 
 #define ZEPHYR_USER_NODE DT_PATH(zephyr_user)
 
