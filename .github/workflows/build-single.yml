@@ -205,6 +205,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbdebug.py"   # TEMP nRF54L ESB debug (remove after interop diagnosed)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_sensordebug.py"   # TEMP nRF54L FIFO debug
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_quatdebug.py"   # TEMP nRF54L fusion-quat debug
+          # patch_ratecap.py REMOVED: rate cap did not help (disconnect happens when still too)
           tail -n 10 prj.conf
 
       - name: Apply receiver options
@@ -217,6 +218,7 @@ jobs:
           grep -q '^CONFIG_NRFX_TIMER1=y' prj.conf || printf '\n\nCONFIG_NRFX_TIMER1=y\n' >> prj.conf
           sed -i 's|^[[:space:]]*//[[:space:]]*\(IRQ_DIRECT_CONNECT(TIMER1_IRQn.*\)|\1|' src/connection/timer.c
           sed -i 's|^[[:space:]]*//[[:space:]]*\(irq_enable(TIMER1_IRQn.*\)|\1|' src/connection/timer.c
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_recvdebug.py"   # TEMP dongle-side rx/fwd debug
           tail -n 5 prj.conf
 
       - name: west build
