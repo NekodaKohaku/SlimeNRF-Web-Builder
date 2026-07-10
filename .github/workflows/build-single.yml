@@ -200,7 +200,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_console.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_pm.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbclk.py"
-          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbnoack.py"   # RE-ENABLED v35: no-ack test (data phase) to see if ACK/retransmit interop wedges the nRF52 receiver
+          # patch_esbnoack.py DISABLED: back to ACK mode (v36 tests SDK-version match instead)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbhalt.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbdebug.py"   # TEMP nRF54L ESB debug (remove after interop diagnosed)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_sensordebug.py"   # TEMP nRF54L FIFO debug
