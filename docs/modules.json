@@ -13,7 +13,7 @@
       "repository_url": "https://github.com/SlimeVR/SlimeVR-Tracker-nRF.git",
       "repository_revision": "main",
       "sdk_url": "https://github.com/nrfconnect/sdk-nrf.git",
-      "sdk_revision": "v3.1-branch",
+      "sdk_revision": "v3.2-branch",
       "zephyr_sdk_version": "0.17.4",
       "receiver": {
         "repository_url": "https://github.com/SlimeVR/SlimeVR-Tracker-nRF-Receiver.git",
