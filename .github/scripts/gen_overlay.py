@@ -341,7 +341,7 @@ def build_nrf54l(bus, pins, opts):
     L.append('&uicr { nfct-pins-as-gpios; };')  # flash-time NFC-pin release (Nordic-recommended for nRF54L secure builds); test54l_board.c PADCONFIG=0 stays as runtime fallback
     hfxo_ff = int((opts or {}).get('hfxo_cap_ff', 0) or 0)
     if 4000 <= hfxo_ff <= 17000:  # nRF54L HFXO internal load-cap tuning for the module crystal (test54l default is for the DK crystal)
-        L.append('&hfxo { load-capacitance-femtofarad = <%d>; };' % hfxo_ff)
+        L.append('&hfxo { load-capacitors = "internal"; load-capacitance-femtofarad = <%d>; };' % hfxo_ff)
     return L
 
 
