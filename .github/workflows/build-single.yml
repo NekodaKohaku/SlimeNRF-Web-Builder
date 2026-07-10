@@ -201,6 +201,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_pm.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbclk.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbnoack.py"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbdebug.py"   # TEMP nRF54L ESB debug (remove after interop diagnosed)
           tail -n 10 prj.conf
 
       - name: Apply receiver options
