@@ -88,6 +88,9 @@
         <div><label for="adcR1"><span data-i18n="adcR1"></span></label><input id="adcR1" type="number" min="0" value="0"></div>
         <div><label for="adcR2"><span data-i18n="adcR2"></span></label><input id="adcR2" type="number" min="0" value="0"></div>
       </div>
+      <div id="hfxoRow" class="grid" style="margin-top:12px;">
+        <div><label for="hfxoCap">HFXO 負載電容 / HFXO load cap (fF, 0=SDK default)</label><input id="hfxoCap" type="number" min="0" max="17000" step="250" value="0"></div>
+      </div>
 
       <div class="sec" data-i18n="secBehavior"></div>
       <div class="grid">
@@ -211,7 +214,7 @@ function parsePin(p) {
   return m ? { port: +m[1], pin: +m[2] } : null;
 }
 
-const SAVE_IDS = ["type","mod","bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featUart","featPwr","recvLedPol","adcR1","adcR2","recvLed"];
+const SAVE_IDS = ["type","mod","bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featUart","featPwr","recvLedPol","adcR1","adcR2","recvLed","hfxoCap"];
 function collectState() {
   const st = { v: 1, ctrl: {}, pins: {} };
   SAVE_IDS.forEach(id => { const e = document.getElementById(id); if (e) st.ctrl[id] = e.value; });
@@ -230,7 +233,7 @@ function applyState(st) {
   if (!st || !st.ctrl) return;
   const c = st.ctrl;
   setVal("mod", c.mod);
-  ["bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featUart","featPwr","recvLedPol","adcR1","adcR2"].forEach(id => setVal(id, c[id]));
+  ["bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featUart","featPwr","recvLedPol","adcR1","adcR2","hfxoCap"].forEach(id => setVal(id, c[id]));
   onChange();
   Object.keys(st.pins || {}).forEach(k => setVal("pin_" + k, st.pins[k]));
   ["recvLed"].forEach(id => setVal(id, c[id]));
@@ -657,7 +660,8 @@ function collectConfig() {
       adc_r2: parseInt(document.getElementById("adcR2").value || "0", 10) || 0,
       led_polarity: (isRecv ? document.getElementById("recvLedPol") : document.getElementById("ledpol")).value,
       led_channels: isRecv ? 1 : ledChannels(),
-      led_type: isRecv ? "single" : ledType()
+      led_type: isRecv ? "single" : ledType(),
+      hfxo_cap_ff: parseInt(document.getElementById("hfxoCap") ? document.getElementById("hfxoCap").value || "0" : "0", 10) || 0
     }
   };
 }
