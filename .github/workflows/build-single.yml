@@ -196,6 +196,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_batt.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_console.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbclk.py"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbnoack.py"
           tail -n 10 prj.conf
 
       - name: Apply receiver options
