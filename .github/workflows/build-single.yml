@@ -215,10 +215,7 @@ jobs:
         run: |
           set -euo pipefail
           cd zephyr-workspace/SlimeVR-Tracker-nRF
-          # NCS 3.2: &timer1 enabled in DT overlay makes NRFX_TIMER1 a valid symbol; now set it to enable the nrfx timer1 driver (declares TIMER1_IRQHandler)
-          grep -q '^CONFIG_NRFX_TIMER1=y' prj.conf || printf '\n\nCONFIG_NRFX_TIMER1=y\n' >> prj.conf
-          sed -i 's|^[[:space:]]*//[[:space:]]*\(IRQ_DIRECT_CONNECT(TIMER1_IRQn.*\)|\1|' src/connection/timer.c
-          sed -i 's|^[[:space:]]*//[[:space:]]*\(irq_enable(TIMER1_IRQn.*\)|\1|' src/connection/timer.c
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_recvtimerstub.py"   # NCS 3.2: stub timer.c (drops nrfx TIMER1 dep; TDMA unused)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_recvdebug.py"   # TEMP dongle-side rx/fwd debug
           tail -n 5 prj.conf
 
