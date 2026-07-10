@@ -159,6 +159,7 @@ jobs:
             *nrf54l*)
               append 'CONFIG_MAIN_STACK_SIZE=2048'   # nRF54L M33+FPU+TrustZone needs more than upstream 512 (upstream: "crashing on nrf54l at 512")
               append 'CONFIG_VOLTAGE_DIVIDER=n'   # redundant Zephyr voltage sensor (firmware reads ADC itself); its init fails -ENOTSUP on nRF54L SAADC
+              append 'CONFIG_RADIO_TX_POWER=0'   # nRF54L: drop +8dBm -> 0dBm; +8 desensitizes the dongle at close range (near-far), jamming other trackers
               cp "$GITHUB_WORKSPACE/.github/scripts/test54l_board.c" boards/nordic/test54l/board.c && echo "test54l board.c -> reads DT vcc/gnd-gpios"
               ;;
             *)
