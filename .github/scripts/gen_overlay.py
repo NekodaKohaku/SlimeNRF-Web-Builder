@@ -274,6 +274,9 @@ def build_nrf54l(bus, pins, opts):
         L.append(f"&spi20 {{ cs-gpios = {cs}; }};")
     if bus != "spi":
         # test54l enables &spi20 unconditionally; its pinctrl squats on P1.02/P1.03/P1.04.
+        # Its imu_spi child must go too: sensor.c guards on the CHILD's status, which does
+        # not inherit the parent's, so it would still try to reference the dead bus device.
+        L.append('&imu_spi { status = "disabled"; };')
         L.append('&spi20 { status = "disabled"; };')
     if mc in ("i2c", "i2c_shared"):
         L.append('&i2c21 { status = "okay"; };')
@@ -284,6 +287,11 @@ def build_nrf54l(bus, pins, opts):
         # low-power-enable -- i.e. it DISCONNECTS those two pads. Any pin the user assigned
         # to P1.05/P1.06 (an LED, for instance) lights up at boot and then dies as soon as
         # the idle TWIM is suspended. Turn the unused controller off so it releases the pins.
+        # Disabling the parent bus does NOT propagate to its children in devicetree, and
+        # sensor.c guards on DT_NODE_HAS_STATUS(DT_NODELABEL(mag), okay) -- the board's mag
+        # node has no explicit status so it stays "okay" and I2C_DT_SPEC_GET() then tries to
+        # reference a bus device that no longer exists. Disable the child too.
+        L.append('&mag { status = "disabled"; };')
         L.append('&i2c21 { status = "disabled"; };')
     if mc == "spi" and pins.get("mag_cs"):
         L.append(f"&spi20 {{ mag_spi: mag_spi@1 {MAG_SPI_DEV}; }};")
