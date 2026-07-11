@@ -43,9 +43,9 @@ new = '#if LED3_EXISTS\n\tgpio_pin_configure_dt(&led3, GPIO_OUTPUT);\n\tgpio_pin
 if old in s: s = s.replace(old, new, 1); n += 1
 
 # 每次點燈:設定前後的腳位狀態
-old = '\tgpio_pin_set_dt(&led, value_pptt > 5000);\n#endif\n}\n'
-new = ('\tldbg_dump("set-pre");\n\tgpio_pin_set_dt(&led, value_pptt > 5000);\n'
-       '\tLOG_INF("[ldbg] gpio_set value=%d -> %d", value_pptt, value_pptt > 5000);\n'
+old = '\tgpio_pin_configure_dt(&led, (value_pptt > 5000) ? GPIO_OUTPUT_ACTIVE : GPIO_OUTPUT_INACTIVE);\n#endif\n}\n'
+new = ('\tldbg_dump("set-pre");\n\tgpio_pin_configure_dt(&led, (value_pptt > 5000) ? GPIO_OUTPUT_ACTIVE : GPIO_OUTPUT_INACTIVE);\n'
+       '\tLOG_INF("[ldbg] gpio_cfg value=%d -> %d", value_pptt, value_pptt > 5000);\n'
        '\tldbg_dump("set-post");\n#endif\n}\n')
 if old in s: s = s.replace(old, new, 1); n += 1
 

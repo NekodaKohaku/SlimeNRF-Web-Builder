@@ -57,4 +57,30 @@ for old, new in hunks:
 open(f, "w", encoding="utf-8").write(s)
 print("patch_ledpwm: applied %d/2 (PWM-owned LED pin no longer reconfigured as GPIO)" % n)
 
+# Third fix, and the one that actually lights the LED on nRF54L.
+#
+# Measured on hardware (PIN_CNF dump): led_pin_init() correctly sets the pin to
+# 0x003 (DIR=output, push-pull) and the very next gpio_pin_set_dt() does drive the
+# pad -- that is the one flash you see at boot. ~100 ms later PIN_CNF has become
+# 0x800/0x802 (DIR=INPUT, DRIVE1=Disconnect'1'), and it stays that way forever.
+# Something outside led.c reconfigures the pin to an open-drain INPUT. From then on
+# gpio_pin_set_dt() still writes OUT correctly (the dump shows OUT toggling 1/0) but
+# the pad is an input, so nothing reaches the LED.
+#
+# gpio_pin_set_dt() only writes OUT; it never re-asserts direction. So drive the LED
+# with gpio_pin_configure_dt(GPIO_OUTPUT_ACTIVE/INACTIVE) instead: it re-asserts
+# DIR=output *and* sets the level in one call, so whoever is clobbering the pin loses
+# the race every time we update the LED. Costs one extra register write per LED change
+# (a few per second at most) and is chip-agnostic -- on nRF52 it is simply equivalent.
+old = "\tgpio_pin_set_dt(&led, value_pptt > 5000);\n"
+new = "\tgpio_pin_configure_dt(&led, (value_pptt > 5000) ? GPIO_OUTPUT_ACTIVE : GPIO_OUTPUT_INACTIVE);\n"
+if new in s:
+    print("patch_ledpwm: gpio re-assert already applied")
+elif old in s:
+    s = s.replace(old, new, 1)
+    open(f, "w", encoding="utf-8").write(s)
+    print("patch_ledpwm: LED now driven with gpio_pin_configure_dt (re-asserts DIR=output every set)")
+else:
+    print("patch_ledpwm: WARNING gpio_pin_set_dt anchor not matched", file=sys.stderr)
+
 sys.exit(0)
