@@ -3,8 +3,8 @@
 #
 # Upstream forces tx_payload.noack = true on nRF54L with the comment
 # "TODO: esb halts with ack and tx fail" -- i.e. noack is only there to dodge the
-# halt caused by per-packet clocks_stop() on TX_FAILED. patch_esbhalt already fixes
-# that halt (HF clock now stays on while streaming), so the reason for noack is gone.
+# halt caused by per-packet clocks_stop() on TX_FAILED. patch_clkpolicy already fixes
+# that halt (clocks_stop() is a no-op on nRF54L while paired), so the reason for noack is gone.
 #
 # Why this matters: ACK is ESB's collision-avoidance mechanism. Two ACK trackers that
 # collide both miss their ACK, back off by retransmit_delay, and re-space themselves.
@@ -20,7 +20,7 @@ old = ("#if defined(NRF54L15_XXAA) // TODO: esb halts with ack and tx fail\n"
        "#else\n"
        "\ttx_payload.noack = false;\n"
        "#endif\n")
-new = ("\ttx_payload.noack = false; // ACK on nRF54L too: halt cause removed by patch_esbhalt\n")
+new = ("\ttx_payload.noack = false; // ACK on nRF54L too: halt cause removed by patch_clkpolicy\n")
 if "noack = false; // ACK on nRF54L" in s:
     print("patch_esback: already applied")
 elif old in s:
