@@ -1,0 +1,57 @@
+{
+  "_comment": "Per-MCU hardware facts. Shared by docs/index.html (fetch) and .github/scripts/gen_overlay.py (file read) so the two can never drift. A module in modules.json only names its 'mcu'; everything below is derived from the silicon, not the board. Adding a board that uses an existing MCU needs no change here.",
+
+  "mcus": {
+    "nrf52840": {
+      "label": "nRF52840",
+
+      "_ain": "SAADC analog input mapping. Product Spec v1.8 table 'Analog inputs'. modules.json's analog_pins is computed as (module pins) INTERSECT (these keys) -- never hand-maintained.",
+      "ain": {
+        "P0.02": 0, "P0.03": 1, "P0.04": 2, "P0.05": 3,
+        "P0.28": 4, "P0.29": 5, "P0.30": 6, "P0.31": 7
+      },
+
+      "_clock_pins": "null = the SPIM/TWIM clock output may sit on any GPIO.",
+      "clock_pins": null,
+      "clock_keys": ["sck", "scl", "mag_scl"],
+
+      "_port_constraints": "{} = every signal may sit on any port.",
+      "port_constraints": {},
+
+      "_rx_follows_tx_port": "false = UART RX and TX may live on different ports.",
+      "rx_follows_tx_port": false,
+
+      "recv_led_default": "P0.15"
+    },
+
+    "nrf54l15": {
+      "label": "nRF54L15",
+
+      "_ain": "SAADC analog input mapping. Note this is NOT the same as the nRF52's -- the nRF54L's AIN0..7 are on P1.04-P1.07 and P1.11-P1.14.",
+      "ain": {
+        "P1.04": 0, "P1.05": 1, "P1.06": 2, "P1.07": 3,
+        "P1.11": 4, "P1.12": 5, "P1.13": 6, "P1.14": 7
+      },
+
+      "_clock_pins": "The nRF54L's SPIM/TWIM clock output can only be driven from these pads.",
+      "clock_pins": ["P1.03", "P1.04", "P1.08", "P1.11", "P1.12"],
+      "clock_keys": ["sck", "scl", "mag_scl"],
+
+      "_port_constraints": "Which GPIO ports each signal may use. The high-speed serial instances (spi20/i2c21/spi22) are wired to port 1 only; slower signals and the port-0 UART (uart30) may also use port 0.",
+      "port_constraints": {
+        "sck": ["1"], "mosi": ["1"], "miso": ["1"], "sda": ["1"], "scl": ["1"],
+        "cs": ["0", "1"], "int": ["0", "1"],
+        "led": ["1"], "led1": ["1"], "led2": ["1"],
+        "sw0": ["0", "1"], "vcc": ["0", "1"], "gnd": ["0", "1"],
+        "pwr": ["0", "1"], "clk": ["0", "1"],
+        "tx": ["0", "1"], "rx": ["0", "1"],
+        "mag_sda": ["1"], "mag_scl": ["1"], "mag_cs": ["0", "1"]
+      },
+
+      "_rx_follows_tx_port": "true = TX and RX must share a port, because the port decides the UART instance (port 0 -> uart30, port 1 -> uart22).",
+      "rx_follows_tx_port": true,
+
+      "recv_led_default": null
+    }
+  }
+}

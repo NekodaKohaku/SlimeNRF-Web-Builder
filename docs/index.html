@@ -205,6 +205,7 @@ function applyLang() {
 }
 
 let MODULES = [];
+let MCUS = {};
 
 function parsePin(p) {
   const m = /^P(\d)\.(\d+)$/.exec(p);
@@ -265,7 +266,12 @@ function importConfig(e) {
   r.readAsText(f);
 }
 async function init() {
-  MODULES = (await (await fetch("modules.json")).json()).modules;
+  const [_mods, _mcus] = await Promise.all([
+    (await fetch("modules.json")).json(),
+    (await fetch("mcus.json")).json()
+  ]);
+  MODULES = _mods.modules;
+  MCUS = _mcus.mcus;
   ["sleep","output","ledpol","extra","recvLed","recvLedPol"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
   ["bus","imu","magconn","battery","ledch","featLed","featSw0","featClk","featUart","featPwr"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); onChange(); }));
   document.getElementById("adc").addEventListener("change", () => { markDirty(); onChange(); });
@@ -347,26 +353,33 @@ function magPinFields() {
   return [];
 }
 
-const NRF54L_CLOCK_PINS = ["P1.03", "P1.04", "P1.08", "P1.11", "P1.12"];
-const NRF54L_PORTS = {
-  sck:["1"], mosi:["1"], miso:["1"], sda:["1"], scl:["1"],
-  cs:["0","1"], int:["0","1"], led:["1"], led1:["1"], led2:["1"], sw0:["0","1"],
-  vcc:["0","1"], gnd:["0","1"], pwr:["0","1"], clk:["0","1"], tx:["0","1"], rx:["0","1"],
-  mag_sda:["1"], mag_scl:["1"], mag_cs:["0","1"]
-};
+function mcuOf(mod) { return (mod && MCUS[mod.mcu]) || {}; }
+
+// The ADC pin list is (what the module brings out) INTERSECT (what the silicon can sample).
+// Derived, never hand-written -- a module that lists a non-AIN pin simply won't offer it.
+function analogPins(mod) {
+  const ain = mcuOf(mod).ain || {};
+  return (mod.pins || []).filter(p => Object.prototype.hasOwnProperty.call(ain, p));
+}
+
+function portOf(p) { const m = /^P(\d)\./.exec(p); return m ? m[1] : null; }
+
 function allowedPins(mod, key) {
   const pins = mod.pins || [];
-  if (mod.mcu !== "nrf54l15") return pins;
-  if (key === "sck" || key === "scl" || key === "mag_scl") return pins.filter(p => NRF54L_CLOCK_PINS.includes(p));
-  if (key === "rx") {
+  const mcu = mcuOf(mod);
+  if ((mcu.clock_keys || []).includes(key) && mcu.clock_pins)
+    return pins.filter(p => mcu.clock_pins.includes(p));
+  const constraints = mcu.port_constraints || {};
+  if (key === "rx" && mcu.rx_follows_tx_port) {
     const txv = ((document.getElementById("pin_tx") || {}).value) || "";
-    const txp = (txv.match(/^P(\d)/) || [])[1];
-    const allowR = txp ? [txp] : (NRF54L_PORTS.rx || ["0", "1"]);
-    return pins.filter(p => { const m = /^P(\d)\./.exec(p); return m && allowR.includes(m[1]); });
+    const txp = portOf(txv);
+    const allowR = txp ? [txp] : (constraints.rx || null);
+    if (!allowR) return pins;
+    return pins.filter(p => allowR.includes(portOf(p)));
   }
-  const allow = NRF54L_PORTS[key];
+  const allow = constraints[key];
   if (!allow) return pins;
-  return pins.filter(p => { const m = /^P(\d)\./.exec(p); return m && allow.indexOf(m[1]) >= 0; });
+  return pins.filter(p => allow.includes(portOf(p)));
 }
 
 const REQUIRED_PINS = ["sck","mosi","miso","cs","sda","scl","led","led1","led2","adc","clk","sw0","tx","rx","pwr"];
@@ -397,7 +410,7 @@ function buildPins() {
     const s = document.createElement("select"); s.id = "pin_" + key; s.dataset.key = key;
     if (key === "vcc" || key === "gnd") { const rail = key === "vcc" ? "VDD" : "GND"; const o = document.createElement("option"); o.value = rail; o.textContent = rail; s.appendChild(o); }
     else if (!REQUIRED_PINS.includes(key)) { const none = document.createElement("option"); none.value = ""; none.textContent = "—"; s.appendChild(none); }
-    const optPins = ((key === "adc") ? ((mod.analog_pins) || []) : allowedPins(mod, key)).slice();
+    const optPins = ((key === "adc") ? analogPins(mod) : allowedPins(mod, key)).slice();
     const _nm = pinNumMap(mod);
     optPins.sort((a, b) => (parseInt(_nm[a] || 9999, 10)) - (parseInt(_nm[b] || 9999, 10)));
     optPins.forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = pinDisp(mod, p); s.appendChild(o); });
@@ -420,11 +433,12 @@ function populateRecvLed() {
   (mod.pins || []).slice().sort((a, b) => (parseInt(_nmR[a] || 9999, 10)) - (parseInt(_nmR[b] || 9999, 10)))
     .forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = pinDisp(mod, p); sel.appendChild(o); });
   if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
-  else if ([...sel.options].some(o => o.value === "P0.15")) sel.value = "P0.15";
+  else { const d = mcuOf(mod).recv_led_default;
+         if (d && [...sel.options].some(o => o.value === d)) sel.value = d; }
 }
 
 function updateAdc() {
-  const ains = (currentModule() && currentModule().analog_pins) || [];
+  const ains = currentModule() ? analogPins(currentModule()) : [];
   const adcSel = document.getElementById("adc");
   const extOpt = adcSel.querySelector('option[value="external"]');
   const batOn = document.getElementById("battery").value !== "none";
@@ -651,7 +665,7 @@ function collectConfig() {
       sleep: document.getElementById("sleep").value,
       extra_actions: (!isRecv) ? document.getElementById("extra").value : "disabled",
       battery: document.getElementById("battery").value,
-      adc: (!isRecv && document.getElementById("battery").value !== "none" && document.getElementById("adc").value === "external" && ((mod.analog_pins || []).length > 0)) ? "external" : "internal",
+      adc: (!isRecv && document.getElementById("battery").value !== "none" && document.getElementById("adc").value === "external" && (analogPins(mod).length > 0)) ? "external" : "internal",
       adc_pin: (document.getElementById("pin_adc") ? document.getElementById("pin_adc").value : ""),
       adc_r1: parseInt(document.getElementById("adcR1").value || "0", 10) || 0,
       adc_r2: parseInt(document.getElementById("adcR2").value || "0", 10) || 0,
