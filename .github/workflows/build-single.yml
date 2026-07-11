@@ -150,6 +150,7 @@ jobs:
           BAT='${{ steps.cfg.outputs.battery }}'
           FMT='${{ steps.cfg.outputs.fileformat }}'
           BOARD='${{ steps.cfg.outputs.board_target }}'
+          append 'CONFIG_VOLTAGE_DIVIDER=n'   # redundant Zephyr voltage sensor: the firmware reads the ADC itself. Its init returns -ENOTSUP on NCS 3.2 (both nRF52 and nRF54L) -> 'voltage_init: setup: -134'
           if [ "$FMT" = "hex" ]; then
             # SWD 直燒、無 bootloader:code-partition 由 overlay 定在 0x0,確保用 DT 分割
             append 'CONFIG_USE_DT_CODE_PARTITION=y'
@@ -158,7 +159,6 @@ jobs:
           case "$BOARD" in
             *nrf54l*)
               append 'CONFIG_MAIN_STACK_SIZE=2048'   # nRF54L M33+FPU+TrustZone needs more than upstream 512 (upstream: "crashing on nrf54l at 512")
-              append 'CONFIG_VOLTAGE_DIVIDER=n'   # redundant Zephyr voltage sensor (firmware reads ADC itself); its init fails -ENOTSUP on nRF54L SAADC
               cp "$GITHUB_WORKSPACE/.github/scripts/test54l_board.c" boards/nordic/test54l/board.c && echo "test54l board.c -> reads DT vcc/gnd-gpios"
               ;;
             *)
@@ -208,6 +208,7 @@ jobs:
           # patch_esbnoack.py DISABLED: back to ACK mode (v36 tests SDK-version match instead)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esback.py"   # v51: nRF54L back to ACK -> REMOVES upstream's "#if NRF54L: noack=true" special case. ACK is ESB collision backoff; noack made the 54 deaf to collisions and it steamrolled the nRF52 trackers.
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbreinit.py"   # v43: nRF54L periodic ESB soft-restart (resets PID, un-wedges receiver; only tracker reboot recovers)
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_txdebug.py"   # TEMP: measure TX rate on both chips
           # patch_ratecap.py REMOVED: rate cap did not help (disconnect happens when still too)
           tail -n 10 prj.conf
 
