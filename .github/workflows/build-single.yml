@@ -200,6 +200,7 @@ jobs:
           fi
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_temp.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_batt.py"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_adc32.py"   # NCS 3.2: SAADC AIN encoding changed (NRF_SAADC_AIN0 == 0); the old +1 read the wrong pin
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_console.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_pm.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_conntx.py"   # v48: connection_thread slept after EVERY packet -> capped TX at ~55/s; add missing continue
