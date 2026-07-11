@@ -198,6 +198,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_batt.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_console.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_pm.py"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_ledtest.py"   # TEMP: pin LED high, measure it
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_conntx.py"   # v48: connection_thread slept after EVERY packet -> capped TX at ~55/s; add missing continue
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbclk.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_clkpolicy.py"   # nRF54L HF-clock policy, ONE place (clocks_stop) instead of 3 call-site ifdefs; replaces patch_esbhalt+patch_connclk
