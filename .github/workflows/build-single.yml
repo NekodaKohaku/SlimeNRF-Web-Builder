@@ -165,7 +165,6 @@ jobs:
               # nRF52 (has_usb=false modules): disable USB so USB_EXISTS is false and the
               # SlimeNRF console is not USB-insertion-gated -> it auto-starts over UART/RTT.
               append 'CONFIG_USB_DEVICE_STACK=n'
-              append 'CONFIG_GPIO_AS_PINRESET=y'
               ;;
           esac
           sed -i 's|SPI_DT_SPEC_GET(\([^,]*,[[:space:]]*SPI_OP\))|SPI_DT_SPEC_GET(\1, 0)|g' src/sensor/sensor.c || true
@@ -196,6 +195,7 @@ jobs:
           fi
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_pwr.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_ledpwm.py"   # PWM-driven LED: stop led.c from also configuring that pin as GPIO (steals it from PWM on nRF54L via PIN_CNF.CTRLSEL -> dead LED)
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_leddebug.py"   # TEMP nRF54L LED diagnosis (remove once fixed)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_temp.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_batt.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_console.py"

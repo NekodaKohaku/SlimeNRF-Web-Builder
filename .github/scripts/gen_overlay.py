@@ -197,6 +197,7 @@ def build_nrf52(bus, pins, opts):
         L += ws2812_node("spi2")
         L.append('&pwm0 { status = "disabled"; };')
         L.append("/ { aliases { led-strip = &led_strip; /delete-property/ pwm-led0; }; /delete-node/ pwmleds; };")
+    L.append('&uicr { gpio-as-nreset; };')  # NCS 3.2: CONFIG_GPIO_AS_PINRESET is deprecated/non-promptable, the reset pin is a UICR devicetree property now (mirrors nRF54L's nfct-pins-as-gpios)
     L += mag_device_nodes("nrf52", pins, mc)
     L.append('&uicr { nfct-pins-as-gpios; };')  # free NFC pins P0.09/P0.10 as GPIO (nRF52 tracker only; Kconfig NFCT_PINS_AS_GPIOS removed in Zephyr 4.x)
     return L
@@ -339,9 +340,6 @@ def build_nrf54l(bus, pins, opts):
         L += ws2812_node(strip_spi)
         L.append("/ { aliases { led-strip = &led_strip; }; };")
     L.append('&uicr { nfct-pins-as-gpios; };')  # flash-time NFC-pin release (Nordic-recommended for nRF54L secure builds); test54l_board.c PADCONFIG=0 stays as runtime fallback
-    hfxo_ff = int((opts or {}).get('hfxo_cap_ff', 0) or 0)
-    if 4000 <= hfxo_ff <= 17000:  # nRF54L HFXO internal load-cap tuning for the module crystal (test54l default is for the DK crystal)
-        L.append('&hfxo { load-capacitors = "internal"; load-capacitance-femtofarad = <%d>; };' % hfxo_ff)
     return L
 
 
