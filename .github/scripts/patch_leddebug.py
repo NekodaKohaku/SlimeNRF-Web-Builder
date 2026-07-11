@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-# TEMP: make led.c report which path it compiled to and what it is doing.
-# Distinguishes (A) pwm_led0 alias missing -> GPIO fallback on a PWM-owned pin,
-# from (B) PWM path fine but PM suspend/resume leaves the pin in the sleep state.
+# TEMP: dump the LED pin's actual PIN_CNF / OUT registers so we stop guessing who owns it.
+# PIN_CNF tells us DIR (output?), INPUT (connected?), and on nRF54L the CTRLSEL field
+# (which peripheral, if any, owns the pad). OUT tells us the level being driven.
 import sys
 f = "src/system/led.c"
 s = open(f, encoding="utf-8").read()
@@ -9,39 +9,53 @@ if "[ldbg]" in s:
     print("patch_leddebug: already applied"); sys.exit(0)
 n = 0
 
-# 1) which path did we compile?
+helper = '''
+#include <hal/nrf_gpio.h>
+static void ldbg_dump(const char *tag)
+{
+#if LED_EXISTS
+	uint32_t abs_pin = NRF_GPIO_PIN_MAP(1, led.pin); /* LED is on gpio1 in this build */
+	NRF_GPIO_Type *reg = nrf_gpio_pin_port_decode(&abs_pin);
+	uint32_t cnf = reg->PIN_CNF[abs_pin];
+	LOG_INF("[ldbg] %-10s P1.%02u PIN_CNF=0x%08x  DIR=%u INPUT=%u CTRLSEL=%u  OUT=%u",
+		tag, (unsigned)led.pin, (unsigned)cnf,
+		(unsigned)(cnf & 1), (unsigned)((cnf >> 1) & 1), (unsigned)((cnf >> 28) & 0xF),
+		(unsigned)((reg->OUT >> led.pin) & 1));
+#endif
+}
+#else
+static void ldbg_dump(const char *tag) { (void)tag; }
+#endif
+'''
+# helper 要放在 led/LED_EXISTS 宣告之後
+anchor = "static enum sys_led_pattern current_led_pattern;\n"
+assert anchor in s
+s = s.replace(anchor, helper.replace("#else\nstatic void ldbg_dump(const char *tag) { (void)tag; }\n#endif\n", "") + "\n" + anchor, 1); n += 1
+
+# 開機:哪條路徑
 old = 'static int led_pin_init(void)\n{\n\tLOG_DBG("led_pin_init");\n'
 new = ('static int led_pin_init(void)\n{\n\tLOG_DBG("led_pin_init");\n'
-       '#ifdef PWM_LED_EXISTS\n'
-       '\tLOG_INF("[ldbg] path=PWM  period=%u ns  dev=%s", (unsigned)pwm_led.period, pwm_led.dev ? pwm_led.dev->name : "NULL");\n'
-       '#else\n'
-       '\tLOG_INF("[ldbg] path=GPIO-FALLBACK  (DT_ALIAS(pwm_led0) MISSING!)");\n'
-       '#endif\n'
-       '#ifdef LED_EXISTS\n'
-       '\tLOG_INF("[ldbg] LED_EXISTS=1 (led-gpios present)");\n'
-       '#else\n'
-       '\tLOG_INF("[ldbg] LED_EXISTS=0");\n'
-       '#endif\n')
+       '#ifdef PWM_LED_EXISTS\n\tLOG_INF("[ldbg] path=PWM");\n#else\n\tLOG_INF("[ldbg] path=GPIO");\n#endif\n'
+       '\tldbg_dump("init-in");\n')
+if old in s: s = s.replace(old, new, 1); n += 1
+old = '#if LED3_EXISTS\n\tgpio_pin_configure_dt(&led3, GPIO_OUTPUT);\n\tgpio_pin_set_dt(&led3, 0);\n#endif\n\treturn 0;\n}\n\nSYS_INIT(led_pin_init'
+new = '#if LED3_EXISTS\n\tgpio_pin_configure_dt(&led3, GPIO_OUTPUT);\n\tgpio_pin_set_dt(&led3, 0);\n#endif\n\tldbg_dump("init-out");\n\treturn 0;\n}\n\nSYS_INIT(led_pin_init'
 if old in s: s = s.replace(old, new, 1); n += 1
 
-# 2) every actual drive call: what pulse are we asking for?
-old = ('#elif PWM_LED_EXISTS\n'
-       '\tvalue_pptt = value_pptt * brightness_pptt / 10000;\n')
-new = ('#elif PWM_LED_EXISTS\n'
-       '\tvalue_pptt = value_pptt * brightness_pptt / 10000;\n'
-       '\tLOG_INF("[ldbg] set color=%d value=%d -> pulse=%u/%u", (int)color, value_pptt,\n'
-       '\t\t(unsigned)(pwm_led.period / 10000 * (led_pwm_period[color][0] < 0 ? 10000 : led_pwm_period[color][0]) * value_pptt / 10000),\n'
-       '\t\t(unsigned)pwm_led.period);\n')
+# 每次點燈:設定前後的腳位狀態
+old = '\tgpio_pin_set_dt(&led, value_pptt > 5000);\n#endif\n}\n'
+new = ('\tldbg_dump("set-pre");\n\tgpio_pin_set_dt(&led, value_pptt > 5000);\n'
+       '\tLOG_INF("[ldbg] gpio_set value=%d -> %d", value_pptt, value_pptt > 5000);\n'
+       '\tldbg_dump("set-post");\n#endif\n}\n')
 if old in s: s = s.replace(old, new, 1); n += 1
 
-# 3) is the PWM being suspended (and does it come back)?
-old = 'static void led_suspend(void)\n{\n\tLOG_DBG("led_suspend");\n'
-new = 'static void led_suspend(void)\n{\n\tLOG_INF("[ldbg] SUSPEND");\n'
-if old in s: s = s.replace(old, new, 1); n += 1
-old = 'static void led_resume(void)\n{\n\tLOG_DBG("led_resume");\n'
-new = 'static void led_resume(void)\n{\n\tLOG_INF("[ldbg] RESUME");\n'
-if old in s: s = s.replace(old, new, 1); n += 1
+# suspend / resume
+for a, b in [('static void led_suspend(void)\n{\n\tLOG_DBG("led_suspend");\n',
+              'static void led_suspend(void)\n{\n\tLOG_INF("[ldbg] SUSPEND");\n\tldbg_dump("susp");\n'),
+             ('static void led_resume(void)\n{\n\tLOG_DBG("led_resume");\n',
+              'static void led_resume(void)\n{\n\tLOG_INF("[ldbg] RESUME");\n\tldbg_dump("resu");\n')]:
+    if a in s: s = s.replace(a, b, 1); n += 1
 
 open(f, "w", encoding="utf-8").write(s)
-print("patch_leddebug: applied %d/4" % n)
+print("patch_leddebug: applied %d hunks (PIN_CNF/OUT dump)" % n)
 sys.exit(0)

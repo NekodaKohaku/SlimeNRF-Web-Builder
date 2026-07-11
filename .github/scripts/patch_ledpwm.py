@@ -56,4 +56,5 @@ for old, new in hunks:
         print("patch_ledpwm: WARNING hunk not matched", file=sys.stderr)
 open(f, "w", encoding="utf-8").write(s)
 print("patch_ledpwm: applied %d/2 (PWM-owned LED pin no longer reconfigured as GPIO)" % n)
+
 sys.exit(0)
