@@ -194,8 +194,6 @@ jobs:
             esac
           fi
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_pwr.py"
-          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_ledpwm.py"   # PWM-driven LED: stop led.c from also configuring that pin as GPIO (steals it from PWM on nRF54L via PIN_CNF.CTRLSEL -> dead LED)
-          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_leddebug.py"   # TEMP nRF54L LED diagnosis (remove once fixed)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_temp.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_batt.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_console.py"
