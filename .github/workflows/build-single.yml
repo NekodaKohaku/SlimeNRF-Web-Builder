@@ -195,6 +195,7 @@ jobs:
             esac
           fi
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_pwr.py"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_ledpwm.py"   # PWM-driven LED: stop led.c from also configuring that pin as GPIO (steals it from PWM on nRF54L via PIN_CNF.CTRLSEL -> dead LED)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_temp.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_batt.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_console.py"
@@ -205,9 +206,6 @@ jobs:
           # patch_esbnoack.py DISABLED: back to ACK mode (v36 tests SDK-version match instead)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esback.py"   # v51: nRF54L back to ACK -> REMOVES upstream's "#if NRF54L: noack=true" special case. ACK is ESB collision backoff; noack made the 54 deaf to collisions and it steamrolled the nRF52 trackers.
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbreinit.py"   # v43: nRF54L periodic ESB soft-restart (resets PID, un-wedges receiver; only tracker reboot recovers)
-          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbdebug.py"   # TEMP nRF54L ESB debug (remove after interop diagnosed)
-          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_sensordebug.py"   # TEMP nRF54L FIFO debug
-          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_quatdebug.py"   # TEMP nRF54L fusion-quat debug
           # patch_ratecap.py REMOVED: rate cap did not help (disconnect happens when still too)
           tail -n 10 prj.conf
 
@@ -218,7 +216,6 @@ jobs:
           set -euo pipefail
           cd zephyr-workspace/SlimeVR-Tracker-nRF
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_recvtimerstub.py"   # NCS 3.2: stub timer.c (drops nrfx TIMER1 dep; TDMA unused)
-          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_recvdebug.py"   # TEMP dongle-side rx/fwd debug
           tail -n 5 prj.conf
 
       - name: west build
