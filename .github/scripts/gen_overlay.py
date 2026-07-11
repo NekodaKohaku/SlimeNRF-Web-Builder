@@ -208,7 +208,12 @@ def build_nrf54l(bus, pins, opts):
     lt = (opts or {}).get("led_type", "single")
     led_on = bool(pins.get("led")) and pins.get("led") != "none"
     is_strip54 = led_on and lt == "strip"
-    _pwm54 = led_on and not is_strip54  # any non-strip LED drives PWM (pwm20) so brightness/fade patterns match nRF52; single LED uses PWM_OUT0 only
+    # nRF54L LED: plain GPIO, not PWM.
+    # PWM on nRF54L only buys ON_PERSIST/LONG_PERSIST (20% dim) and PULSE_PERSIST (charging
+    # breathe); every other pattern is pure 0%/100%. It is not worth the pwm20 pinctrl
+    # owning the pad (CTRLSEL) when the LED will not light. Multi-channel (RGB) still needs
+    # PWM, so keep that on PWM; a single LED goes straight to GPIO.
+    _pwm54 = led_on and not is_strip54 and bool(pins.get('led1'))
     L = ["&pinctrl {"]
     txq = parse_pin(pins.get("tx"))
     uart_node = "uart30" if (txq and txq[0] == 0) else "uart22"
