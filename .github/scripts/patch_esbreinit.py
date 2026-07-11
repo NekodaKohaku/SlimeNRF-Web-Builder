@@ -29,9 +29,11 @@ inject = (anchor +
           "\tstatic uint32_t esb_reinit_ctr = 0;\n"
           "\tif (++esb_reinit_ctr >= ESB_REINIT_EVERY)\n"
           "\t{\n"
+          "\t\tuint32_t _rt0 = k_cycle_get_32();\n"
           "\t\tesb_reinit_ctr = 0;\n"
           "\t\tesb_disable();\n"
           "\t\tesb_initialize(true);\n"
+          "\t\tLOG_INF(\"[reinit] us=%u\", k_cyc_to_us_floor32(k_cycle_get_32() - _rt0));\n"
           "\t}\n"
           "#endif /* defined(NRF54L15_XXAA) */\n")
 s = s.replace(anchor, inject, 1)
