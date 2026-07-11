@@ -208,7 +208,6 @@ jobs:
           # patch_esbnoack.py DISABLED: back to ACK mode (v36 tests SDK-version match instead)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esback.py"   # v51: nRF54L back to ACK -> REMOVES upstream's "#if NRF54L: noack=true" special case. ACK is ESB collision backoff; noack made the 54 deaf to collisions and it steamrolled the nRF52 trackers.
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbreinit.py"   # v43: nRF54L periodic ESB soft-restart (resets PID, un-wedges receiver; only tracker reboot recovers)
-          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_txdebug.py"   # TEMP: measure TX rate on both chips
           # patch_ratecap.py REMOVED: rate cap did not help (disconnect happens when still too)
           tail -n 10 prj.conf
 
