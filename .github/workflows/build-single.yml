@@ -199,9 +199,11 @@ jobs:
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_batt.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_console.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_pm.py"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_conntx.py"   # v48: connection_thread slept after EVERY packet -> capped TX at ~55/s; add missing continue
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbclk.py"
           # patch_esbnoack.py DISABLED: back to ACK mode (v36 tests SDK-version match instead)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbhalt.py"
+          # patch_esback.py HELD BACK to v49: isolate the connection_thread TX-rate fix first
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbreinit.py"   # v43: nRF54L periodic ESB soft-restart (resets PID, un-wedges receiver; only tracker reboot recovers)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbnoflush.py"   # v40: nRF54L skip per-packet esb_flush_tx (PID/pipe wedge test)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbdebug.py"   # TEMP nRF54L ESB debug (remove after interop diagnosed)
