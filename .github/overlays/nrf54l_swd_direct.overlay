@@ -4,7 +4,7 @@
 	};
 };
 
-&flash0 {
+&cpuapp_rram {
 	/delete-node/ partitions;
 	partitions {
 		compatible = "fixed-partitions";
@@ -13,12 +13,12 @@
 
 		slot0_partition: partition@0 {
 			label = "image-0";
-			reg = <0x00000000 0x000ec000>;
+			reg = <0x00000000 0x0015c000>;
 		};
 
-		storage_partition: partition@ec000 {
+		storage_partition: partition@15c000 {
 			label = "storage";
-			reg = <0x000ec000 0x00008000>;
+			reg = <0x0015c000 0x00009000>;
 		};
 	};
 };
