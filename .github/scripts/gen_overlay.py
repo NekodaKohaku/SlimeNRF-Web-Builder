@@ -197,6 +197,13 @@ def build_nrf52(bus, pins, opts):
         L += ws2812_node("spi2")
         L.append('&pwm0 { status = "disabled"; };')
         L.append("/ { aliases { led-strip = &led_strip; /delete-property/ pwm-led0; }; /delete-node/ pwmleds; };")
+    if not led_on:
+        # promicro_uf2 enables &pwm0 unconditionally and its pinctrl squats on P0.15.
+        # With no LED nothing drives it, PM suspends the device, and the "sleep" pinctrl
+        # (low-power-enable) DISCONNECTS the pad -- so anything the user assigns to P0.15
+        # dies. Turn the unused controller off and drop its now-dangling led alias.
+        L.append('&pwm0 { status = "disabled"; };')
+        L.append("/ { aliases { /delete-property/ pwm-led0; }; /delete-node/ pwmleds; };")
     L.append('&uicr { gpio-as-nreset; };')  # NCS 3.2: CONFIG_GPIO_AS_PINRESET is deprecated/non-promptable, the reset pin is a UICR devicetree property now (mirrors nRF54L's nfct-pins-as-gpios)
     L += mag_device_nodes("nrf52", pins, mc)
     L.append('&uicr { nfct-pins-as-gpios; };')  # free NFC pins P0.09/P0.10 as GPIO (nRF52 tracker only; Kconfig NFCT_PINS_AS_GPIOS removed in Zephyr 4.x)
@@ -208,12 +215,7 @@ def build_nrf54l(bus, pins, opts):
     lt = (opts or {}).get("led_type", "single")
     led_on = bool(pins.get("led")) and pins.get("led") != "none"
     is_strip54 = led_on and lt == "strip"
-    # nRF54L LED: plain GPIO, not PWM.
-    # PWM on nRF54L only buys ON_PERSIST/LONG_PERSIST (20% dim) and PULSE_PERSIST (charging
-    # breathe); every other pattern is pure 0%/100%. It is not worth the pwm20 pinctrl
-    # owning the pad (CTRLSEL) when the LED will not light. Multi-channel (RGB) still needs
-    # PWM, so keep that on PWM; a single LED goes straight to GPIO.
-    _pwm54 = led_on and not is_strip54 and bool(pins.get('led1'))
+    _pwm54 = led_on and not is_strip54  # any non-strip LED drives PWM (pwm20) so brightness/fade patterns match nRF52; single LED uses PWM_OUT0 only
     L = ["&pinctrl {"]
     txq = parse_pin(pins.get("tx"))
     uart_node = "uart30" if (txq and txq[0] == 0) else "uart22"
@@ -270,8 +272,19 @@ def build_nrf54l(bus, pins, opts):
         if mc == "spi" and pins.get("mag_cs"):
             cs += f", {gpio(pins['mag_cs'], 'GPIO_ACTIVE_LOW')}"
         L.append(f"&spi20 {{ cs-gpios = {cs}; }};")
+    if bus != "spi":
+        # test54l enables &spi20 unconditionally; its pinctrl squats on P1.02/P1.03/P1.04.
+        L.append('&spi20 { status = "disabled"; };')
     if mc in ("i2c", "i2c_shared"):
         L.append('&i2c21 { status = "okay"; };')
+    else:
+        # The test54l board DTS enables &i2c21 unconditionally and its pinctrl squats on
+        # P1.05 (TWIM_SCL) and P1.06 (TWIM_SDA). With no I2C magnetometer nothing ever uses
+        # it, so PM suspends the device and applies its "sleep" pinctrl state, which is
+        # low-power-enable -- i.e. it DISCONNECTS those two pads. Any pin the user assigned
+        # to P1.05/P1.06 (an LED, for instance) lights up at boot and then dies as soon as
+        # the idle TWIM is suspended. Turn the unused controller off so it releases the pins.
+        L.append('&i2c21 { status = "disabled"; };')
     if mc == "spi" and pins.get("mag_cs"):
         L.append(f"&spi20 {{ mag_spi: mag_spi@1 {MAG_SPI_DEV}; }};")
     if pins.get("tx") and pins.get("rx"):
