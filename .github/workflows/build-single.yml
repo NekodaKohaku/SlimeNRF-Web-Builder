@@ -208,10 +208,8 @@ jobs:
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_conntx.py"   # v48: connection_thread slept after EVERY packet -> capped TX at ~55/s; add missing continue
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbclk.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_clkpolicy.py"   # nRF54L HF-clock policy, ONE place (clocks_stop) instead of 3 call-site ifdefs; replaces patch_esbhalt+patch_connclk
-          # patch_esbnoack.py DISABLED: back to ACK mode (v36 tests SDK-version match instead)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esback.py"   # v51: nRF54L back to ACK -> REMOVES upstream's "#if NRF54L: noack=true" special case. ACK is ESB collision backoff; noack made the 54 deaf to collisions and it steamrolled the nRF52 trackers.
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbreinit.py"   # v43: nRF54L periodic ESB soft-restart (resets PID, un-wedges receiver; only tracker reboot recovers)
-          # patch_ratecap.py REMOVED: rate cap did not help (disconnect happens when still too)
           tail -n 10 prj.conf
 
       - name: Apply receiver options
