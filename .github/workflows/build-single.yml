@@ -151,7 +151,6 @@ jobs:
           FMT='${{ steps.cfg.outputs.fileformat }}'
           BOARD='${{ steps.cfg.outputs.board_target }}'
           append 'CONFIG_VOLTAGE_DIVIDER=n'   # redundant Zephyr voltage sensor: the firmware reads the ADC itself. Its init returns -ENOTSUP on NCS 3.2 (both nRF52 and nRF54L) -> 'voltage_init: setup: -134'
-          append 'CONFIG_ADC_LOG_LEVEL_INF=y'   # battery.c logs through the ADC module: without this its 'raw N ~ M mV => X mV' / 'Setup AINn got r' diagnostics are silently dropped
           if [ "$FMT" = "hex" ]; then
             # SWD 直燒、無 bootloader:code-partition 由 overlay 定在 0x0,確保用 DT 分割
             append 'CONFIG_USE_DT_CODE_PARTITION=y'
