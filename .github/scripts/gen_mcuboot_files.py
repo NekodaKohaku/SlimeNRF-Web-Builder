@@ -98,6 +98,8 @@ if is54:
 		retainedmem_boot: retainedmem {
 			compatible = "zephyr,retained-ram";
 			status = "okay";
+			#address-cells = <1>;
+			#size-cells = <1>;
 
 			boot_mode_ret: retention@0 {
 				compatible = "zephyr,retention";
@@ -154,6 +156,8 @@ else:
 
 &gpregret1 {{
 	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <1>;
 
 	boot_mode0: retention@0 {{
 		compatible = "zephyr,retention";
@@ -185,6 +189,8 @@ else:
 
 &gpregret1 {
 	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <1>;
 
 	boot_mode0: retention@0 {
 		compatible = "zephyr,retention";
