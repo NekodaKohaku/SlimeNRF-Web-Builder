@@ -107,7 +107,9 @@ if is54:
 			boot_mode_ret: retention@0 {
 				compatible = "zephyr,retention";
 				status = "okay";
-				reg = <0x0 0x1>;
+				reg = <0x0 0x4>;
+				prefix = [42 4d];
+				checksum = <1>;
 			};
 		};
 	};
