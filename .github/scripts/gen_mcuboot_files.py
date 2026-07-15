@@ -36,6 +36,10 @@ def parse_pin(p):
         return 0, int(m.group(1))
     sys.exit(f"gen_mcuboot_files: cannot parse pin '{p}'")
 
+# 診断モード: options.mcuboot_debug=="enabled" で mcuboot が UART にログを出す
+# (zephyr,uart-mcumgr の代わりに zephyr,console を使う。同一 UART・115200)
+debug = (cfg.get("options") or {}).get("mcuboot_debug") == "enabled"
+
 txp, rxp = parse_pin(tx), parse_pin(rx)
 is54 = "54l" in board.lower()
 uart = ("uart30" if txp[0] == 0 else "uart22") if is54 else "uart0"
@@ -84,6 +88,26 @@ CONFIG_BOOT_SERIAL_WAIT_FOR_DFU_TIMEOUT=500
 CONFIG_GPIO=y
 
 CONFIG_LOG=n
+""" if not debug else """CONFIG_MCUBOOT_SERIAL=y
+CONFIG_BOOT_SERIAL_UART=y
+CONFIG_BOOT_SERIAL_MAX_RECEIVE_SIZE=1024
+CONFIG_BOOT_MGMT_ECHO=y
+CONFIG_BOOT_SERIAL_NO_APPLICATION=y
+CONFIG_BOOT_SERIAL_ENTRANCE_GPIO=n
+CONFIG_RETAINED_MEM=y
+CONFIG_RETENTION=y
+CONFIG_RETENTION_BOOT_MODE=y
+CONFIG_BOOT_SERIAL_BOOT_MODE=y
+CONFIG_BOOT_SERIAL_WAIT_FOR_DFU=y
+CONFIG_BOOT_SERIAL_WAIT_FOR_DFU_TIMEOUT=3000
+CONFIG_GPIO=y
+
+# 診断モード: 起動バナー / イメージ検証結果を UART に出力
+CONFIG_LOG=y
+CONFIG_LOG_MODE_MINIMAL=y
+CONFIG_SERIAL=y
+CONFIG_CONSOLE=y
+CONFIG_UART_CONSOLE=y
 """)
 
 # ---------- sysbuild/mcuboot.overlay + アプリ側 boot-mode ノード ----------
@@ -116,7 +140,7 @@ if is54:
 """
     mcuboot_overlay = f"""/ {{
 	chosen {{
-		zephyr,uart-mcumgr = &{uart};
+		{("zephyr,console" if debug else "zephyr,uart-mcumgr")} = &{uart};
 		zephyr,boot-mode = &boot_mode_ret;
 		zephyr,flash-controller = &rram_controller;
 	}};
@@ -155,7 +179,7 @@ else:
     # nRF52840: boot mode は GPREGRET に置く (ソフトリセット後も保持、RAM 消費なし)
     mcuboot_overlay = f"""/ {{
 	chosen {{
-		zephyr,uart-mcumgr = &{uart};
+		{("zephyr,console" if debug else "zephyr,uart-mcumgr")} = &{uart};
 		zephyr,boot-mode = &boot_mode0;
 		zephyr,flash-controller = &flash_controller;
 	}};
