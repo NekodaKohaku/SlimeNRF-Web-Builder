@@ -80,6 +80,9 @@ CONFIG_BOOT_SERIAL_BOOT_MODE=y
 CONFIG_BOOT_SERIAL_WAIT_FOR_DFU=y
 CONFIG_BOOT_SERIAL_WAIT_FOR_DFU_TIMEOUT=500
 
+# gpio-hog (電源自锁) 用
+CONFIG_GPIO=y
+
 CONFIG_LOG=n
 """)
 
@@ -200,6 +203,35 @@ else:
 		reg = <0x0 0x1>;
 	};
 };
+"""
+
+# ---------- 電源自锁 (power latch): mcuboot 実行中・recovery 中も電源を保持 ----------
+# アプリ側のラッチは app 起動後にしか効かないため、mcuboot にも同じピンを渡す。
+# 54L: test54l board.c (全イメージ共通) が zephyr,user の pwr-gpios を PRE_KERNEL_1 の
+#      raw HAL でラッチする -> DT を与えるだけでよい。
+# 52:  gpio-hog で GPIO ドライバ初期化時 (PRE_KERNEL_1) に自動的に high を駆動。
+pwr = pins.get("pwr")
+if pwr:
+    pp = parse_pin(pwr)
+    if is54:
+        mcuboot_overlay += f"""
+/ {{
+	zephyr,user {{
+		pwr-gpios = <&gpio{pp[0]} {pp[1]} GPIO_ACTIVE_HIGH>;
+	}};
+}};
+"""
+    else:
+        mcuboot_overlay += f"""
+&gpio{pp[0]} {{
+	status = "okay";
+
+	pwrhold_hog: pwrhold-hog {{
+		gpio-hog;
+		gpios = <{pp[1]} GPIO_ACTIVE_HIGH>;
+		output-high;
+	}};
+}};
 """
 
 write("sysbuild/mcuboot.overlay", mcuboot_overlay)
