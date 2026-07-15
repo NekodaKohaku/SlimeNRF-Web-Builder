@@ -113,6 +113,7 @@ if is54:
 	chosen {{
 		zephyr,uart-mcumgr = &{uart};
 		zephyr,boot-mode = &boot_mode_ret;
+		zephyr,flash-controller = &rram_controller;
 	}};
 {retention_nodes}}};
 
@@ -151,6 +152,7 @@ else:
 	chosen {{
 		zephyr,uart-mcumgr = &{uart};
 		zephyr,boot-mode = &boot_mode0;
+		zephyr,flash-controller = &flash_controller;
 	}};
 }};
 
