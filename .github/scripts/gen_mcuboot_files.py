@@ -38,7 +38,11 @@ def parse_pin(p):
 
 # 診断モード: options.mcuboot_debug=="enabled" で mcuboot が UART にログを出す
 # (zephyr,uart-mcumgr の代わりに zephyr,console を使う。同一 UART・115200)
-debug = (cfg.get("options") or {}).get("mcuboot_debug") == "enabled"
+_dbg = (cfg.get("options") or {}).get("mcuboot_debug")
+debug = _dbg == "enabled"
+# minimal: 裸 MCUboot 二分用 — recovery/retention/boot-mode 全部無効、
+# console ログのみ有効。「素の MCUboot が app を起動できるか」を単独検証する
+minimal = _dbg == "minimal"
 
 txp, rxp = parse_pin(tx), parse_pin(rx)
 is54 = "54l" in board.lower()
@@ -63,7 +67,14 @@ SB_CONFIG_BOOT_SIGNATURE_TYPE_NONE=y
 
 # ---------- sysbuild/mcuboot.conf ----------
 write("sysbuild/mcuboot.conf",
-"""CONFIG_MCUBOOT_SERIAL=y
+"""# minimal 診断: 素の MCUboot + console ログのみ (recovery 一切なし)
+CONFIG_LOG=y
+CONFIG_LOG_MODE_MINIMAL=y
+CONFIG_SERIAL=y
+CONFIG_CONSOLE=y
+CONFIG_UART_CONSOLE=y
+CONFIG_GPIO=y
+""" if minimal else """CONFIG_MCUBOOT_SERIAL=y
 CONFIG_BOOT_SERIAL_UART=y
 CONFIG_BOOT_SERIAL_MAX_RECEIVE_SIZE=1024
 CONFIG_BOOT_MGMT_ECHO=y
@@ -140,11 +151,10 @@ if is54:
 """
     mcuboot_overlay = f"""/ {{
 	chosen {{
-		{("zephyr,console" if debug else "zephyr,uart-mcumgr")} = &{uart};
-		zephyr,boot-mode = &boot_mode_ret;
-		zephyr,flash-controller = &rram_controller;
+		{("zephyr,console" if (debug or minimal) else "zephyr,uart-mcumgr")} = &{uart};
+{("" if minimal else chr(9)+chr(9)+"zephyr,boot-mode = &boot_mode_ret;"+chr(10))}		zephyr,flash-controller = &rram_controller;
 	}};
-{retention_nodes}}};
+{("" if minimal else retention_nodes)}}};
 
 &cpuapp_sram {{
 	reg = <0x20000000 0x3ee00>;
@@ -179,9 +189,8 @@ else:
     # nRF52840: boot mode は GPREGRET に置く (ソフトリセット後も保持、RAM 消費なし)
     mcuboot_overlay = f"""/ {{
 	chosen {{
-		{("zephyr,console" if debug else "zephyr,uart-mcumgr")} = &{uart};
-		zephyr,boot-mode = &boot_mode0;
-		zephyr,flash-controller = &flash_controller;
+		{("zephyr,console" if (debug or minimal) else "zephyr,uart-mcumgr")} = &{uart};
+{("" if minimal else chr(9)+chr(9)+"zephyr,boot-mode = &boot_mode0;"+chr(10))}		zephyr,flash-controller = &flash_controller;
 	}};
 }};
 
