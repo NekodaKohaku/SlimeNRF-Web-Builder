@@ -273,7 +273,8 @@ jobs:
           UPD="$BDIR/SlimeVR-Tracker-nRF/zephyr/zephyr.signed.bin"
           [ -f "$UPD" ] || UPD="$(find $BDIR -name zephyr.signed.bin | head -1)"
           cp "$UPD" "out/${NAME}.update.bin"
-          cp "$BDIR/partitions.yml" "out/${NAME}.partitions.yml" 2>/dev/null || true
+          PYML="$(find $BDIR -maxdepth 3 -name partitions.yml 2>/dev/null | head -1)"
+          [ -n "$PYML" ] && cp "$PYML" "out/${NAME}.partitions.yml" || true
           else
           SRC="SlimeVR-Tracker-nRF/build/zephyr/zephyr.$FMT"
           [ -f "$SRC" ] || SRC="SlimeVR-Tracker-nRF/build/SlimeVR-Tracker-nRF/zephyr/zephyr.$FMT"
