@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SlimeNRF 更新固件</title>
+<style>
+  :root { --bg:#12131a; --card:#1c1e29; --fg:#e8e9f0; --mut:#8b8fa3; --acc:#7c5cff; --ok:#39d98a; --err:#ff5c7a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Segoe UI","Noto Sans TC","Noto Sans JP",system-ui,sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width:760px; margin:0 auto; padding:24px 16px 60px; }
+  .top { display:flex; justify-content:space-between; align-items:center; }
+  h1 { font-size:22px; margin:8px 0 2px; }
+  .sub { color:var(--mut); font-size:13px; margin-bottom:20px; }
+  .card { background:var(--card); border-radius:12px; padding:16px; margin-bottom:14px; }
+  .card h2 { font-size:15px; margin:0 0 10px; color:var(--acc); }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
+  button { background:var(--acc); color:#fff; border:0; border-radius:8px; padding:9px 16px; font-size:14px; cursor:pointer; }
+  button:disabled { background:#3a3d4d; color:#777b90; cursor:not-allowed; }
+  button.alt { background:#2c2f40; }
+  select,input[type=text] { background:#2c2f40; color:var(--fg); border:1px solid #3a3d4d; border-radius:8px; padding:8px; font-size:14px; }
+  .status { font-size:13px; padding:4px 10px; border-radius:99px; background:#2c2f40; color:var(--mut); }
+  .status.ok { background:rgba(57,217,138,.15); color:var(--ok); }
+  .status.err { background:rgba(255,92,122,.15); color:var(--err); }
+  #bar { height:10px; background:#2c2f40; border-radius:99px; overflow:hidden; margin:8px 0 4px; }
+  #barfill { height:100%; width:0%; background:linear-gradient(90deg,var(--acc),#4cc2ff); transition:width .15s; }
+  #log { width:100%; height:220px; background:#0d0e13; color:#9adfa9; border:1px solid #2c2f40; border-radius:8px;
+         font-family:Consolas,monospace; font-size:12px; padding:8px; white-space:pre-wrap; overflow-y:auto; }
+  .hint { color:var(--mut); font-size:12.5px; line-height:1.6; }
+  .filename { color:var(--ok); font-size:13px; }
+  a { color:#4cc2ff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1 data-i18n="title">SlimeNRF 更新固件</h1>
+    <select id="langSel"></select>
+  </div>
+  <div class="sub"><a href="index.html" data-i18n="back">← 回「產生固件」</a></div>
+  <div class="sub" data-i18n="subtitle"></div>
+
+  <div class="card">
+    <h2 data-i18n="sec1"></h2>
+    <div class="row">
+      <button id="btnConnect" data-i18n="btnConnect"></button>
+      <select id="baud">
+        <option value="115200" selected>115200</option>
+        <option value="230400">230400</option>
+        <option value="460800">460800</option>
+      </select>
+      <span class="status" id="stConn" data-i18n="stDisconnected"></span>
+    </div>
+    <div class="hint" data-i18n="hint1"></div>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="sec2"></h2>
+    <div class="row">
+      <button id="btnEnter" disabled data-i18n="btnEnter"></button>
+      <button id="btnPing" class="alt" disabled data-i18n="btnPing"></button>
+      <span class="status" id="stMode">—</span>
+    </div>
+    <div class="hint" data-i18n-html="hint2"></div>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="sec3"></h2>
+    <div class="row">
+      <button id="btnFile" class="alt" data-i18n="btnFile"></button>
+      <input type="file" id="file" accept=".bin,.signed.bin" style="display:none">
+      <span class="filename" id="fname" data-i18n="fnameNone"></span>
+    </div>
+    <div class="row">
+      <input type="text" id="binurl" data-i18n-ph="urlPh" style="flex:1">
+      <button id="btnFetch" class="alt" data-i18n="btnFetch"></button>
+    </div>
+    <div class="row">
+      <button id="btnUpload" disabled data-i18n="btnUpload"></button>
+      <button id="btnReset" class="alt" disabled data-i18n="btnReset"></button>
+      <select id="chunk">
+        <option value="128" selected data-i18n="chunk128"></option>
+        <option value="256" data-i18n="chunk256"></option>
+        <option value="512" data-i18n="chunk512"></option>
+      </select>
+    </div>
+    <div id="bar"><div id="barfill"></div></div>
+    <div class="hint" id="prog" data-i18n="progIdle"></div>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="secLog"></h2>
+    <div id="log"></div>
+    <div class="row" style="margin-top:8px">
+      <input type="text" id="cmd" data-i18n-ph="cmdPh" style="flex:1">
+      <button id="btnSend" class="alt" disabled data-i18n="btnSend"></button>
+    </div>
+  </div>
+
+  <div class="hint" data-i18n="footer"></div>
+</div>
+
+<script>
+"use strict";
+/* ================= 多言語 (I18N) =================
+ * builder 本体 (index.html) と同じ localStorage["lang"] キーを共有し、
+ * サイト全体で言語設定が連動する。zh / en / ja 対応。
+ * ================================================ */
+const T = {
+  zh: {
+    _name:"中文",
+    title:"SlimeNRF 更新固件", back:"← 回「產生固件」",
+    subtitle:"透過 UART (RX/TX) 更新 nRF52840 / nRF54L15 追蹤器 · MCUboot Serial Recovery · 需使用 Chrome 或 Edge 瀏覽器",
+    sec1:"1 · 連接追蹤器", btnConnect:"連接序列埠", btnDisconnect:"中斷連接",
+    stDisconnected:"未連接", stConnected:"已連接",
+    hint1:"將追蹤器的 RX/TX 接到 USB 轉序列埠板 (TX→RX、RX→TX、GND 共地),插入電腦後按「連接序列埠」。",
+    sec2:"2 · 進入更新模式", btnEnter:"進入更新模式", btnPing:"偵測 (Ping)",
+    stModeIn:"更新模式 (recovery)", stModeNo:"未偵測到",
+    hint2:"按下後網頁會嘗試送出 <code>dfu</code> 指令並持續偵測。若沒有反應,請改用其中一種方式:<br>① 快速連按追蹤器按鈕 4 下(進入 DFU 的原有操作)。<br>② 按一下追蹤器的 RESET 鍵 —— 開機後 0.5 秒內網頁會自動抓住更新窗口。",
+    sec3:"3 · 選擇韌體並更新", btnFile:"選擇韌體檔 (.bin)", fnameNone:"未選擇檔案",
+    urlPh:"或貼上 update.bin 的網址 (release 連結)", btnFetch:"從網址載入",
+    btnUpload:"開始更新", btnReset:"重新啟動裝置",
+    chunk128:"穩定 (128B/包)", chunk256:"快速 (256B/包)", chunk512:"極速 (512B/包)",
+    progIdle:"請使用 update.bin (已含 MCUboot 映像標頭)。更新完成後裝置會自動重啟進入新韌體。",
+    secLog:"紀錄", cmdPh:"送出文字指令 (例如 dfu、info)", btnSend:"送出",
+    footer:"不支援 Web Serial?請確認使用桌面版 Chrome / Edge,且此頁面由 HTTPS 或 localhost 開啟。",
+    mConnected:"== 已連接序列埠 ==", mDisconnected:"== 已中斷連接 ==", mConnFail:"! 連接失敗: ",
+    mReadStop:"! 讀取中斷: ", mCrc:"! CRC 錯誤, 封包丟棄", mNoSerial:"! 此瀏覽器不支援 Web Serial API, 請使用桌面版 Chrome 或 Edge",
+    mSendDfu:">> 送出 dfu 指令...", mDetect:">> 偵測更新模式中 (30 秒)... 若無反應請按一下 RESET 鍵或連按按鈕 4 下",
+    mEntered:"== 已進入更新模式! ==", mDetectTimeout:"! 偵測逾時, 請確認接線與波特率後重試",
+    mMagicWarn:"! 警告: 檔案開頭不是 MCUboot 映像 magic, 請確認選的是 update.bin",
+    mUpStart:"== 開始上傳 ", mRetry:"! 逾時, 重試 ", mRcErr:"裝置回傳錯誤 rc=", mTooMany:"重試次數過多: ",
+    mUpDone:"== 上傳完成! 耗時 ", mUpDoneSec:" 秒 ==", mRebooting:">> 重新啟動裝置...",
+    mRebooted:"== 已送出重啟, 裝置將進入新韌體 ==", mRebootNoResp:"! 重啟指令無回應, 請手動按 RESET",
+    mUpFail:"! 上傳失敗: ", mUpFailHint:"  (可重新進入更新模式後再試一次, 失敗的上傳不會弄壞 bootloader)",
+    mRebootSent:">> 已送出重啟指令", mDl:">> 下載 ", mDlDone:"== 載入完成 ==",
+    mDlFail:"! 下載失敗 (瀏覽器 CORS 限制時請改用下載後選擇檔案): ", mNotConn:"未連接", mTimeout:"timeout"
+  },
+  en: {
+    _name:"English",
+    title:"SlimeNRF Firmware Updater", back:"← Back to builder",
+    subtitle:"Update nRF52840 / nRF54L15 trackers over UART (RX/TX) · MCUboot Serial Recovery · Requires Chrome or Edge",
+    sec1:"1 · Connect tracker", btnConnect:"Connect serial port", btnDisconnect:"Disconnect",
+    stDisconnected:"Not connected", stConnected:"Connected",
+    hint1:"Wire the tracker's RX/TX to a USB-serial adapter (TX→RX, RX→TX, common GND), plug it in and press \"Connect serial port\".",
+    sec2:"2 · Enter update mode", btnEnter:"Enter update mode", btnPing:"Detect (Ping)",
+    stModeIn:"Update mode (recovery)", stModeNo:"Not detected",
+    hint2:"The page sends the <code>dfu</code> command and keeps probing. If nothing happens, try one of:<br>① Quickly tap the tracker button 4 times (the existing DFU gesture).<br>② Press the tracker's RESET once — the page catches the 0.5 s window after boot automatically.",
+    sec3:"3 · Select firmware and update", btnFile:"Select firmware (.bin)", fnameNone:"No file selected",
+    urlPh:"or paste the update.bin URL (release link)", btnFetch:"Load from URL",
+    btnUpload:"Start update", btnReset:"Reboot device",
+    chunk128:"Stable (128 B/pkt)", chunk256:"Fast (256 B/pkt)", chunk512:"Turbo (512 B/pkt)",
+    progIdle:"Use update.bin (contains the MCUboot image header). The device reboots into the new firmware when done.",
+    secLog:"Log", cmdPh:"send a text command (e.g. dfu, info)", btnSend:"Send",
+    footer:"No Web Serial? Use desktop Chrome / Edge and open this page over HTTPS or localhost.",
+    mConnected:"== Serial port connected ==", mDisconnected:"== Disconnected ==", mConnFail:"! Connect failed: ",
+    mReadStop:"! Read interrupted: ", mCrc:"! CRC error, packet dropped", mNoSerial:"! This browser has no Web Serial API. Use desktop Chrome or Edge.",
+    mSendDfu:">> Sending dfu command...", mDetect:">> Probing for update mode (30 s)... if nothing happens press RESET once or tap the button 4 times",
+    mEntered:"== Update mode entered! ==", mDetectTimeout:"! Probe timed out. Check wiring and baud rate, then retry.",
+    mMagicWarn:"! Warning: file does not start with the MCUboot image magic. Make sure it is update.bin.",
+    mUpStart:"== Uploading ", mRetry:"! Timeout, retry ", mRcErr:"device returned error rc=", mTooMany:"too many retries: ",
+    mUpDone:"== Upload complete! Took ", mUpDoneSec:" s ==", mRebooting:">> Rebooting device...",
+    mRebooted:"== Reboot sent, device boots the new firmware ==", mRebootNoResp:"! No response to reboot, press RESET manually.",
+    mUpFail:"! Upload failed: ", mUpFailHint:"  (re-enter update mode and try again; a failed upload cannot damage the bootloader)",
+    mRebootSent:">> Reboot command sent", mDl:">> Downloading ", mDlDone:"== Loaded ==",
+    mDlFail:"! Download failed (if blocked by CORS, download the file and select it instead): ", mNotConn:"not connected", mTimeout:"timeout"
+  },
+  ja: {
+    _name:"日本語",
+    title:"SlimeNRF ファームウェア更新", back:"← ジェネレーターへ戻る",
+    subtitle:"UART (RX/TX) 経由で nRF52840 / nRF54L15 トラッカーを更新 · MCUboot Serial Recovery · Chrome または Edge が必要",
+    sec1:"1 · トラッカーを接続", btnConnect:"シリアルポートに接続", btnDisconnect:"切断",
+    stDisconnected:"未接続", stConnected:"接続済み",
+    hint1:"トラッカーの RX/TX を USB シリアル変換基板に接続し (TX→RX、RX→TX、GND 共通)、PC に挿してから「シリアルポートに接続」を押してください。",
+    sec2:"2 · 更新モードに入る", btnEnter:"更新モードに入る", btnPing:"検出 (Ping)",
+    stModeIn:"更新モード (recovery)", stModeNo:"未検出",
+    hint2:"ボタンを押すと <code>dfu</code> コマンドを送信して検出を続けます。反応がない場合は次のいずれかを試してください:<br>① トラッカーのボタンを素早く 4 回連打 (従来の DFU 操作)。<br>② トラッカーの RESET を 1 回押す — 起動後 0.5 秒の更新ウィンドウをページが自動で捕捉します。",
+    sec3:"3 · ファームウェアを選択して更新", btnFile:"ファームウェアを選択 (.bin)", fnameNone:"ファイル未選択",
+    urlPh:"または update.bin の URL を貼り付け (release リンク)", btnFetch:"URL から読み込み",
+    btnUpload:"更新開始", btnReset:"デバイスを再起動",
+    chunk128:"安定 (128B/パケット)", chunk256:"高速 (256B/パケット)", chunk512:"最速 (512B/パケット)",
+    progIdle:"update.bin (MCUboot イメージヘッダー付き) を使用してください。完了後は自動的に再起動し新ファームウェアが起動します。",
+    secLog:"ログ", cmdPh:"テキストコマンドを送信 (例: dfu、info)", btnSend:"送信",
+    footer:"Web Serial 非対応?デスクトップ版 Chrome / Edge を使い、HTTPS または localhost でこのページを開いてください。",
+    mConnected:"== シリアルポート接続完了 ==", mDisconnected:"== 切断しました ==", mConnFail:"! 接続失敗: ",
+    mReadStop:"! 読み取り中断: ", mCrc:"! CRC エラー、パケット破棄", mNoSerial:"! このブラウザは Web Serial API 非対応です。デスクトップ版 Chrome / Edge を使用してください。",
+    mSendDfu:">> dfu コマンド送信中...", mDetect:">> 更新モード検出中 (30 秒)... 反応がなければ RESET を 1 回押すかボタンを 4 回連打してください",
+    mEntered:"== 更新モードに入りました! ==", mDetectTimeout:"! 検出タイムアウト。配線とボーレートを確認して再試行してください。",
+    mMagicWarn:"! 警告: ファイル先頭が MCUboot イメージ magic ではありません。update.bin か確認してください。",
+    mUpStart:"== アップロード開始 ", mRetry:"! タイムアウト、再試行 ", mRcErr:"デバイスがエラーを返しました rc=", mTooMany:"再試行回数超過: ",
+    mUpDone:"== アップロード完了! 所要 ", mUpDoneSec:" 秒 ==", mRebooting:">> デバイス再起動中...",
+    mRebooted:"== 再起動を送信、新ファームウェアが起動します ==", mRebootNoResp:"! 再起動コマンド無応答。手動で RESET を押してください。",
+    mUpFail:"! アップロード失敗: ", mUpFailHint:"  (更新モードに入り直して再試行できます。失敗しても bootloader は壊れません)",
+    mRebootSent:">> 再起動コマンド送信済み", mDl:">> ダウンロード中 ", mDlDone:"== 読み込み完了 ==",
+    mDlFail:"! ダウンロード失敗 (CORS 制限時はファイルをダウンロードして選択してください): ", mNotConn:"未接続", mTimeout:"タイムアウト"
+  }
+};
+
+/* 言語の初期化: builder と同じ localStorage["lang"] を優先し、なければブラウザ言語 */
+let LANG = (() => {
+  try { const s = localStorage.getItem("lang"); if (s && T[s]) return s; } catch (e) {}
+  const l = (navigator.language || "en").toLowerCase();
+  if (l.startsWith("zh")) return "zh";
+  if (l.startsWith("ja")) return "ja";
+  return "en";
+})();
+const t = k => (T[LANG] && T[LANG][k]) || T.en[k] || k;
+
+function applyLang() {
+  document.title = t("title");
+  document.documentElement.lang = LANG === "zh" ? "zh-Hant" : LANG;
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-html]").forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+  document.querySelectorAll("[data-i18n-ph]").forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+  /* 状態表示は現在の接続状態に合わせて再描画 */
+  $("stConn").textContent = port ? t("stConnected") : t("stDisconnected");
+  $("btnConnect").textContent = port ? t("btnDisconnect") : t("btnConnect");
+}
+function initLangSel() {
+  const sel = document.getElementById("langSel");
+  for (const k of Object.keys(T)) {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = T[k]._name;
+    if (k === LANG) o.selected = true;
+    sel.appendChild(o);
+  }
+  sel.onchange = () => { LANG = sel.value; try { localStorage.setItem("lang", LANG); } catch (e) {} applyLang(); };
+}
+
+/* ================= SMP over serial (mcumgr コンソールトランスポート) =================
+ * データグラム = u16BE(len(data)+2) + data + u16BE(crc16-xmodem(data))
+ * base64 化した後 127 バイト以下の行に分割: 先頭行 0x06 0x09、継続行 0x04 0x14、行末 0x0A
+ * 各行の base64 は単独でデコード可能 (4 文字境界で分割)
+ * ================================================================================ */
+
+const $ = id => document.getElementById(id);
+const log = s => {
+  const el = $("log");
+  el.textContent += s + "\n";
+  el.scrollTop = el.scrollHeight;
+};
+
+let port = null, writer = null, readLoopActive = false;
+let seq = 0;
+let pending = null; // {seq, resolve, reject, timer}
+let fwBytes = null;
+let inRecovery = false;
+
+/* ---------- CRC16 (CCITT/XMODEM, 多項式 0x1021, 初期値 0) ---------- */
+function crc16(data) {
+  let crc = 0;
+  for (let i = 0; i < data.length; i++) {
+    crc ^= data[i] << 8;
+    for (let b = 0; b < 8; b++)
+      crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
+  }
+  return crc;
+}
+
+/* ---------- 最小 CBOR エンコーダー ---------- */
+function cborUint(major, v, out) {
+  const m = major << 5;
+  if (v < 24) out.push(m | v);
+  else if (v < 0x100) out.push(m | 24, v);
+  else if (v < 0x10000) out.push(m | 25, v >> 8, v & 0xff);
+  else out.push(m | 26, (v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff);
+}
+function cborEncode(obj) {
+  const out = [];
+  const keys = Object.keys(obj);
+  cborUint(5, keys.length, out); // map
+  for (const k of keys) {
+    cborUint(3, k.length, out); // tstr (ASCII キー前提)
+    for (let i = 0; i < k.length; i++) out.push(k.charCodeAt(i));
+    const v = obj[k];
+    if (v instanceof Uint8Array) { cborUint(2, v.length, out); for (const b of v) out.push(b); }
+    else if (typeof v === "number") {
+      if (v >= 0) cborUint(0, v, out); else cborUint(1, -1 - v, out);
+    }
+    else if (typeof v === "boolean") out.push(v ? 0xf5 : 0xf4);
+    else if (typeof v === "string") { cborUint(3, v.length, out); for (let i = 0; i < v.length; i++) out.push(v.charCodeAt(i)); }
+  }
+  return new Uint8Array(out);
+}
+
+/* ---------- 最小 CBOR デコーダー ({rc, off, r} 程度の応答が解析できれば十分) ---------- */
+function cborDecode(buf) {
+  let p = 0;
+  function item() {
+    if (p >= buf.length) throw new Error("cbor eof");
+    const ib = buf[p++], major = ib >> 5;
+    let arg = ib & 0x1f;
+    if (arg === 24) arg = buf[p++];
+    else if (arg === 25) { arg = (buf[p] << 8) | buf[p + 1]; p += 2; }
+    else if (arg === 26) { arg = (buf[p] * 0x1000000) + (buf[p+1] << 16) + (buf[p+2] << 8) + buf[p+3]; p += 4; }
+    else if (arg === 27) { let hi = 0, lo = 0; for (let i = 0; i < 4; i++) hi = hi * 256 + buf[p++]; for (let i = 0; i < 4; i++) lo = lo * 256 + buf[p++]; arg = hi * 0x100000000 + lo; }
+    else if (arg > 27) { /* 不定長 / special は未対応 */ }
+    switch (major) {
+      case 0: return arg;
+      case 1: return -1 - arg;
+      case 2: { const v = buf.slice(p, p + arg); p += arg; return v; }
+      case 3: { let s = ""; for (let i = 0; i < arg; i++) s += String.fromCharCode(buf[p + i]); p += arg; return s; }
+      case 4: { const a = []; for (let i = 0; i < arg; i++) a.push(item()); return a; }
+      case 5: { const o = {}; for (let i = 0; i < arg; i++) { const k = item(); o[k] = item(); } return o; }
+      case 7:
+        if (arg === 20) return false;
+        if (arg === 21) return true;
+        if (arg === 22 || arg === 23) return null;
+        return null;
+      default: return null;
+    }
+  }
+  return item();
+}
+
+/* ---------- パケットのエンコード ---------- */
+function b64encode(bytes) {
+  let s = "";
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+}
+function encodeFrames(smpBytes) {
+  const total = smpBytes.length + 2; // data + crc
+  const body = new Uint8Array(2 + smpBytes.length + 2);
+  body[0] = total >> 8; body[1] = total & 0xff;
+  body.set(smpBytes, 2);
+  const c = crc16(smpBytes);
+  body[body.length - 2] = c >> 8; body[body.length - 1] = c & 0xff;
+  const b64 = b64encode(body);
+  const frames = [];
+  let i = 0, first = true;
+  while (i < b64.length) {
+    const chunk = b64.slice(i, i + 124); // 2+124+1 = 最大 127 バイト
+    i += 124;
+    const marker = first ? "\x06\x09" : "\x04\x14";
+    first = false;
+    const f = new Uint8Array(marker.length + chunk.length + 1);
+    f[0] = marker.charCodeAt(0); f[1] = marker.charCodeAt(1);
+    for (let j = 0; j < chunk.length; j++) f[2 + j] = chunk.charCodeAt(j);
+    f[f.length - 1] = 0x0a;
+    frames.push(f);
+  }
+  return frames;
+}
+function buildSmp(op, group, id, payloadObj) {
+  const payload = cborEncode(payloadObj);
+  const h = new Uint8Array(8 + payload.length);
+  h[0] = op & 0x07;          // op: 0 read, 1 read rsp, 2 write, 3 write rsp
+  h[1] = 0;                  // flags
+  h[2] = payload.length >> 8; h[3] = payload.length & 0xff;
+  h[4] = group >> 8; h[5] = group & 0xff;
+  h[6] = seq = (seq + 1) & 0xff;
+  h[7] = id;
+  h.set(payload, 8);
+  return { bytes: h, seq: h[6] };
+}
+
+/* ---------- 受信の解析 ---------- */
+let lineBuf = [];
+let pktBuf = null, pktExpect = 0;
+const textDecoder = new TextDecoder("utf-8", { fatal: false });
+
+function feed(bytes) {
+  for (const b of bytes) {
+    lineBuf.push(b);
+    if (b === 0x0a) { handleLine(new Uint8Array(lineBuf)); lineBuf = []; }
+    if (lineBuf.length > 4096) lineBuf = [];
+  }
+}
+function b64decodeStr(s) {
+  try { const bin = atob(s); const out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; }
+  catch (e) { return null; }
+}
+function handleLine(line) {
+  const isFirst = line[0] === 0x06 && line[1] === 0x09;
+  const isCont  = line[0] === 0x04 && line[1] === 0x14;
+  if (!isFirst && !isCont) {
+    // 通常のテキスト出力 (アプリの log / コンソール)
+    const txt = textDecoder.decode(line).replace(/\r?\n$/, "");
+    if (txt.trim().length) log("· " + txt);
+    return;
+  }
+  let s = "";
+  for (let i = 2; i < line.length; i++) { const c = line[i]; if (c !== 0x0a && c !== 0x0d) s += String.fromCharCode(c); }
+  const dec = b64decodeStr(s);
+  if (!dec) return;
+  if (isFirst) {
+    pktExpect = (dec[0] << 8) | dec[1];       // len = data + 2B crc
+    pktBuf = Array.from(dec.slice(2));
+  } else if (pktBuf) {
+    pktBuf.push(...dec);
+  } else return;
+  if (pktBuf.length >= pktExpect) {
+    const all = new Uint8Array(pktBuf.slice(0, pktExpect));
+    pktBuf = null;
+    const data = all.slice(0, all.length - 2);
+    const rxc = (all[all.length - 2] << 8) | all[all.length - 1];
+    if (crc16(data) !== rxc) { log(t("mCrc")); return; }
+    handleSmp(data);
+  }
+}
+function handleSmp(d) {
+  if (d.length < 8) return;
+  const rsp = { op: d[0] & 7, len: (d[2] << 8) | d[3], group: (d[4] << 8) | d[5], seq: d[6], id: d[7], payload: {} };
+  try { if (d.length > 8) rsp.payload = cborDecode(d.slice(8)); } catch (e) {}
+  if (pending && pending.seq === rsp.seq) {
+    clearTimeout(pending.timer);
+    const r = pending.resolve; pending = null; r(rsp);
+  }
+}
+
+/* ---------- 送信 ---------- */
+async function writeRaw(bytes) {
+  if (!writer) throw new Error(t("mNotConn"));
+  await writer.write(bytes);
+}
+function smpRequest(op, group, id, payloadObj, timeoutMs = 3000) {
+  return new Promise(async (resolve, reject) => {
+    const { bytes, seq: s } = buildSmp(op, group, id, payloadObj);
+    if (pending) { clearTimeout(pending.timer); pending.reject(new Error("superseded")); pending = null; }
+    pending = { seq: s, resolve, reject, timer: setTimeout(() => { if (pending && pending.seq === s) { pending = null; reject(new Error(t("mTimeout"))); } }, timeoutMs) };
+    try {
+      for (const f of encodeFrames(bytes)) { await writeRaw(f); }
+    } catch (e) { if (pending && pending.seq === s) { clearTimeout(pending.timer); pending = null; } reject(e); }
+  });
+}
+const smpEcho  = (ms = 800) => smpRequest(2, 0, 0, { d: "hi" }, ms);         // OS echo
+const smpReset = ()         => smpRequest(2, 0, 5, {}, 3000);                // OS reset
+
+/* ---------- 接続 ---------- */
+async function connect() {
+  if (port) { await disconnect(); return; }
+  try {
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: parseInt($("baud").value) });
+    writer = port.writable.getWriter();
+    $("stConn").textContent = t("stConnected"); $("stConn").className = "status ok";
+    $("btnConnect").textContent = t("btnDisconnect");
+    for (const id of ["btnEnter", "btnPing", "btnSend"]) $(id).disabled = false;
+    updateUploadBtn();
+    log(t("mConnected"));
+    readLoop();
+  } catch (e) { log(t("mConnFail") + e.message); }
+}
+async function disconnect() {
+  readLoopActive = false;
+  try { writer && writer.releaseLock(); } catch (e) {}
+  try { port && await port.close(); } catch (e) {}
+  port = null; writer = null; inRecovery = false;
+  $("stConn").textContent = t("stDisconnected"); $("stConn").className = "status";
+  $("stMode").textContent = "—"; $("stMode").className = "status";
+  $("btnConnect").textContent = t("btnConnect");
+  for (const id of ["btnEnter", "btnPing", "btnUpload", "btnReset", "btnSend"]) $(id).disabled = true;
+  log(t("mDisconnected"));
+}
+async function readLoop() {
+  readLoopActive = true;
+  while (port && port.readable && readLoopActive) {
+    const reader = port.readable.getReader();
+    try {
+      while (readLoopActive) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) feed(value);
+      }
+    } catch (e) { log(t("mReadStop") + e.message); }
+    finally { try { reader.releaseLock(); } catch (e) {} }
+    if (!port || !port.readable) break;
+  }
+}
+
+/* ---------- recovery モードへの移行 ---------- */
+function setMode(ok) {
+  inRecovery = ok;
+  $("stMode").textContent = ok ? t("stModeIn") : t("stModeNo");
+  $("stMode").className = ok ? "status ok" : "status err";
+  $("btnReset").disabled = !ok;
+  updateUploadBtn();
+}
+async function ping() {
+  try { const r = await smpEcho(800); if (r) { setMode(true); return true; } } catch (e) {}
+  setMode(false); return false;
+}
+async function enterRecovery() {
+  $("btnEnter").disabled = true;
+  try {
+    log(t("mSendDfu"));
+    try { await writeRaw(new TextEncoder().encode("dfu\n")); } catch (e) {}
+    // 30 秒間 ping を継続 (アプリ経由の再起動 / RESET 押下 / 4 回連打 すべてをカバー)
+    log(t("mDetect"));
+    const until = Date.now() + 30000;
+    while (Date.now() < until) {
+      try { const r = await smpEcho(300); if (r) { log(t("mEntered")); setMode(true); return; } } catch (e) {}
+      await new Promise(r => setTimeout(r, 60));
+    }
+    log(t("mDetectTimeout"));
+    setMode(false);
+  } finally { $("btnEnter").disabled = false; }
+}
+
+/* ---------- ファームウェアのアップロード ---------- */
+function updateUploadBtn() { $("btnUpload").disabled = !(port && fwBytes && inRecovery); }
+function checkMagic() {
+  // MCUboot イメージ先頭 magic: 0x96f3b83d (リトルエンディアン 3d b8 f3 96)
+  if (!(fwBytes[0] === 0x3d && fwBytes[1] === 0xb8 && fwBytes[2] === 0xf3 && fwBytes[3] === 0x96))
+    log(t("mMagicWarn"));
+}
+$("btnFile").onclick = () => $("file").click();
+$("file").onchange = async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  fwBytes = new Uint8Array(await f.arrayBuffer());
+  $("fname").textContent = f.name + " (" + (fwBytes.length / 1024).toFixed(1) + " KB)";
+  $("fname").removeAttribute("data-i18n");
+  checkMagic();
+  updateUploadBtn();
+};
+$("btnFetch").onclick = async () => {
+  const u = $("binurl").value.trim(); if (!u) return;
+  try {
+    log(t("mDl") + u);
+    const r = await fetch(u); if (!r.ok) throw new Error("HTTP " + r.status);
+    fwBytes = new Uint8Array(await r.arrayBuffer());
+    $("fname").textContent = u.split("/").pop() + " (" + (fwBytes.length / 1024).toFixed(1) + " KB)";
+    $("fname").removeAttribute("data-i18n");
+    checkMagic();
+    updateUploadBtn(); log(t("mDlDone"));
+  } catch (e) { log(t("mDlFail") + e.message); }
+};
+async function upload() {
+  if (!fwBytes) return;
+  $("btnUpload").disabled = true; $("btnEnter").disabled = true;
+  const chunkSize = parseInt($("chunk").value);
+  const t0 = Date.now();
+  let off = 0, retries = 0;
+  log(t("mUpStart") + fwBytes.length + " bytes ==");
+  try {
+    while (off < fwBytes.length) {
+      const chunk = fwBytes.slice(off, off + chunkSize);
+      const req = off === 0
+        ? { image: 0, len: fwBytes.length, off: 0, data: chunk }
+        : { off: off, data: chunk };
+      let rsp;
+      try {
+        rsp = await smpRequest(2, 1, 1, req, 5000); // group1=IMAGE, id1=UPLOAD
+      } catch (e) {
+        if (++retries > 5) throw new Error(t("mTooMany") + e.message);
+        log(t("mRetry") + "(" + retries + "/5) off=" + off);
+        continue;
+      }
+      retries = 0;
+      const rc = rsp.payload.rc ?? 0;
+      if (rc !== 0) throw new Error(t("mRcErr") + rc + " (off=" + off + ")");
+      off = (typeof rsp.payload.off === "number") ? rsp.payload.off : off + chunk.length;
+      const pct = Math.floor(off / fwBytes.length * 100);
+      $("barfill").style.width = pct + "%";
+      const kbps = (off / 1024) / ((Date.now() - t0) / 1000);
+      $("prog").textContent = pct + "% · " + (off / 1024).toFixed(1) + " / " + (fwBytes.length / 1024).toFixed(1) + " KB · " + kbps.toFixed(1) + " KB/s";
+      $("prog").removeAttribute("data-i18n");
+    }
+    $("barfill").style.width = "100%";
+    log(t("mUpDone") + ((Date.now() - t0) / 1000).toFixed(1) + t("mUpDoneSec"));
+    log(t("mRebooting"));
+    try { await smpReset(); log(t("mRebooted")); } catch (e) { log(t("mRebootNoResp")); }
+    setMode(false);
+  } catch (e) {
+    log(t("mUpFail") + e.message);
+    log(t("mUpFailHint"));
+  } finally {
+    $("btnUpload").disabled = false; $("btnEnter").disabled = false; updateUploadBtn();
+  }
+}
+
+/* ---------- UI バインド ---------- */
+$("btnConnect").onclick = connect;
+$("btnEnter").onclick = enterRecovery;
+$("btnPing").onclick = ping;
+$("btnUpload").onclick = upload;
+$("btnReset").onclick = async () => { try { await smpReset(); log(t("mRebootSent")); setMode(false); } catch (e) { log("! " + e.message); } };
+$("btnSend").onclick = async () => {
+  const txt = $("cmd").value.trim(); if (!txt) return;
+  try { await writeRaw(new TextEncoder().encode(txt + "\n")); log(">> " + txt); $("cmd").value = ""; } catch (e) { log("! " + e.message); }
+};
+$("cmd").addEventListener("keydown", e => { if (e.key === "Enter") $("btnSend").click(); });
+
+/* ?bin=<url> で update.bin の URL を自動入力 (build 完了ページからの連携用) */
+const qbin = new URLSearchParams(location.search).get("bin");
+if (qbin) $("binurl").value = qbin;
+
+initLangSel();
+applyLang();
+
+if (!("serial" in navigator)) {
+  log(t("mNoSerial"));
+  $("btnConnect").disabled = true;
+}
+navigator.serial && navigator.serial.addEventListener("disconnect", () => { if (port) disconnect(); });
+</script>
+</body>
+</html>
