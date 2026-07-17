@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+# mcuboot 自身の main.c に電源自锁 (EARLY, raw HAL) を追記する。
+# 実行場所: zephyr-workspace/SlimeVR-Tracker-nRF (build-single.yml の
+# "Enable MCUboot UART DFU" ステップ)。冪等 (二回目以降は何もしない)。
+#
+# 背景:
+#   board.c (PRE_KERNEL_1 prio 40) 経由のラッチは mcuboot 側で効いておらず、
+#   短押し起動すると app が立ち上がるまで (~0.6s) 電源ボタンを押し続ける
+#   必要があった。mcuboot のソースに直接入れることで:
+#     - 確実に mcuboot 映像にリンクされる
+#     - EARLY (全 SYS_INIT の最前、電源投入後 <1ms) でラッチできる
+#       -> raw HAL のレジスタ書き込みのみ。ドライバ/クロック初期化を待たない
+#   DT は gen_mcuboot_files.py が mcuboot.overlay に出力する
+#   zephyr,user { pwr-gpios } を読む。prop が無いビルドでは #if で
+#   ブロック全体が消えるため無害。nRF52 / nRF54L 両対応。
+import os, sys
+
+CANDIDATES = (
+    "../bootloader/mcuboot/boot/zephyr/main.c",   # NCS 標準レイアウト
+    "../modules/mcuboot/boot/zephyr/main.c",      # 念のため
+)
+
+path = sys.argv[1] if len(sys.argv) > 1 else next(
+    (p for p in CANDIDATES if os.path.isfile(p)), None)
+if not path or not os.path.isfile(path):
+    sys.exit("patch_mcuboot_pwr: mcuboot main.c not found: " + ", ".join(CANDIDATES))
+
+MARK = "SLIMENRF_PWR_LATCH"
+src = open(path, encoding="utf-8").read()
+if MARK in src:
+    print(f"patch_mcuboot_pwr: already applied ({path})")
+    sys.exit(0)
+
+BLOCK = """
+/* ==== SLIMENRF_PWR_LATCH (SlimeNRF-Web-Builder が追記) ====
+ * 電源自锁: zephyr,user の pwr-gpios を EARLY (全 init の最前、電源投入後
+ * <1ms) で raw HAL によりラッチする。レジスタ書き込みのみで、カーネル・
+ * ドライバ・クロックに依存しないため EARLY で安全。
+ * これにより電源ボタン短押しでも mcuboot の起動 (+0.5s DFU 待機) 中に
+ * 電源が保持される。nRF52 / nRF54L 両対応 (NRF_GPIO_PIN_MAP が吸収)。
+ */
+#include <zephyr/init.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/dt-bindings/gpio/gpio.h>
+#include <hal/nrf_gpio.h>
+
+#define SLIMENRF_PWR_NODE DT_PATH(zephyr_user)
+#if DT_NODE_HAS_PROP(SLIMENRF_PWR_NODE, pwr_gpios)
+static int slimenrf_pwr_latch(void)
+{
+	uint32_t pin = NRF_GPIO_PIN_MAP(
+		DT_PROP(DT_GPIO_CTLR(SLIMENRF_PWR_NODE, pwr_gpios), port),
+		DT_GPIO_PIN(SLIMENRF_PWR_NODE, pwr_gpios));
+
+	nrf_gpio_cfg(pin, NRF_GPIO_PIN_DIR_OUTPUT, NRF_GPIO_PIN_INPUT_DISCONNECT,
+		     NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_S0S1, NRF_GPIO_PIN_NOSENSE);
+#if (DT_GPIO_FLAGS(SLIMENRF_PWR_NODE, pwr_gpios) & GPIO_ACTIVE_LOW)
+	nrf_gpio_pin_clear(pin);
+#else
+	nrf_gpio_pin_set(pin);
+#endif
+	return 0;
+}
+SYS_INIT(slimenrf_pwr_latch, EARLY, 0);
+#endif
+"""
+
+with open(path, "a", encoding="utf-8", newline="\n") as f:
+    f.write(BLOCK)
+print(f"patch_mcuboot_pwr: appended EARLY power latch to {path}")
