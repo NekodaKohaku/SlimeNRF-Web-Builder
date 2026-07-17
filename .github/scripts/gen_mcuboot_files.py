@@ -68,6 +68,7 @@ SB_CONFIG_BOOT_SIGNATURE_TYPE_NONE=y
 # ---------- sysbuild/mcuboot.conf ----------
 write("sysbuild/mcuboot.conf",
 """# minimal 診断: 素の MCUboot + console ログのみ (recovery 一切なし)
+CONFIG_FPROTECT=n
 CONFIG_LOG=y
 CONFIG_LOG_MODE_MINIMAL=y
 CONFIG_SERIAL=y
@@ -101,6 +102,10 @@ CONFIG_GPIO=y
 # recovery 中は LED 点灯 (mcuboot-led0 alias は overlay で定義)
 CONFIG_MCUBOOT_INDICATION_LED=y
 
+# nRF54L15 では jump 直前の bootloader flash 保護 (fprotect) が失敗し
+# 起動が中断されるため無効化 (DIY・無署名構成では保護不要)
+CONFIG_FPROTECT=n
+
 CONFIG_LOG=n
 """ if not debug else """# 診断モード: serial recovery (serial_adapter) は UART console と共存不可の
 # ため無効化し、起動ログのみ UART に出力する。boot-mode / retention は
@@ -109,6 +114,7 @@ CONFIG_RETAINED_MEM=y
 CONFIG_RETENTION=y
 CONFIG_RETENTION_BOOT_MODE=y
 CONFIG_GPIO=y
+CONFIG_FPROTECT=n
 
 CONFIG_LOG=y
 CONFIG_LOG_MODE_MINIMAL=y
