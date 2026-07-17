@@ -98,6 +98,9 @@ CONFIG_BOOT_SERIAL_WAIT_FOR_DFU_TIMEOUT=500
 # gpio-hog (電源自锁) 用
 CONFIG_GPIO=y
 
+# recovery 中は LED 点灯 (mcuboot-led0 alias は overlay で定義)
+CONFIG_MCUBOOT_INDICATION_LED=y
+
 CONFIG_LOG=n
 """ if not debug else """# 診断モード: serial recovery (serial_adapter) は UART console と共存不可の
 # ため無効化し、起動ログのみ UART に出力する。boot-mode / retention は
@@ -258,6 +261,43 @@ if pwr:
 		gpio-hog;
 		gpios = <{pp[1]} GPIO_ACTIVE_HIGH>;
 		output-high;
+	}};
+}};
+"""
+
+# ---------- LED 診断 / DFU 表示 ----------
+# 診断モード: gpio-hog で GPIO 初期化直後に LED 点灯 -> 「MCUboot 生存」の可視信号。
+#             点灯したまま = mcuboot で停止 / 消灯・変化 = app が引き継いだ。
+# 通常モード: gpio-leds ノード + mcuboot-led0 alias -> recovery 中に LED 点灯 (DFU 表示)。
+led = pins.get("led")
+if led:
+    lp = parse_pin(led)
+    lflag = "GPIO_ACTIVE_LOW" if (cfg.get("options") or {}).get("led_polarity") == "low" else "GPIO_ACTIVE_HIGH"
+    if debug or minimal:
+        mcuboot_overlay += f"""
+&gpio{lp[0]} {{
+	status = "okay";
+
+	mcubootled_hog: mcubootled-hog {{
+		gpio-hog;
+		gpios = <{lp[1]} {lflag}>;
+		output-high;
+	}};
+}};
+"""
+    else:
+        mcuboot_overlay += f"""
+/ {{
+	mcuboot_leds {{
+		compatible = "gpio-leds";
+
+		mcuboot_led0: mcuboot-led-0 {{
+			gpios = <&gpio{lp[0]} {lp[1]} {lflag}>;
+		}};
+	}};
+
+	aliases {{
+		mcuboot-led0 = &mcuboot_led0;
 	}};
 }};
 """
