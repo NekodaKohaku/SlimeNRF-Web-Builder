@@ -230,6 +230,7 @@ jobs:
           set -euo pipefail
           cd zephyr-workspace/SlimeVR-Tracker-nRF
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_dfu.py"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_pwr.py"   # mcuboot main.c に EARLY 電源自锁を追記 (短押し起動用)
           python3 "$GITHUB_WORKSPACE/.github/scripts/gen_mcuboot_files.py" \
             "$CONFIG_JSON" "${{ steps.overlay.outputs.overlay_path }}"
 
@@ -273,7 +274,8 @@ jobs:
           UPD="$BDIR/SlimeVR-Tracker-nRF/zephyr/zephyr.signed.bin"
           [ -f "$UPD" ] || UPD="$(find $BDIR -name zephyr.signed.bin | head -1)"
           cp "$UPD" "out/${NAME}.update.bin"
-          PYML="$(find $BDIR -maxdepth 3 -name partitions.yml 2>/dev/null | head -1)"
+          PYML="$(find $BDIR -name 'partitions*.yml' 2>/dev/null | head -1)"
+          [ -z "$PYML" ] && PYML="$(ls SlimeVR-Tracker-nRF/pm_static/pm_static_*.yml 2>/dev/null | head -1)"
           [ -n "$PYML" ] && cp "$PYML" "out/${NAME}.partitions.yml" || true
           else
           SRC="SlimeVR-Tracker-nRF/build/zephyr/zephyr.$FMT"
