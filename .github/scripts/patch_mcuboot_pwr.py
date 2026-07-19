@@ -57,13 +57,16 @@ static int slimenrf_pwr_latch(void)
 	nrf_gpio_pin_set(pin);
 #endif
 
-#if NRF_GPIO_HAS_RETENTION
+#if NRF_GPIO_HAS_RETENTION_SETCLEAR || NRF_GPIO_HAS_RETENTION
 	/* nRF54L: 前回の電源 OFF 時に pad が RETAIN で凍結されたまま残ると、
 	 * 上のレジスタ書き込みが実ピンに反映されない (実機で確認済み。
 	 * OUT/PIN_CNF は正しいのに pad が low のままだった)。
+	 * Zephyr の gpio_nrfx ドライバは全ての出力操作を
+	 * retain_clear -> 書込 -> retain_set で包む = 出力ピンは常時凍結。
 	 * レジスタを正しい値にした「後」で凍結を解除する -> pad は直接
-	 * high へ遷移し、グリッチなしでラッチが効く。nRF52 では
-	 * NRF_GPIO_HAS_RETENTION=0 なのでこのブロックは消える。 */
+	 * high へ遷移し、グリッチなしでラッチが効く。
+	 * nRF54L15 は RETAINSET/RETAINCLR (HAS_RETENTION_SETCLEAR) 側。
+	 * nRF52 はどちらも 0 なのでこのブロックは消える。 */
 	{
 		uint32_t rel = pin;
 		NRF_GPIO_Type *reg = nrf_gpio_pin_port_decode(&rel);
@@ -111,7 +114,11 @@ static void slimenrf_pwr_diag(void)
 		DT_GPIO_PIN(SLIMENRF_PWR_NODE, pwr_gpios));
 	NRF_GPIO_Type *reg = nrf_gpio_pin_port_decode(&pin);
 
-#if NRF_GPIO_HAS_RETENTION
+#if NRF_GPIO_HAS_RETENTION_SETCLEAR
+	printk("SLIMENRF pwr pad: OUT=0x%08x PIN_CNF[%u]=0x%08x RETAIN=0x%08x\n",
+	       (unsigned)reg->OUT, (unsigned)pin, (unsigned)reg->PIN_CNF[pin],
+	       (unsigned)reg->RETAINSET);
+#elif NRF_GPIO_HAS_RETENTION
 	printk("SLIMENRF pwr pad: OUT=0x%08x PIN_CNF[%u]=0x%08x RETAIN=0x%08x\n",
 	       (unsigned)reg->OUT, (unsigned)pin, (unsigned)reg->PIN_CNF[pin],
 	       (unsigned)nrf_gpio_port_retain_get(reg));
