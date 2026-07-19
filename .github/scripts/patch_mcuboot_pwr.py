@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-# mcuboot 自身の main.c に電源自锁 (EARLY, raw HAL) を追記する。
+# mcuboot 自身の main.c に電源自锁 (raw HAL) を追記する。
 # 実行場所: zephyr-workspace/SlimeVR-Tracker-nRF (build-single.yml の
 # "Enable MCUboot UART DFU" ステップ)。冪等 (二回目以降は何もしない)。
 #
-# 背景:
-#   board.c (PRE_KERNEL_1 prio 40) 経由のラッチは mcuboot 側で効いておらず、
-#   短押し起動すると app が立ち上がるまで (~0.6s) 電源ボタンを押し続ける
-#   必要があった。mcuboot のソースに直接入れることで:
-#     - 確実に mcuboot 映像にリンクされる
-#     - EARLY (全 SYS_INIT の最前、電源投入後 <1ms) でラッチできる
-#       -> raw HAL のレジスタ書き込みのみ。ドライバ/クロック初期化を待たない
-#   DT は gen_mcuboot_files.py が mcuboot.overlay に出力する
-#   zephyr,user { pwr-gpios } を読む。prop が無いビルドでは #if で
-#   ブロック全体が消えるため無害。nRF52 / nRF54L 両対応。
+# 二重の保険でラッチする:
+#   1) SYS_INIT EARLY (全 init の最前、電源投入後 <1ms)
+#   2) main() 冒頭 (watchdog 直後、電源投入後 ~10-30ms) で明示的に呼ぶ
+# どちらも 0.5s DFU 待機ウィンドウよりはるかに早い。EARLY が環境要因で
+# 効かない場合でも main() 側が確実にラッチする。
+#
+# DT は gen_mcuboot_files.py が mcuboot.overlay に出力する
+# zephyr,user { pwr-gpios } を読む。prop が無いビルドでは空関数になり無害。
+# nRF52 / nRF54L 両対応 (NRF_GPIO_PIN_MAP が吸収)。
 import os, sys
 
 CANDIDATES = (
@@ -32,12 +31,10 @@ if MARK in src:
     sys.exit(0)
 
 BLOCK = """
-/* ==== SLIMENRF_PWR_LATCH (SlimeNRF-Web-Builder が追記) ====
- * 電源自锁: zephyr,user の pwr-gpios を EARLY (全 init の最前、電源投入後
- * <1ms) で raw HAL によりラッチする。レジスタ書き込みのみで、カーネル・
- * ドライバ・クロックに依存しないため EARLY で安全。
- * これにより電源ボタン短押しでも mcuboot の起動 (+0.5s DFU 待機) 中に
- * 電源が保持される。nRF52 / nRF54L 両対応 (NRF_GPIO_PIN_MAP が吸収)。
+/* ==== SLIMENRF_PWR_LATCH (SlimeNRF-Web-Builder が挿入) ====
+ * 電源自锁: zephyr,user の pwr-gpios を raw HAL でラッチする。
+ * レジスタ書き込みのみで、カーネル・ドライバ・クロックに依存しない。
+ * EARLY SYS_INIT と main() 冒頭の両方から呼ばれる (冪等)。
  */
 #include <zephyr/init.h>
 #include <zephyr/devicetree.h>
@@ -62,9 +59,26 @@ static int slimenrf_pwr_latch(void)
 	return 0;
 }
 SYS_INIT(slimenrf_pwr_latch, EARLY, 0);
+#else
+static inline int slimenrf_pwr_latch(void) { return 0; }
 #endif
 """
 
-with open(path, "a", encoding="utf-8", newline="\n") as f:
-    f.write(BLOCK)
-print(f"patch_mcuboot_pwr: appended EARLY power latch to {path}")
+# ---- 1) main() の直前に関数ブロックを挿入 ----
+ANCHOR_MAIN = "\nint main(void)\n"
+if ANCHOR_MAIN not in src:
+    sys.exit(f"patch_mcuboot_pwr: anchor 'int main(void)' not found in {path}")
+src = src.replace(ANCHOR_MAIN, "\n" + BLOCK + "\nint main(void)\n", 1)
+
+# ---- 2) main() 冒頭 (watchdog 直後) に呼び出しを挿入 ----
+ANCHOR_WDT = "MCUBOOT_WATCHDOG_FEED();"
+if ANCHOR_WDT not in src:
+    sys.exit(f"patch_mcuboot_pwr: anchor MCUBOOT_WATCHDOG_FEED not found in {path}")
+src = src.replace(
+    ANCHOR_WDT,
+    ANCHOR_WDT + "\n\n    /* SLIMENRF: 電源自锁 (EARLY の保険。冪等なので二重実行は無害) */\n"
+    "    (void)slimenrf_pwr_latch();",
+    1)
+
+open(path, "w", encoding="utf-8", newline="").write(src)
+print(f"patch_mcuboot_pwr: EARLY + main() power latch inserted into {path}")
