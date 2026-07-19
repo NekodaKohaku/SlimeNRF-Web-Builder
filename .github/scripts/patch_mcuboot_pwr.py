@@ -56,6 +56,26 @@ static int slimenrf_pwr_latch(void)
 #else
 	nrf_gpio_pin_set(pin);
 #endif
+
+#if NRF_GPIO_HAS_RETENTION
+	/* nRF54L: 前回の電源 OFF 時に pad が RETAIN で凍結されたまま残ると、
+	 * 上のレジスタ書き込みが実ピンに反映されない (実機で確認済み。
+	 * OUT/PIN_CNF は正しいのに pad が low のままだった)。
+	 * レジスタを正しい値にした「後」で凍結を解除する -> pad は直接
+	 * high へ遷移し、グリッチなしでラッチが効く。nRF52 では
+	 * NRF_GPIO_HAS_RETENTION=0 なのでこのブロックは消える。 */
+	{
+		uint32_t rel = pin;
+		NRF_GPIO_Type *reg = nrf_gpio_pin_port_decode(&rel);
+
+#if NRF_GPIO_HAS_RETENTION_SETCLEAR
+		nrf_gpio_port_retain_disable(reg, 1UL << rel);
+#else
+		nrf_gpio_port_retain_set(reg,
+			nrf_gpio_port_retain_get(reg) & ~(1UL << rel));
+#endif
+	}
+#endif
 	return 0;
 }
 /* 三段構えでラッチする (冪等なので重複実行は無害):
@@ -91,8 +111,14 @@ static void slimenrf_pwr_diag(void)
 		DT_GPIO_PIN(SLIMENRF_PWR_NODE, pwr_gpios));
 	NRF_GPIO_Type *reg = nrf_gpio_pin_port_decode(&pin);
 
+#if NRF_GPIO_HAS_RETENTION
+	printk("SLIMENRF pwr pad: OUT=0x%08x PIN_CNF[%u]=0x%08x RETAIN=0x%08x\n",
+	       (unsigned)reg->OUT, (unsigned)pin, (unsigned)reg->PIN_CNF[pin],
+	       (unsigned)nrf_gpio_port_retain_get(reg));
+#else
 	printk("SLIMENRF pwr pad: OUT=0x%08x PIN_CNF[%u]=0x%08x\n",
 	       (unsigned)reg->OUT, (unsigned)pin, (unsigned)reg->PIN_CNF[pin]);
+#endif
 }
 #else
 static volatile uint32_t slimenrf_latch_mask;
