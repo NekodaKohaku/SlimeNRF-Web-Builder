@@ -58,7 +58,16 @@ static int slimenrf_pwr_latch(void)
 #endif
 	return 0;
 }
+/* 三段構えでラッチする (冪等なので重複実行は無害):
+ *   EARLY        - 本来の最速パス (mcuboot では実行されない事例が確認された)
+ *   PRE_KERNEL_1 - 全ドライバ初期化 (遅い crypto 含む) より前。実測で
+ *                  mcuboot でも確実に実行される (UART/GPIO ドライバが同じ
+ *                  仕組みで動いていることが証拠)
+ *   main() 冒頭  - 最終保険
+ */
 SYS_INIT(slimenrf_pwr_latch, EARLY, 0);
+static int slimenrf_pwr_latch_pk1(void) { return slimenrf_pwr_latch(); }
+SYS_INIT(slimenrf_pwr_latch_pk1, PRE_KERNEL_1, 0);
 #else
 static inline int slimenrf_pwr_latch(void) { return 0; }
 #endif
