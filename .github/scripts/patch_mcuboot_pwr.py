@@ -30,7 +30,7 @@ if MARK in src:
     print(f"patch_mcuboot_pwr: already applied ({path})")
     sys.exit(0)
 
-BLOCK = """
+BLOCK = r"""
 /* ==== SLIMENRF_PWR_LATCH (SlimeNRF-Web-Builder が挿入) ====
  * 電源自锁: zephyr,user の pwr-gpios を raw HAL でラッチする。
  * レジスタ書き込みのみで、カーネル・ドライバ・クロックに依存しない。
