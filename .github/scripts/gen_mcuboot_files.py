@@ -75,6 +75,12 @@ CONFIG_SERIAL=y
 CONFIG_CONSOLE=y
 CONFIG_UART_CONSOLE=y
 CONFIG_GPIO=y
+
+# 診断: 起動時の hash 検証も無効化 -> mcuboot は純粋なジャンプ台になる。
+# 起動直後の高負荷 (全 app 領域の SHA-256 = CPU+RRAM+CRACEN フル稼働) が
+# 電源レール立ち上がりを鈍らせている仮説の切り分け用。
+# 注意: この構成は検証しないので破損 app でも起動を試みる (診断専用!)
+CONFIG_BOOT_VALIDATE_SLOT0=n
 """ if minimal else """CONFIG_MCUBOOT_SERIAL=y
 CONFIG_BOOT_SERIAL_UART=y
 CONFIG_BOOT_SERIAL_MAX_RECEIVE_SIZE=1024
