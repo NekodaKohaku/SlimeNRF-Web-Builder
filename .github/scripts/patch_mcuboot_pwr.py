@@ -148,10 +148,11 @@ src = src.replace(
     ANCHOR_WDT,
     ANCHOR_WDT + "\n\n    /* SLIMENRF: 電源自锁 (最終保険) + 診断出力 */\n"
     "    (void)slimenrf_pwr_latch();\n"
-    "    printk(\"SLIMENRF latch mask=0x%x uptime=%lld ms\\n\",\n"
-    "           (unsigned)slimenrf_latch_mask, (long long)k_uptime_get());\n"
+    "    printk(\"SLIMENRF v4 mask=0x%x uptime=%lld ms gates=%d/%d\\n\",\n"
+    "           (unsigned)slimenrf_latch_mask, (long long)k_uptime_get(),\n"
+    "           (int)NRF_GPIO_HAS_RETENTION, (int)NRF_GPIO_HAS_RETENTION_SETCLEAR);\n"
     "    slimenrf_pwr_diag();",
     1)
 
 open(path, "w", encoding="utf-8", newline="").write(src)
-print(f"patch_mcuboot_pwr: EARLY + main() power latch inserted into {path}")
+print(f"patch_mcuboot_pwr v4 (retain-clear): EARLY + main() power latch inserted into {path}")
