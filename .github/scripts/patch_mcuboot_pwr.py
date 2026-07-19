@@ -59,16 +59,29 @@ static int slimenrf_pwr_latch(void)
 	return 0;
 }
 /* 三段構えでラッチする (冪等なので重複実行は無害):
- *   EARLY        - 本来の最速パス (mcuboot では実行されない事例が確認された)
- *   PRE_KERNEL_1 - 全ドライバ初期化 (遅い crypto 含む) より前。実測で
- *                  mcuboot でも確実に実行される (UART/GPIO ドライバが同じ
- *                  仕組みで動いていることが証拠)
- *   main() 冒頭  - 最終保険
+ *   EARLY / PRE_KERNEL_1 / main() 冒頭
+ * 診断: 各段が実行されたら slimenrf_latch_mask に bit を立て、
+ * main() 冒頭で printk する (debug ビルドの UART console で見える。
+ * 本番ビルドは CONSOLE=n なので何も出ないだけで無害)。
+ *   bit0 = EARLY 実行済 / bit1 = PRE_KERNEL_1 実行済
  */
-SYS_INIT(slimenrf_pwr_latch, EARLY, 0);
-static int slimenrf_pwr_latch_pk1(void) { return slimenrf_pwr_latch(); }
-SYS_INIT(slimenrf_pwr_latch_pk1, PRE_KERNEL_1, 0);
+static volatile uint32_t slimenrf_latch_mask;
+
+static int slimenrf_latch_early(void)
+{
+	slimenrf_latch_mask |= 1;
+	return slimenrf_pwr_latch();
+}
+SYS_INIT(slimenrf_latch_early, EARLY, 0);
+
+static int slimenrf_latch_pk1(void)
+{
+	slimenrf_latch_mask |= 2;
+	return slimenrf_pwr_latch();
+}
+SYS_INIT(slimenrf_latch_pk1, PRE_KERNEL_1, 0);
 #else
+static volatile uint32_t slimenrf_latch_mask;
 static inline int slimenrf_pwr_latch(void) { return 0; }
 #endif
 """
@@ -85,8 +98,10 @@ if ANCHOR_WDT not in src:
     sys.exit(f"patch_mcuboot_pwr: anchor MCUBOOT_WATCHDOG_FEED not found in {path}")
 src = src.replace(
     ANCHOR_WDT,
-    ANCHOR_WDT + "\n\n    /* SLIMENRF: 電源自锁 (EARLY の保険。冪等なので二重実行は無害) */\n"
-    "    (void)slimenrf_pwr_latch();",
+    ANCHOR_WDT + "\n\n    /* SLIMENRF: 電源自锁 (最終保険) + 診断出力 */\n"
+    "    (void)slimenrf_pwr_latch();\n"
+    "    printk(\"SLIMENRF latch mask=0x%x uptime=%lld ms\\n\",\n"
+    "           (unsigned)slimenrf_latch_mask, (long long)k_uptime_get());",
     1)
 
 open(path, "w", encoding="utf-8", newline="").write(src)
