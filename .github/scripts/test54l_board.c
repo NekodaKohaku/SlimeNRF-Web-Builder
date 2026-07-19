@@ -50,7 +50,7 @@ static int board_test54l_init(void)
 	/* nRF54L: 前回の電源 OFF で pad が RETAIN 凍結されたままだと、上の
 	 * レジスタ書き込みが実ピンに反映されず、ドライバが解除する main()
 	 * 頃まで自锁が効かない (実機で確認)。レジスタ設定後に凍結を解除。 */
-	#if NRF_GPIO_HAS_RETENTION
+	#if NRF_GPIO_HAS_RETENTION_SETCLEAR || NRF_GPIO_HAS_RETENTION
 	{
 		uint32_t rel = NRF_GPIO_PIN_MAP(PWR_GPIO_PORT_NUM, PWR_GPIO_PIN);
 		NRF_GPIO_Type *reg = nrf_gpio_pin_port_decode(&rel);
