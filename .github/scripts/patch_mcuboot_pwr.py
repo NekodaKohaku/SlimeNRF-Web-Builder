@@ -80,9 +80,24 @@ static int slimenrf_latch_pk1(void)
 	return slimenrf_pwr_latch();
 }
 SYS_INIT(slimenrf_latch_pk1, PRE_KERNEL_1, 0);
+
+/* 診断: ラッチ後にレジスタを読み戻して報告する。
+ * OUT bit が 1 なのに実ピンが low なら、pad レベルの介入
+ * (retention / CTRLSEL / SPU 等) を意味する。 */
+static void slimenrf_pwr_diag(void)
+{
+	uint32_t pin = NRF_GPIO_PIN_MAP(
+		DT_PROP(DT_GPIO_CTLR(SLIMENRF_PWR_NODE, pwr_gpios), port),
+		DT_GPIO_PIN(SLIMENRF_PWR_NODE, pwr_gpios));
+	NRF_GPIO_Type *reg = nrf_gpio_pin_port_decode(&pin);
+
+	printk("SLIMENRF pwr pad: OUT=0x%08x PIN_CNF[%u]=0x%08x\n",
+	       (unsigned)reg->OUT, (unsigned)pin, (unsigned)reg->PIN_CNF[pin]);
+}
 #else
 static volatile uint32_t slimenrf_latch_mask;
 static inline int slimenrf_pwr_latch(void) { return 0; }
+static inline void slimenrf_pwr_diag(void) {}
 #endif
 """
 
@@ -101,7 +116,8 @@ src = src.replace(
     ANCHOR_WDT + "\n\n    /* SLIMENRF: 電源自锁 (最終保険) + 診断出力 */\n"
     "    (void)slimenrf_pwr_latch();\n"
     "    printk(\"SLIMENRF latch mask=0x%x uptime=%lld ms\\n\",\n"
-    "           (unsigned)slimenrf_latch_mask, (long long)k_uptime_get());",
+    "           (unsigned)slimenrf_latch_mask, (long long)k_uptime_get());\n"
+    "    slimenrf_pwr_diag();",
     1)
 
 open(path, "w", encoding="utf-8", newline="").write(src)
