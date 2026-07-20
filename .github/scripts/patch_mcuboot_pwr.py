@@ -49,7 +49,7 @@ static int slimenrf_pwr_latch(void)
 		DT_PROP(DT_GPIO_CTLR(SLIMENRF_PWR_NODE, pwr_gpios), port),
 		DT_GPIO_PIN(SLIMENRF_PWR_NODE, pwr_gpios));
 
-	nrf_gpio_cfg(pin, NRF_GPIO_PIN_DIR_OUTPUT, NRF_GPIO_PIN_INPUT_DISCONNECT,
+	nrf_gpio_cfg(pin, NRF_GPIO_PIN_DIR_OUTPUT, NRF_GPIO_PIN_INPUT_CONNECT,
 		     NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_S0S1, NRF_GPIO_PIN_NOSENSE);
 #if (DT_GPIO_FLAGS(SLIMENRF_PWR_NODE, pwr_gpios) & GPIO_ACTIVE_LOW)
 	nrf_gpio_pin_clear(pin);
@@ -127,10 +127,29 @@ static void slimenrf_pwr_diag(void)
 	       (unsigned)reg->OUT, (unsigned)pin, (unsigned)reg->PIN_CNF[pin]);
 #endif
 }
+/* 診断: pad の実電位を IN レジスタで読み戻し、1 秒間ウォッチする。
+ * OUT=1 なのに IN=0 が続く区間 = pad が実際に low な時間帯 (直接測定)。
+ * console 無効の本番ビルドでは printk が消えるが、ループ自体を避ける
+ * ため CONFIG_UART_CONSOLE でガードする。 */
+static void slimenrf_pad_monitor(void)
+{
+#if defined(CONFIG_UART_CONSOLE)
+	uint32_t pin = NRF_GPIO_PIN_MAP(
+		DT_PROP(DT_GPIO_CTLR(SLIMENRF_PWR_NODE, pwr_gpios), port),
+		DT_GPIO_PIN(SLIMENRF_PWR_NODE, pwr_gpios));
+
+	for (int i = 0; i < 40; i++) {
+		printk("SLIMENRF pad IN=%d t=%lld\n",
+		       (int)nrf_gpio_pin_read(pin), (long long)k_uptime_get());
+		k_busy_wait(25000);
+	}
+#endif
+}
 #else
 static volatile uint32_t slimenrf_latch_mask;
 static inline int slimenrf_pwr_latch(void) { return 0; }
 static inline void slimenrf_pwr_diag(void) {}
+static inline void slimenrf_pad_monitor(void) {}
 #endif
 """
 
@@ -148,11 +167,12 @@ src = src.replace(
     ANCHOR_WDT,
     ANCHOR_WDT + "\n\n    /* SLIMENRF: 電源自锁 (最終保険) + 診断出力 */\n"
     "    (void)slimenrf_pwr_latch();\n"
-    "    printk(\"SLIMENRF v4 mask=0x%x uptime=%lld ms gates=%d/%d\\n\",\n"
+    "    printk(\"SLIMENRF v5 mask=0x%x uptime=%lld ms gates=%d/%d\\n\",\n"
     "           (unsigned)slimenrf_latch_mask, (long long)k_uptime_get(),\n"
     "           (int)NRF_GPIO_HAS_RETENTION, (int)NRF_GPIO_HAS_RETENTION_SETCLEAR);\n"
-    "    slimenrf_pwr_diag();",
+    "    slimenrf_pwr_diag();\n"
+    "    slimenrf_pad_monitor();",
     1)
 
 open(path, "w", encoding="utf-8", newline="").write(src)
-print(f"patch_mcuboot_pwr v4 (retain-clear): EARLY + main() power latch inserted into {path}")
+print(f"patch_mcuboot_pwr v5 (pad-monitor): EARLY + main() power latch inserted into {path}")

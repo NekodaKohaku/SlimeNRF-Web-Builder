@@ -77,3 +77,13 @@ static int board_test54l_init(void)
 }
 
 SYS_INIT(board_test54l_init, EARLY, 0);
+
+/* Zephyr 正規の board hook (全 SYS_INIT より前、C runtime 準備後)。
+ * CONFIG_BOARD_EARLY_INIT_HOOK=y のビルドでは EARLY SYS_INIT より
+ * さらに早くラッチする。二重実行は冪等なので無害。 */
+#ifdef CONFIG_BOARD_EARLY_INIT_HOOK
+void board_early_init_hook(void)
+{
+	(void)board_test54l_init();
+}
+#endif

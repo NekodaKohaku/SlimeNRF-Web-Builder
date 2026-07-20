@@ -76,6 +76,9 @@ CONFIG_CONSOLE=y
 CONFIG_UART_CONSOLE=y
 CONFIG_GPIO=y
 
+# board.c の board_early_init_hook (電源自锁) を有効化
+CONFIG_BOARD_EARLY_INIT_HOOK=y
+
 # 診断: 起動時の hash 検証も無効化 -> mcuboot は純粋なジャンプ台になる。
 # 起動直後の高負荷 (全 app 領域の SHA-256 = CPU+RRAM+CRACEN フル稼働) が
 # 電源レール立ち上がりを鈍らせている仮説の切り分け用。
@@ -105,6 +108,9 @@ CONFIG_BOOT_SERIAL_WAIT_FOR_DFU_TIMEOUT=500
 # INDICATION_LED (gpio-leds) 用
 CONFIG_GPIO=y
 
+# board.c の board_early_init_hook (電源自锁) を有効化
+CONFIG_BOARD_EARLY_INIT_HOOK=y
+
 # recovery 中は LED 点灯 (mcuboot-led0 alias は overlay で定義)
 CONFIG_MCUBOOT_INDICATION_LED=y
 
@@ -127,6 +133,9 @@ CONFIG_LOG_MODE_MINIMAL=y
 CONFIG_SERIAL=y
 CONFIG_CONSOLE=y
 CONFIG_UART_CONSOLE=y
+
+# board.c の board_early_init_hook (電源自锁) を有効化
+CONFIG_BOARD_EARLY_INIT_HOOK=y
 """)
 
 # ---------- sysbuild/mcuboot.overlay + アプリ側 boot-mode ノード ----------
@@ -314,7 +323,8 @@ else:
 # ---------- アプリ prj.conf ----------
 with open("prj.conf", "a", encoding="utf-8", newline="\n") as f:
     f.write("\n\n# mcuboot UART DFU (bootmode_set)\n"
-            "CONFIG_RETAINED_MEM=y\nCONFIG_RETENTION=y\nCONFIG_RETENTION_BOOT_MODE=y\n")
+            "CONFIG_RETAINED_MEM=y\nCONFIG_RETENTION=y\nCONFIG_RETENTION_BOOT_MODE=y\n"
+            "CONFIG_BOARD_EARLY_INIT_HOOK=y\n")
 print("== appended retention Kconfigs to prj.conf ==")
 
 # ---------- 凍結パーティションレイアウト ----------
