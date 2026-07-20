@@ -271,23 +271,6 @@ else:
 };
 """
 
-# ---------- 電源自锁 (power latch): mcuboot 実行中・recovery 中も電源を保持 ----------
-# 52 / 54L 共通: zephyr,user の pwr-gpios を mcuboot の DT に渡し、
-# patch_mcuboot_pwr.py が mcuboot 自身の main.c に追記した EARLY init
-# (電源投入後 <1ms、raw HAL) がラッチする。
-# board.c (PRE_KERNEL_1 prio 40、遅い) や gpio-hog (ドライバ初期化、
-# mcuboot 側で確実にリンクされる保証がない) には依存しない。
-pwr = pins.get("pwr")
-if pwr:
-    pp = parse_pin(pwr)
-    mcuboot_overlay += f"""
-/ {{
-	zephyr,user {{
-		pwr-gpios = <&gpio{pp[0]} {pp[1]} GPIO_ACTIVE_HIGH>;
-	}};
-}};
-"""
-
 # nano: overlay を最小に置き換え (chosen flash-controller + SRAM 縮小のみ。
 # pwr の zephyr,user とアプリ側 append は共通処理がこの後で足す)
 if nano:
@@ -308,6 +291,24 @@ if nano:
 		zephyr,flash-controller = &flash_controller;
 	};
 };
+"""
+
+
+# ---------- 電源自锁 (power latch): mcuboot 実行中・recovery 中も電源を保持 ----------
+# 52 / 54L 共通: zephyr,user の pwr-gpios を mcuboot の DT に渡し、
+# patch_mcuboot_pwr.py が mcuboot 自身の main.c に追記した EARLY init
+# (電源投入後 <1ms、raw HAL) がラッチする。
+# board.c (PRE_KERNEL_1 prio 40、遅い) や gpio-hog (ドライバ初期化、
+# mcuboot 側で確実にリンクされる保証がない) には依存しない。
+pwr = pins.get("pwr")
+if pwr:
+    pp = parse_pin(pwr)
+    mcuboot_overlay += f"""
+/ {{
+	zephyr,user {{
+		pwr-gpios = <&gpio{pp[0]} {pp[1]} GPIO_ACTIVE_HIGH>;
+	}};
+}};
 """
 
 # minimal 診断: mcuboot の CPU を 64MHz に落とす。
