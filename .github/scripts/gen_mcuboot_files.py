@@ -38,14 +38,7 @@ def parse_pin(p):
 
 # 診断モード: options.mcuboot_debug=="enabled" で mcuboot が UART にログを出す
 # (zephyr,uart-mcumgr の代わりに zephyr,console を使う。同一 UART・115200)
-_dbg = (cfg.get("options") or {}).get("mcuboot_debug")
-debug = _dbg == "enabled"
-# minimal: 裸 MCUboot 二分用 — recovery/retention/boot-mode 全部無効、
-# console ログのみ有効。「素の MCUboot が app を起動できるか」を単独検証する
-minimal = _dbg == "minimal"
-# nano: 二分の最終段 — mcuboot を「ラッチ + ジャンプ」だけに剥ぐ。
-# UART/console/GPIO ドライバ/entropy/検証 全部なし。観測手段はタップ挙動のみ
-nano = _dbg == "nano"
+debug = (cfg.get("options") or {}).get("mcuboot_debug") == "enabled"
 
 txp, rxp = parse_pin(tx), parse_pin(rx)
 is54 = "54l" in board.lower()
@@ -70,33 +63,7 @@ SB_CONFIG_BOOT_SIGNATURE_TYPE_NONE=y
 
 # ---------- sysbuild/mcuboot.conf ----------
 write("sysbuild/mcuboot.conf",
-"""# nano 診断: ラッチ + ジャンプのみ。サブシステム全部なし
-CONFIG_FPROTECT=n
-CONFIG_BOOT_VALIDATE_SLOT0=n
-CONFIG_LOG=n
-CONFIG_SERIAL=n
-CONFIG_CONSOLE=n
-CONFIG_UART_CONSOLE=n
-CONFIG_GPIO=n
-CONFIG_ENTROPY_GENERATOR=n
-""" if nano else """# minimal 診断: 素の MCUboot + console ログのみ (recovery 一切なし)
-CONFIG_FPROTECT=n
-CONFIG_LOG=y
-CONFIG_LOG_MODE_MINIMAL=y
-CONFIG_SERIAL=y
-CONFIG_CONSOLE=y
-CONFIG_UART_CONSOLE=y
-CONFIG_GPIO=y
-
-# board.c の board_early_init_hook (電源自锁) を有効化
-CONFIG_BOARD_EARLY_INIT_HOOK=y
-
-# 診断: 起動時の hash 検証も無効化 -> mcuboot は純粋なジャンプ台になる。
-# 起動直後の高負荷 (全 app 領域の SHA-256 = CPU+RRAM+CRACEN フル稼働) が
-# 電源レール立ち上がりを鈍らせている仮説の切り分け用。
-# 注意: この構成は検証しないので破損 app でも起動を試みる (診断専用!)
-CONFIG_BOOT_VALIDATE_SLOT0=n
-""" if minimal else """CONFIG_MCUBOOT_SERIAL=y
+"""CONFIG_MCUBOOT_SERIAL=y
 CONFIG_BOOT_SERIAL_UART=y
 CONFIG_BOOT_SERIAL_MAX_RECEIVE_SIZE=1024
 CONFIG_BOOT_MGMT_ECHO=y
@@ -120,9 +87,6 @@ CONFIG_BOOT_SERIAL_WAIT_FOR_DFU_TIMEOUT=500
 # INDICATION_LED (gpio-leds) 用
 CONFIG_GPIO=y
 
-# board.c の board_early_init_hook (電源自锁) を有効化
-CONFIG_BOARD_EARLY_INIT_HOOK=y
-
 # recovery 中は LED 点灯 (mcuboot-led0 alias は overlay で定義)
 CONFIG_MCUBOOT_INDICATION_LED=y
 
@@ -145,14 +109,9 @@ CONFIG_LOG_MODE_MINIMAL=y
 CONFIG_SERIAL=y
 CONFIG_CONSOLE=y
 CONFIG_UART_CONSOLE=y
-
-# board.c の board_early_init_hook (電源自锁) を有効化
-CONFIG_BOARD_EARLY_INIT_HOOK=y
 """)
 
 # ---------- sysbuild/mcuboot.overlay + アプリ側 boot-mode ノード ----------
-if nano and is54:
-    pass  # 下の is54 分岐の後で上書きする
 if is54:
     # nRF54L15: GPREGRET が無いため、boot mode は保持 SRAM 512 B に置く。
     # ファームウェア自身の保持領域 0x2003F000 の直下 (socs overlay が主 SRAM を
@@ -182,10 +141,11 @@ if is54:
 """
     mcuboot_overlay = f"""/ {{
 	chosen {{
-		{("zephyr,console" if (debug or minimal) else "zephyr,uart-mcumgr")} = &{uart};
-{("" if minimal else chr(9)+chr(9)+"zephyr,boot-mode = &boot_mode_ret;"+chr(10))}		zephyr,flash-controller = &rram_controller;
+		{("zephyr,console" if debug else "zephyr,uart-mcumgr")} = &{uart};
+		zephyr,boot-mode = &boot_mode_ret;
+		zephyr,flash-controller = &rram_controller;
 	}};
-{("" if minimal else retention_nodes)}}};
+{retention_nodes}}};
 
 &cpuapp_sram {{
 	reg = <0x20000000 0x3ee00>;
@@ -220,8 +180,9 @@ else:
     # nRF52840: boot mode は GPREGRET に置く (ソフトリセット後も保持、RAM 消費なし)
     mcuboot_overlay = f"""/ {{
 	chosen {{
-		{("zephyr,console" if (debug or minimal) else "zephyr,uart-mcumgr")} = &{uart};
-{("" if minimal else chr(9)+chr(9)+"zephyr,boot-mode = &boot_mode0;"+chr(10))}		zephyr,flash-controller = &flash_controller;
+		{("zephyr,console" if debug else "zephyr,uart-mcumgr")} = &{uart};
+		zephyr,boot-mode = &boot_mode0;
+		zephyr,flash-controller = &flash_controller;
 	}};
 }};
 
@@ -271,29 +232,6 @@ else:
 };
 """
 
-# nano: overlay を最小に置き換え (chosen flash-controller + SRAM 縮小のみ。
-# pwr の zephyr,user とアプリ側 append は共通処理がこの後で足す)
-if nano:
-    if is54:
-        mcuboot_overlay = """/ {
-	chosen {
-		zephyr,flash-controller = &rram_controller;
-	};
-};
-
-&cpuapp_sram {
-	reg = <0x20000000 0x3ee00>;
-};
-"""
-    else:
-        mcuboot_overlay = """/ {
-	chosen {
-		zephyr,flash-controller = &flash_controller;
-	};
-};
-"""
-
-
 # ---------- 電源自锁 (power latch): mcuboot 実行中・recovery 中も電源を保持 ----------
 # 52 / 54L 共通: zephyr,user の pwr-gpios を mcuboot の DT に渡し、
 # patch_mcuboot_pwr.py が mcuboot 自身の main.c に追記した EARLY init
@@ -311,26 +249,15 @@ if pwr:
 }};
 """
 
-# minimal 診断: mcuboot の CPU を 64MHz に落とす。
-# 仮説: 起動初期の消費電流が NiMH 昇圧の 3V3 立ち上がりを鈍らせ、
-# VDD が 2.5V を超えるまで Q3 (2N7002) が開かず自锁が効かない。
-# クロック半減で初期電流を下げ、レール立ち上がりを速くする実験。
-if minimal:
-    mcuboot_overlay += """
-&cpu {
-	clock-frequency = <64000000>;
-};
-"""
-
 # ---------- LED 診断 / DFU 表示 ----------
 # 診断モード: gpio-hog で GPIO 初期化直後に LED 点灯 -> 「MCUboot 生存」の可視信号。
 #             点灯したまま = mcuboot で停止 / 消灯・変化 = app が引き継いだ。
 # 通常モード: gpio-leds ノード + mcuboot-led0 alias -> recovery 中に LED 点灯 (DFU 表示)。
 led = pins.get("led")
-if led and not nano:
+if led:
     lp = parse_pin(led)
     lflag = "GPIO_ACTIVE_LOW" if (cfg.get("options") or {}).get("led_polarity") == "low" else "GPIO_ACTIVE_HIGH"
-    if debug or minimal:
+    if debug:
         mcuboot_overlay += f"""
 &gpio{lp[0]} {{
 	status = "okay";
@@ -371,8 +298,7 @@ else:
 # ---------- アプリ prj.conf ----------
 with open("prj.conf", "a", encoding="utf-8", newline="\n") as f:
     f.write("\n\n# mcuboot UART DFU (bootmode_set)\n"
-            "CONFIG_RETAINED_MEM=y\nCONFIG_RETENTION=y\nCONFIG_RETENTION_BOOT_MODE=y\n"
-            "CONFIG_BOARD_EARLY_INIT_HOOK=y\n")
+            "CONFIG_RETAINED_MEM=y\nCONFIG_RETENTION=y\nCONFIG_RETENTION_BOOT_MODE=y\n")
 print("== appended retention Kconfigs to prj.conf ==")
 
 # ---------- 凍結パーティションレイアウト ----------

@@ -5,8 +5,7 @@
  *
  * EARLY (旧: PRE_KERNEL_1 prio 40): raw HAL のレジスタ書き込みのみで
  * ドライバ / クロック初期化に依存しないため、全 SYS_INIT の最前で実行できる。
- * これで電源投入後 <1ms でラッチされ、SWD 直燒 / uf2 / mcuboot どの
- * ビルドの app 側も同様に速くなる。
+ * SWD 直燒 / uf2 / mcuboot どのビルドでも同じ動作。
  */
 #include <zephyr/init.h>
 #include <zephyr/devicetree.h>
@@ -46,22 +45,6 @@ static int board_test54l_init(void)
 	#else
 	nrf_gpio_pin_set(NRF_GPIO_PIN_MAP(PWR_GPIO_PORT_NUM, PWR_GPIO_PIN));
 	#endif
-
-	/* nRF54L: 前回の電源 OFF で pad が RETAIN 凍結されたままだと、上の
-	 * レジスタ書き込みが実ピンに反映されず、ドライバが解除する main()
-	 * 頃まで自锁が効かない (実機で確認)。レジスタ設定後に凍結を解除。 */
-	#if NRF_GPIO_HAS_RETENTION_SETCLEAR || NRF_GPIO_HAS_RETENTION
-	{
-		uint32_t rel = NRF_GPIO_PIN_MAP(PWR_GPIO_PORT_NUM, PWR_GPIO_PIN);
-		NRF_GPIO_Type *reg = nrf_gpio_pin_port_decode(&rel);
-
-		#if NRF_GPIO_HAS_RETENTION_SETCLEAR
-		nrf_gpio_port_retain_disable(reg, 1UL << rel);
-		#else
-		nrf_gpio_port_retain_set(reg, nrf_gpio_port_retain_get(reg) & ~(1UL << rel));
-		#endif
-	}
-	#endif
 #endif
 
 	/* Sensor power via DT vcc-gpios / gnd-gpios (was hardcoded P1.7/P1.8). */
@@ -77,13 +60,3 @@ static int board_test54l_init(void)
 }
 
 SYS_INIT(board_test54l_init, EARLY, 0);
-
-/* Zephyr 正規の board hook (全 SYS_INIT より前、C runtime 準備後)。
- * CONFIG_BOARD_EARLY_INIT_HOOK=y のビルドでは EARLY SYS_INIT より
- * さらに早くラッチする。二重実行は冪等なので無害。 */
-#ifdef CONFIG_BOARD_EARLY_INIT_HOOK
-void board_early_init_hook(void)
-{
-	(void)board_test54l_init();
-}
-#endif

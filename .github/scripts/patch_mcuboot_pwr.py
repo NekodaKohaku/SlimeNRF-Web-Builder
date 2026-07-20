@@ -3,24 +3,16 @@
 # 実行場所: zephyr-workspace/SlimeVR-Tracker-nRF (build-single.yml の
 # "Enable MCUboot UART DFU" ステップ)。冪等 (二回目以降は何もしない)。
 #
-# 二重の保険でラッチする:
-#   1) SYS_INIT EARLY (全 init の最前、電源投入後 <1ms)
-#   2) main() 冒頭 (watchdog 直後、電源投入後 ~10-30ms) で明示的に呼ぶ
-# どちらも 0.5s DFU 待機ウィンドウよりはるかに早い。EARLY が環境要因で
-# 効かない場合でも main() 側が確実にラッチする。
+# 二段構えでラッチする (冪等なので重複実行は無害):
+#   1) SYS_INIT EARLY  - 全 init の最前 (電源投入後 ~1ms)
+#   2) main() 冒頭     - 保険 (watchdog 直後、~15ms)
+# どちらも 0.5s DFU 待機ウィンドウよりはるかに早い。EN 保持コンデンサが
+# 立ち上がり期間を橋渡しし、レール安定後はこのラッチが電源を保持する。
 #
 # DT は gen_mcuboot_files.py が mcuboot.overlay に出力する
 # zephyr,user { pwr-gpios } を読む。prop が無いビルドでは空関数になり無害。
 # nRF52 / nRF54L 両対応 (NRF_GPIO_PIN_MAP が吸収)。
-import json, os, sys
-
-# 診断: options.mcuboot_early_delay_ms が設定されていれば、EARLY ラッチ直後に
-# その時間だけ超低負荷スピン (電源レール立ち上がり最優先) してから起動を続ける
-try:
-    _o = json.loads(os.environ.get("CONFIG_JSON", "{}")).get("options") or {}
-    EARLY_DELAY_MS = int(_o.get("mcuboot_early_delay_ms", 0))
-except Exception:
-    EARLY_DELAY_MS = 0
+import os, sys
 
 CANDIDATES = (
     "../bootloader/mcuboot/boot/zephyr/main.c",   # NCS 標準レイアウト
@@ -50,7 +42,6 @@ BLOCK = r"""
 #include <hal/nrf_gpio.h>
 
 #define SLIMENRF_PWR_NODE DT_PATH(zephyr_user)
-#define SLIMENRF_EARLY_DELAY_MS @EARLY_DELAY_MS@
 #if DT_NODE_HAS_PROP(SLIMENRF_PWR_NODE, pwr_gpios)
 static int slimenrf_pwr_latch(void)
 {
@@ -58,115 +49,18 @@ static int slimenrf_pwr_latch(void)
 		DT_PROP(DT_GPIO_CTLR(SLIMENRF_PWR_NODE, pwr_gpios), port),
 		DT_GPIO_PIN(SLIMENRF_PWR_NODE, pwr_gpios));
 
-	nrf_gpio_cfg(pin, NRF_GPIO_PIN_DIR_OUTPUT, NRF_GPIO_PIN_INPUT_CONNECT,
+	nrf_gpio_cfg(pin, NRF_GPIO_PIN_DIR_OUTPUT, NRF_GPIO_PIN_INPUT_DISCONNECT,
 		     NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_S0S1, NRF_GPIO_PIN_NOSENSE);
 #if (DT_GPIO_FLAGS(SLIMENRF_PWR_NODE, pwr_gpios) & GPIO_ACTIVE_LOW)
 	nrf_gpio_pin_clear(pin);
 #else
 	nrf_gpio_pin_set(pin);
 #endif
-
-#if NRF_GPIO_HAS_RETENTION_SETCLEAR || NRF_GPIO_HAS_RETENTION
-	/* nRF54L: 前回の電源 OFF 時に pad が RETAIN で凍結されたまま残ると、
-	 * 上のレジスタ書き込みが実ピンに反映されない (実機で確認済み。
-	 * OUT/PIN_CNF は正しいのに pad が low のままだった)。
-	 * Zephyr の gpio_nrfx ドライバは全ての出力操作を
-	 * retain_clear -> 書込 -> retain_set で包む = 出力ピンは常時凍結。
-	 * レジスタを正しい値にした「後」で凍結を解除する -> pad は直接
-	 * high へ遷移し、グリッチなしでラッチが効く。
-	 * nRF54L15 は RETAINSET/RETAINCLR (HAS_RETENTION_SETCLEAR) 側。
-	 * nRF52 はどちらも 0 なのでこのブロックは消える。 */
-	{
-		uint32_t rel = pin;
-		NRF_GPIO_Type *reg = nrf_gpio_pin_port_decode(&rel);
-
-#if NRF_GPIO_HAS_RETENTION_SETCLEAR
-		nrf_gpio_port_retain_disable(reg, 1UL << rel);
-#else
-		nrf_gpio_port_retain_set(reg,
-			nrf_gpio_port_retain_get(reg) & ~(1UL << rel));
-#endif
-	}
-#endif
 	return 0;
 }
-/* 三段構えでラッチする (冪等なので重複実行は無害):
- *   EARLY / PRE_KERNEL_1 / main() 冒頭
- * 診断: 各段が実行されたら slimenrf_latch_mask に bit を立て、
- * main() 冒頭で printk する (debug ビルドの UART console で見える。
- * 本番ビルドは CONSOLE=n なので何も出ないだけで無害)。
- *   bit0 = EARLY 実行済 / bit1 = PRE_KERNEL_1 実行済
- */
-static volatile uint32_t slimenrf_latch_mask;
-
-static int slimenrf_latch_early(void)
-{
-	slimenrf_latch_mask |= 1;
-	(void)slimenrf_pwr_latch();
-
-#if SLIMENRF_EARLY_DELAY_MS > 0
-	/* 遅延起動: ラッチ後に超低負荷で待つ。128MHz ~4cycle/loop 換算の粗い校正。
-	 * この間は他の初期化が一切走らない = 板全体がほぼ無負荷 */
-	for (volatile uint32_t i = 0; i < (uint32_t)SLIMENRF_EARLY_DELAY_MS * 32000u; i++) {
-	}
-#endif
-	return 0;
-}
-SYS_INIT(slimenrf_latch_early, EARLY, 0);
-
-static int slimenrf_latch_pk1(void)
-{
-	slimenrf_latch_mask |= 2;
-	return slimenrf_pwr_latch();
-}
-SYS_INIT(slimenrf_latch_pk1, PRE_KERNEL_1, 0);
-
-/* 診断: ラッチ後にレジスタを読み戻して報告する。
- * OUT bit が 1 なのに実ピンが low なら、pad レベルの介入
- * (retention / CTRLSEL / SPU 等) を意味する。 */
-static void slimenrf_pwr_diag(void)
-{
-	uint32_t pin = NRF_GPIO_PIN_MAP(
-		DT_PROP(DT_GPIO_CTLR(SLIMENRF_PWR_NODE, pwr_gpios), port),
-		DT_GPIO_PIN(SLIMENRF_PWR_NODE, pwr_gpios));
-	NRF_GPIO_Type *reg = nrf_gpio_pin_port_decode(&pin);
-
-#if NRF_GPIO_HAS_RETENTION_SETCLEAR
-	printk("SLIMENRF pwr pad: OUT=0x%08x PIN_CNF[%u]=0x%08x RETAIN=0x%08x\n",
-	       (unsigned)reg->OUT, (unsigned)pin, (unsigned)reg->PIN_CNF[pin],
-	       (unsigned)reg->RETAINSET);
-#elif NRF_GPIO_HAS_RETENTION
-	printk("SLIMENRF pwr pad: OUT=0x%08x PIN_CNF[%u]=0x%08x RETAIN=0x%08x\n",
-	       (unsigned)reg->OUT, (unsigned)pin, (unsigned)reg->PIN_CNF[pin],
-	       (unsigned)nrf_gpio_port_retain_get(reg));
+SYS_INIT(slimenrf_pwr_latch, EARLY, 0);
 #else
-	printk("SLIMENRF pwr pad: OUT=0x%08x PIN_CNF[%u]=0x%08x\n",
-	       (unsigned)reg->OUT, (unsigned)pin, (unsigned)reg->PIN_CNF[pin]);
-#endif
-}
-/* 診断: pad の実電位を IN レジスタで読み戻し、1 秒間ウォッチする。
- * OUT=1 なのに IN=0 が続く区間 = pad が実際に low な時間帯 (直接測定)。
- * console 無効の本番ビルドでは printk が消えるが、ループ自体を避ける
- * ため CONFIG_UART_CONSOLE でガードする。 */
-static void slimenrf_pad_monitor(void)
-{
-#if defined(CONFIG_UART_CONSOLE)
-	uint32_t pin = NRF_GPIO_PIN_MAP(
-		DT_PROP(DT_GPIO_CTLR(SLIMENRF_PWR_NODE, pwr_gpios), port),
-		DT_GPIO_PIN(SLIMENRF_PWR_NODE, pwr_gpios));
-
-	for (int i = 0; i < 40; i++) {
-		printk("SLIMENRF pad IN=%d t=%lld\n",
-		       (int)nrf_gpio_pin_read(pin), (long long)k_uptime_get());
-		k_busy_wait(25000);
-	}
-#endif
-}
-#else
-static volatile uint32_t slimenrf_latch_mask;
 static inline int slimenrf_pwr_latch(void) { return 0; }
-static inline void slimenrf_pwr_diag(void) {}
-static inline void slimenrf_pad_monitor(void) {}
 #endif
 """
 
@@ -174,7 +68,7 @@ static inline void slimenrf_pad_monitor(void) {}
 ANCHOR_MAIN = "\nint main(void)\n"
 if ANCHOR_MAIN not in src:
     sys.exit(f"patch_mcuboot_pwr: anchor 'int main(void)' not found in {path}")
-src = src.replace(ANCHOR_MAIN, "\n" + BLOCK.replace("@EARLY_DELAY_MS@", str(EARLY_DELAY_MS)) + "\nint main(void)\n", 1)
+src = src.replace(ANCHOR_MAIN, "\n" + BLOCK + "\nint main(void)\n", 1)
 
 # ---- 2) main() 冒頭 (watchdog 直後) に呼び出しを挿入 ----
 ANCHOR_WDT = "MCUBOOT_WATCHDOG_FEED();"
@@ -182,15 +76,9 @@ if ANCHOR_WDT not in src:
     sys.exit(f"patch_mcuboot_pwr: anchor MCUBOOT_WATCHDOG_FEED not found in {path}")
 src = src.replace(
     ANCHOR_WDT,
-    ANCHOR_WDT + "\n\n    /* SLIMENRF: 電源自锁 (最終保険) + 診断出力 */\n"
-    "    (void)slimenrf_pwr_latch();\n"
-    "    printk(\"SLIMENRF v6 mask=0x%x uptime=%lld ms gates=%d/%d delay=%d\\n\",\n"
-    "           (unsigned)slimenrf_latch_mask, (long long)k_uptime_get(),\n"
-    "           (int)NRF_GPIO_HAS_RETENTION, (int)NRF_GPIO_HAS_RETENTION_SETCLEAR,\n"
-    "           (int)SLIMENRF_EARLY_DELAY_MS);\n"
-    "    slimenrf_pwr_diag();\n"
-    "    slimenrf_pad_monitor();",
+    ANCHOR_WDT + "\n\n    /* SLIMENRF: 電源自锁 (保険。冪等なので二重実行は無害) */\n"
+    "    (void)slimenrf_pwr_latch();",
     1)
 
 open(path, "w", encoding="utf-8", newline="").write(src)
-print(f"patch_mcuboot_pwr v6 (early-delay={EARLY_DELAY_MS}ms): EARLY + main() power latch inserted into {path}")
+print(f"patch_mcuboot_pwr: EARLY + main() power latch inserted into {path}")
