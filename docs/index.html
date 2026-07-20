@@ -50,7 +50,7 @@
       <button id="exportBtn" data-i18n="exportCfg"></button>
       <button id="importBtn" data-i18n="importCfg"></button>
     </span>
-    <select id="langSelect"></select>
+    <a href="update.html" data-i18n="navUpdate" style="margin-right:12px;font-size:13px"></a><select id="langSelect"></select>
     <input type="file" id="importFile" accept="application/json,.json" style="display:none">
   </div>
 
@@ -92,7 +92,7 @@
       <div class="sec" data-i18n="secBehavior"></div>
       <div class="grid">
         <div><label for="sleep"><span data-i18n="sleep"></span><span class="help" data-help="helpSleep">?</span></label><select id="sleep"><option value="disabled"></option><option value="enabled"></option></select></div>
-        <div><label for="output"><span data-i18n="flash"></span><span class="help" data-help="helpFlash">?</span></label><select id="output"><option value="bootloader"></option><option value="swd"></option></select></div>
+        <div><label for="output"><span data-i18n="flash"></span><span class="help" data-help="helpFlash">?</span></label><select id="output"><option value="bootloader"></option><option value="swd"></option><option value="mcuboot"></option></select></div>
         <div><label for="featLed"><span data-i18n="featLed"></span><span class="help" data-help="helpFeatLed">?</span></label><select id="featLed"><option value="enabled"></option><option value="disabled"></option></select></div>
         <div id="wrapLedch"><label for="ledch"><span data-i18n="ledCh"></span><span class="help" data-help="helpLedCh">?</span></label><select id="ledch"><option value="single"></option><option value="dual"></option><option value="rgb"></option><option value="strip"></option></select></div>
         <div id="wrapLedpol"><label for="ledpol"><span data-i18n="ledPol"></span><span class="help" data-help="helpLedPol">?</span></label><select id="ledpol"><option value="high"></option><option value="low"></option></select></div>
@@ -191,7 +191,7 @@ function applyLang() {
   setOpt("magconn", "none", x.magConnNone); setOpt("magconn", "aux", x.magConnAux);
   setOpt("magconn", "i2c_shared", x.magConnI2cShared); setOpt("magconn", "i2c", x.magConnI2c); setOpt("magconn", "spi", x.magConnSpi);
   setOpt("sleep", "enabled", x.enabled); setOpt("sleep", "disabled", x.disabled);
-  setOpt("output", "bootloader", x.flashBoot); setOpt("output", "swd", x.flashSwd);
+  setOpt("output", "bootloader", x.flashBoot); setOpt("output", "swd", x.flashSwd); setOpt("output", "mcuboot", x.flashMcuboot);
   setOpt("battery", "liion", x.batteryLiion); setOpt("battery", "nimh", x.batteryNimh); setOpt("battery", "none", x.batteryNone);
   setOpt("extra", "disabled", x.extraActOff); setOpt("extra", "enabled", x.extraActOn);
   setOpt("adc", "external", x.adcExternal); setOpt("adc", "internal", x.adcInternal);
@@ -608,8 +608,10 @@ function updateFlash() {
   const sel = document.getElementById("output");
   const boot = sel.querySelector('option[value="bootloader"]');
   const swd = sel.querySelector('option[value="swd"]');
+  const mcub = sel.querySelector('option[value="mcuboot"]');
   boot.disabled = !(isRecv || hasUsb);
   swd.disabled = isRecv;
+  if (mcub) mcub.disabled = isRecv;
   const cur = sel.querySelector('option[value="' + sel.value + '"]');
   if (!cur || cur.disabled) sel.value = isRecv ? "bootloader" : (hasUsb ? (mod.flash_default || "swd") : "swd");
 }
@@ -655,7 +657,7 @@ function collectConfig() {
     sdk_revision: mod.sdk_revision,
     zephyr_sdk_version: mod.zephyr_sdk_version,
     flash_method: fm,
-    fileformat: fm === "bootloader" ? "uf2" : "hex",
+    fileformat: fm === "bootloader" ? "uf2" : fm === "mcuboot" ? "mcuboot" : "hex",
     filename: parts.join("_"),
     bus, imu, mag_conn: mconn,
     pins: isRecv ? (document.getElementById("recvLed").value ? { led: document.getElementById("recvLed").value } : {}) : collectPins(),
@@ -747,6 +749,7 @@ function validate() {
   if (document.getElementById("sleep").value === "enabled" && !pins.int) errors.push(t().errINT);
   if (bus === "i2c" && (!pins.sda || !pins.scl)) errors.push(t().errI2C);
   if (bus === "spi" && (!pins.sck || !pins.mosi || !pins.miso || !pins.cs)) errors.push(t().errSPI);
+  if (flashMethod() === "mcuboot" && (!pins.tx || !pins.rx)) errors.push(t().errMcubootUart);
   return errors;
 }
 function refreshValidation() {
@@ -776,7 +779,7 @@ function showConfirm() {
     rows.push(["ADC", cfg.options.adc === "external" ? cfg.options.adc_pin + " (R1 " + cfg.options.adc_r1 + "k / R2 " + cfg.options.adc_r2 + "k)" : "VDDHDIV5"]);
     Object.keys(cfg.pins).forEach(k => rows.push([k.toUpperCase(), cfg.pins[k]]));
   }
-  rows.push(["Flashing", cfg.flash_method === "bootloader" ? "Bootloader (.uf2 + .hex)" : "Direct SWD (.hex)"]);
+  rows.push(["Flashing", cfg.flash_method === "bootloader" ? "Bootloader (.uf2 + .hex)" : cfg.flash_method === "mcuboot" ? "MCUboot (first_flash.hex + update.bin)" : "Direct SWD (.hex)"]);
   document.getElementById("confirmSummary").innerHTML =
     rows.map(r => '<div>' + r[0] + ': <span style="color:#e7e9ee">' + r[1] + '</span></div>').join("");
   document.getElementById("force").checked = false;
