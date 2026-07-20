@@ -274,6 +274,17 @@ if pwr:
 }};
 """
 
+# minimal 診断: mcuboot の CPU を 64MHz に落とす。
+# 仮説: 起動初期の消費電流が NiMH 昇圧の 3V3 立ち上がりを鈍らせ、
+# VDD が 2.5V を超えるまで Q3 (2N7002) が開かず自锁が効かない。
+# クロック半減で初期電流を下げ、レール立ち上がりを速くする実験。
+if minimal:
+    mcuboot_overlay += """
+&cpu {
+	clock-frequency = <64000000>;
+};
+"""
+
 # ---------- LED 診断 / DFU 表示 ----------
 # 診断モード: gpio-hog で GPIO 初期化直後に LED 点灯 -> 「MCUboot 生存」の可視信号。
 #             点灯したまま = mcuboot で停止 / 消灯・変化 = app が引き継いだ。
