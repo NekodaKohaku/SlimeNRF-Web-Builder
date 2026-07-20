@@ -43,6 +43,9 @@ debug = _dbg == "enabled"
 # minimal: 裸 MCUboot 二分用 — recovery/retention/boot-mode 全部無効、
 # console ログのみ有効。「素の MCUboot が app を起動できるか」を単独検証する
 minimal = _dbg == "minimal"
+# nano: 二分の最終段 — mcuboot を「ラッチ + ジャンプ」だけに剥ぐ。
+# UART/console/GPIO ドライバ/entropy/検証 全部なし。観測手段はタップ挙動のみ
+nano = _dbg == "nano"
 
 txp, rxp = parse_pin(tx), parse_pin(rx)
 is54 = "54l" in board.lower()
@@ -67,7 +70,16 @@ SB_CONFIG_BOOT_SIGNATURE_TYPE_NONE=y
 
 # ---------- sysbuild/mcuboot.conf ----------
 write("sysbuild/mcuboot.conf",
-"""# minimal 診断: 素の MCUboot + console ログのみ (recovery 一切なし)
+"""# nano 診断: ラッチ + ジャンプのみ。サブシステム全部なし
+CONFIG_FPROTECT=n
+CONFIG_BOOT_VALIDATE_SLOT0=n
+CONFIG_LOG=n
+CONFIG_SERIAL=n
+CONFIG_CONSOLE=n
+CONFIG_UART_CONSOLE=n
+CONFIG_GPIO=n
+CONFIG_ENTROPY_GENERATOR=n
+""" if nano else """# minimal 診断: 素の MCUboot + console ログのみ (recovery 一切なし)
 CONFIG_FPROTECT=n
 CONFIG_LOG=y
 CONFIG_LOG_MODE_MINIMAL=y
@@ -139,6 +151,8 @@ CONFIG_BOARD_EARLY_INIT_HOOK=y
 """)
 
 # ---------- sysbuild/mcuboot.overlay + アプリ側 boot-mode ノード ----------
+if nano and is54:
+    pass  # 下の is54 分岐の後で上書きする
 if is54:
     # nRF54L15: GPREGRET が無いため、boot mode は保持 SRAM 512 B に置く。
     # ファームウェア自身の保持領域 0x2003F000 の直下 (socs overlay が主 SRAM を
@@ -274,6 +288,28 @@ if pwr:
 }};
 """
 
+# nano: overlay を最小に置き換え (chosen flash-controller + SRAM 縮小のみ。
+# pwr の zephyr,user とアプリ側 append は共通処理がこの後で足す)
+if nano:
+    if is54:
+        mcuboot_overlay = """/ {
+	chosen {
+		zephyr,flash-controller = &rram_controller;
+	};
+};
+
+&cpuapp_sram {
+	reg = <0x20000000 0x3ee00>;
+};
+"""
+    else:
+        mcuboot_overlay = """/ {
+	chosen {
+		zephyr,flash-controller = &flash_controller;
+	};
+};
+"""
+
 # minimal 診断: mcuboot の CPU を 64MHz に落とす。
 # 仮説: 起動初期の消費電流が NiMH 昇圧の 3V3 立ち上がりを鈍らせ、
 # VDD が 2.5V を超えるまで Q3 (2N7002) が開かず自锁が効かない。
@@ -290,7 +326,7 @@ if minimal:
 #             点灯したまま = mcuboot で停止 / 消灯・変化 = app が引き継いだ。
 # 通常モード: gpio-leds ノード + mcuboot-led0 alias -> recovery 中に LED 点灯 (DFU 表示)。
 led = pins.get("led")
-if led:
+if led and not nano:
     lp = parse_pin(led)
     lflag = "GPIO_ACTIVE_LOW" if (cfg.get("options") or {}).get("led_polarity") == "low" else "GPIO_ACTIVE_HIGH"
     if debug or minimal:

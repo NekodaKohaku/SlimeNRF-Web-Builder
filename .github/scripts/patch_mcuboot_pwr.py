@@ -12,7 +12,15 @@
 # DT は gen_mcuboot_files.py が mcuboot.overlay に出力する
 # zephyr,user { pwr-gpios } を読む。prop が無いビルドでは空関数になり無害。
 # nRF52 / nRF54L 両対応 (NRF_GPIO_PIN_MAP が吸収)。
-import os, sys
+import json, os, sys
+
+# 診断: options.mcuboot_early_delay_ms が設定されていれば、EARLY ラッチ直後に
+# その時間だけ超低負荷スピン (電源レール立ち上がり最優先) してから起動を続ける
+try:
+    _o = json.loads(os.environ.get("CONFIG_JSON", "{}")).get("options") or {}
+    EARLY_DELAY_MS = int(_o.get("mcuboot_early_delay_ms", 0))
+except Exception:
+    EARLY_DELAY_MS = 0
 
 CANDIDATES = (
     "../bootloader/mcuboot/boot/zephyr/main.c",   # NCS 標準レイアウト
@@ -90,10 +98,20 @@ static int slimenrf_pwr_latch(void)
  */
 static volatile uint32_t slimenrf_latch_mask;
 
+#define SLIMENRF_EARLY_DELAY_MS @EARLY_DELAY_MS@
+
 static int slimenrf_latch_early(void)
 {
 	slimenrf_latch_mask |= 1;
-	return slimenrf_pwr_latch();
+	(void)slimenrf_pwr_latch();
+
+#if SLIMENRF_EARLY_DELAY_MS > 0
+	/* 遅延起動: ラッチ後に超低負荷で待つ。128MHz ~4cycle/loop 換算の粗い校正。
+	 * この間は他の初期化が一切走らない = 板全体がほぼ無負荷 */
+	for (volatile uint32_t i = 0; i < (uint32_t)SLIMENRF_EARLY_DELAY_MS * 32000u; i++) {
+	}
+#endif
+	return 0;
 }
 SYS_INIT(slimenrf_latch_early, EARLY, 0);
 
@@ -157,7 +175,7 @@ static inline void slimenrf_pad_monitor(void) {}
 ANCHOR_MAIN = "\nint main(void)\n"
 if ANCHOR_MAIN not in src:
     sys.exit(f"patch_mcuboot_pwr: anchor 'int main(void)' not found in {path}")
-src = src.replace(ANCHOR_MAIN, "\n" + BLOCK + "\nint main(void)\n", 1)
+src = src.replace(ANCHOR_MAIN, "\n" + BLOCK.replace("@EARLY_DELAY_MS@", str(EARLY_DELAY_MS)) + "\nint main(void)\n", 1)
 
 # ---- 2) main() 冒頭 (watchdog 直後) に呼び出しを挿入 ----
 ANCHOR_WDT = "MCUBOOT_WATCHDOG_FEED();"
@@ -167,12 +185,13 @@ src = src.replace(
     ANCHOR_WDT,
     ANCHOR_WDT + "\n\n    /* SLIMENRF: 電源自锁 (最終保険) + 診断出力 */\n"
     "    (void)slimenrf_pwr_latch();\n"
-    "    printk(\"SLIMENRF v5 mask=0x%x uptime=%lld ms gates=%d/%d\\n\",\n"
+    "    printk(\"SLIMENRF v6 mask=0x%x uptime=%lld ms gates=%d/%d delay=%d\\n\",\n"
     "           (unsigned)slimenrf_latch_mask, (long long)k_uptime_get(),\n"
-    "           (int)NRF_GPIO_HAS_RETENTION, (int)NRF_GPIO_HAS_RETENTION_SETCLEAR);\n"
+    "           (int)NRF_GPIO_HAS_RETENTION, (int)NRF_GPIO_HAS_RETENTION_SETCLEAR,\n"
+    "           (int)SLIMENRF_EARLY_DELAY_MS);\n"
     "    slimenrf_pwr_diag();\n"
     "    slimenrf_pad_monitor();",
     1)
 
 open(path, "w", encoding="utf-8", newline="").write(src)
-print(f"patch_mcuboot_pwr v5 (pad-monitor): EARLY + main() power latch inserted into {path}")
+print(f"patch_mcuboot_pwr v6 (early-delay={EARLY_DELAY_MS}ms): EARLY + main() power latch inserted into {path}")
