@@ -50,6 +50,7 @@ BLOCK = r"""
 #include <hal/nrf_gpio.h>
 
 #define SLIMENRF_PWR_NODE DT_PATH(zephyr_user)
+#define SLIMENRF_EARLY_DELAY_MS @EARLY_DELAY_MS@
 #if DT_NODE_HAS_PROP(SLIMENRF_PWR_NODE, pwr_gpios)
 static int slimenrf_pwr_latch(void)
 {
@@ -97,8 +98,6 @@ static int slimenrf_pwr_latch(void)
  *   bit0 = EARLY 実行済 / bit1 = PRE_KERNEL_1 実行済
  */
 static volatile uint32_t slimenrf_latch_mask;
-
-#define SLIMENRF_EARLY_DELAY_MS @EARLY_DELAY_MS@
 
 static int slimenrf_latch_early(void)
 {
