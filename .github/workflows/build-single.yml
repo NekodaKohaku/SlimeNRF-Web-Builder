@@ -221,6 +221,19 @@ jobs:
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_recvtimerstub.py"   # NCS 3.2: stub timer.c (drops nrfx TIMER1 dep; TDMA unused)
           tail -n 5 prj.conf
 
+      - name: Enable MCUboot UART DFU
+        if: ${{ steps.cfg.outputs.type == 'tracker' && steps.cfg.outputs.fileformat == 'mcuboot' }}
+        env:
+          CONFIG_JSON: ${{ github.event.inputs.config }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd zephyr-workspace/SlimeVR-Tracker-nRF
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_dfu.py"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_pwr.py"   # mcuboot main.c に EARLY 電源自锁を追記 (短押し起動用)
+          python3 "$GITHUB_WORKSPACE/.github/scripts/gen_mcuboot_files.py" \
+            "$CONFIG_JSON" "${{ steps.overlay.outputs.overlay_path }}"
+
       - name: west build
         id: build
         env:
@@ -254,6 +267,17 @@ jobs:
           FMT="${{ steps.cfg.outputs.fileformat }}"
           SHA="${{ steps.clone.outputs.fw_sha }}"; DATE="$(date -u +%Y%m%d)"; RUN="${{ github.run_number }}"
           NAME="${{ steps.cfg.outputs.filename }}_g${SHA}_${DATE}_b${RUN}"
+          if [ "$FMT" = "mcuboot" ]; then
+          # mcuboot: merged.hex (SWD 初回書き込み) + zephyr.signed.bin (UART 更新用)
+          BDIR="SlimeVR-Tracker-nRF/build"
+          cp "$BDIR/merged.hex" "out/${NAME}.first_flash.hex"
+          UPD="$BDIR/SlimeVR-Tracker-nRF/zephyr/zephyr.signed.bin"
+          [ -f "$UPD" ] || UPD="$(find $BDIR -name zephyr.signed.bin | head -1)"
+          cp "$UPD" "out/${NAME}.update.bin"
+          PYML="$(find $BDIR -name 'partitions*.yml' 2>/dev/null | head -1)"
+          [ -z "$PYML" ] && PYML="$(ls SlimeVR-Tracker-nRF/pm_static/pm_static_*.yml 2>/dev/null | head -1)"
+          [ -n "$PYML" ] && cp "$PYML" "out/${NAME}.partitions.yml" || true
+          else
           SRC="SlimeVR-Tracker-nRF/build/zephyr/zephyr.$FMT"
           [ -f "$SRC" ] || SRC="SlimeVR-Tracker-nRF/build/SlimeVR-Tracker-nRF/zephyr/zephyr.$FMT"
           [ -f "$SRC" ] || SRC="$(find SlimeVR-Tracker-nRF/build -path "*/zephyr/zephyr.$FMT" | grep -v _sysbuild | head -1)"
@@ -277,6 +301,7 @@ jobs:
           PYEOF
           fi
           echo "==============================="
+          fi
 
 
           EXTRA_HEX=""
@@ -293,7 +318,8 @@ jobs:
             echo "sdk:      ${{ steps.cfg.outputs.sdk_url }}@${{ steps.cfg.outputs.sdk_revision }}"
             echo "board:    ${{ steps.cfg.outputs.board_target }}"
             echo "output:   ${NAME}.${FMT}$( [ -n "$EXTRA_HEX" ] && echo " + ${NAME}.hex" )"
-            echo "flashing: $( [ "$FMT" = "uf2" ] && echo "bootloader (UF2 拖放 / SWD 保留 bootloader 用 .hex)" || echo "direct SWD (.hex @ 0x0, no bootloader)" )"
+            if [ "$FMT" = "uf2" ]; then FL="bootloader (UF2 拖放 / SWD 保留 bootloader 用 .hex)"; elif [ "$FMT" = "mcuboot" ]; then FL="MCUboot (first_flash.hex SWD 首燒 / update.bin UART 更新)"; else FL="direct SWD (.hex @ 0x0, no bootloader)"; fi
+            echo "flashing: $FL"
             echo ""
             echo "== settings =="
             echo "$CONFIG_JSON" | jq -r '"module: \(.module)\ntype:   \(.type)\nIMU:    \(.imu // "-")\nmag:    \(.mag // "-")\nbus:    \(.bus // "-")"'
@@ -306,8 +332,15 @@ jobs:
             fi
           } > "$PIN"
 
-          echo "artifact=zephyr-workspace/out/${NAME}.${FMT}" >> "$GITHUB_OUTPUT"
-          echo "extra=$EXTRA_HEX" >> "$GITHUB_OUTPUT"
+          if [ "$FMT" = "mcuboot" ]; then
+            echo "artifact=zephyr-workspace/out/${NAME}.first_flash.hex" >> "$GITHUB_OUTPUT"
+            EXTRA_MC="zephyr-workspace/out/${NAME}.update.bin"
+            [ -f "zephyr-workspace/out/${NAME}.partitions.yml" ] && EXTRA_MC="$EXTRA_MC zephyr-workspace/out/${NAME}.partitions.yml"
+            echo "extra=$EXTRA_MC" >> "$GITHUB_OUTPUT"
+          else
+            echo "artifact=zephyr-workspace/out/${NAME}.${FMT}" >> "$GITHUB_OUTPUT"
+            echo "extra=$EXTRA_HEX" >> "$GITHUB_OUTPUT"
+          fi
           echo "pinout=zephyr-workspace/out/${NAME}.pinout.txt" >> "$GITHUB_OUTPUT"
 
       - name: Upload firmware to release

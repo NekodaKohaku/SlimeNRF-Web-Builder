@@ -1,7 +1,11 @@
 /*
  * SPDX-License-Identifier: Apache-2.0
- * SlimeNRF-Web-Builder: early power-hold latch (PRE_KERNEL_1) + sensor power via DT.
+ * SlimeNRF-Web-Builder: early power-hold latch (EARLY) + sensor power via DT.
  * Replaces upstream test54l board.c (which hardcoded P1.7/P1.8 and no pwr-hold).
+ *
+ * EARLY (旧: PRE_KERNEL_1 prio 40): raw HAL のレジスタ書き込みのみで
+ * ドライバ / クロック初期化に依存しないため、全 SYS_INIT の最前で実行できる。
+ * SWD 直燒 / uf2 / mcuboot どのビルドでも同じ動作。
  */
 #include <zephyr/init.h>
 #include <zephyr/devicetree.h>
@@ -55,4 +59,4 @@ static int board_test54l_init(void)
 	return 0;
 }
 
-SYS_INIT(board_test54l_init, PRE_KERNEL_1, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
+SYS_INIT(board_test54l_init, EARLY, 0);
