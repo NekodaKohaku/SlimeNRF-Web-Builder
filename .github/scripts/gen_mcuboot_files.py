@@ -183,6 +183,33 @@ else:
 		{("zephyr,console" if debug else "zephyr,uart-mcumgr")} = &{uart};
 		zephyr,boot-mode = &boot_mode0;
 		zephyr,flash-controller = &flash_controller;
+		zephyr,code-partition = &boot_partition;
+	}};
+}};
+
+/* promicro_uf2 の UF2 布局を mcuboot 布局へ置き換え (pm_static と一致)。
+ * mcuboot の CMake は slot0_partition ラベルを要求する。 */
+&flash0 {{
+	/delete-node/ partitions;
+	partitions {{
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		boot_partition: partition@0 {{
+			label = "mcuboot";
+			reg = <0x00000000 0x0000c000>;
+		}};
+
+		slot0_partition: partition@c000 {{
+			label = "image-0";
+			reg = <0x0000c000 0x000e0000>;
+		}};
+
+		storage_partition: partition@ec000 {{
+			label = "storage";
+			reg = <0x000ec000 0x00008000>;
+		}};
 	}};
 }};
 
@@ -216,6 +243,32 @@ else:
 / {
 	chosen {
 		zephyr,boot-mode = &boot_mode0;
+		zephyr,code-partition = &slot0_partition;
+	};
+};
+
+/* UF2 布局 -> mcuboot 布局 (pm_static と一致。実配置は PM が管理) */
+&flash0 {
+	/delete-node/ partitions;
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		boot_partition: partition@0 {
+			label = "mcuboot";
+			reg = <0x00000000 0x0000c000>;
+		};
+
+		slot0_partition: partition@c000 {
+			label = "image-0";
+			reg = <0x0000c000 0x000e0000>;
+		};
+
+		storage_partition: partition@ec000 {
+			label = "storage";
+			reg = <0x000ec000 0x00008000>;
+		};
 	};
 };
 
