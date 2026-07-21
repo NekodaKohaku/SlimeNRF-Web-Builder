@@ -301,6 +301,34 @@ with open("prj.conf", "a", encoding="utf-8", newline="\n") as f:
             "CONFIG_RETAINED_MEM=y\nCONFIG_RETENTION=y\nCONFIG_RETENTION_BOOT_MODE=y\n")
 print("== appended retention Kconfigs to prj.conf ==")
 
+# ---------- board defconfig の app 専用シンボルを退避 ----------
+# board defconfig は全イメージ共通で読まれるが、SlimeVR 専用の Kconfig
+# シンボル (BATTERY_* / SENSOR_* 等) は mcuboot に存在せず
+# "undefined symbol" で Kconfig が fatal になる (nRF52 promicro で実測)。
+# -> それらを defconfig から prj.conf (アプリ専用) へ移動する。
+# USB_DEVICE_* は削除のみ (この用途の無 USB モジュールでは workflow が
+# アプリ側に CONFIG_USB_DEVICE_STACK=n を追記済みのため)。
+import glob
+_APP_ONLY = re.compile(r"^\s*CONFIG_(BATTERY_|SENSOR_)")
+_USB = re.compile(r"^\s*CONFIG_USB_DEVICE")
+for dc in glob.glob("boards/*/*/*defconfig"):
+    lines = open(dc, encoding="utf-8").read().splitlines()
+    keep, moved, dropped = [], [], []
+    for ln in lines:
+        if _APP_ONLY.match(ln):
+            moved.append(ln)
+        elif _USB.match(ln):
+            dropped.append(ln)
+        else:
+            keep.append(ln)
+    if moved or dropped:
+        open(dc, "w", encoding="utf-8", newline="\n").write("\n".join(keep) + "\n")
+        if moved:
+            with open("prj.conf", "a", encoding="utf-8", newline="\n") as f:
+                f.write(f"\n# moved from {dc} (mcuboot の Kconfig に無い app 専用シンボル)\n"
+                        + "\n".join(moved) + "\n")
+        print(f"== {dc}: moved {len(moved)} app-only, dropped {len(dropped)} USB lines ==")
+
 # ---------- 凍結パーティションレイアウト ----------
 # storage は swd_direct overlay と同一アドレス / サイズに固定。SWD 直書きファーム
 # からの移行でも NVS データ (キャリブレーション / ペアリング) が失われない。
