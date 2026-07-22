@@ -49,6 +49,7 @@ jobs:
             echo "sdk_revision=$(get '.sdk_revision')"
             echo "zephyr_sdk_version=$(get '.zephyr_sdk_version')"
             echo "fileformat=$(get '.fileformat')"
+          echo "source=$(get '.source // "official"')"
             echo "filename=$(get '.filename')"
             echo "magnetometer=$(get '.options.magnetometer // "unset"')"
             echo "sleep=$(get '.options.sleep // "unset"')"
@@ -150,6 +151,12 @@ jobs:
           BAT='${{ steps.cfg.outputs.battery }}'
           FMT='${{ steps.cfg.outputs.fileformat }}'
           BOARD='${{ steps.cfg.outputs.board_target }}'
+          SRC_PROF='${{ steps.cfg.outputs.source }}'
+          # jiting fork: 第一階段只支援 SWD 直燒 (mcuboot 對接開發中, uf2 不適用無 USB 模組)
+          if [ "$SRC_PROF" = "jiting" ] && [ "$FMT" != "hex" ]; then
+            echo "ERROR: jiting source currently supports Direct SWD (hex) only" >&2
+            exit 1
+          fi
           append 'CONFIG_VOLTAGE_DIVIDER=n'   # redundant Zephyr voltage sensor: the firmware reads the ADC itself. Its init returns -ENOTSUP on NCS 3.2 (both nRF52 and nRF54L) -> 'voltage_init: setup: -134'
           if [ "$FMT" = "hex" ]; then
             # SWD 直燒、無 bootloader:code-partition 由 overlay 定在 0x0,確保用 DT 分割
@@ -159,26 +166,45 @@ jobs:
           case "$BOARD" in
             *nrf54l*)
               append 'CONFIG_MAIN_STACK_SIZE=2048'   # nRF54L M33+FPU+TrustZone needs more than upstream 512 (upstream: "crashing on nrf54l at 512")
-              cp "$GITHUB_WORKSPACE/.github/scripts/test54l_board.c" boards/nordic/test54l/board.c && echo "test54l board.c -> reads DT vcc/gnd-gpios"
+              if [ "$SRC_PROF" = "jiting" ]; then
+                echo "jiting: keep fork's own test54l board.c"
+              else
+                cp "$GITHUB_WORKSPACE/.github/scripts/test54l_board.c" boards/nordic/test54l/board.c && echo "test54l board.c -> reads DT vcc/gnd-gpios"
+              fi
               ;;
             *)
               # nRF52 (has_usb=false modules): disable USB so USB_EXISTS is false and the
               # SlimeNRF console is not USB-insertion-gated -> it auto-starts over UART/RTT.
               append 'CONFIG_USB_DEVICE_STACK=n'
-              NEED_PWR_EARLY=1   # nRF54L already latches in test54l_board.c; nRF52 has no board-level latch
+              [ "$SRC_PROF" = "jiting" ] && append 'CONFIG_USB_DEVICE_STACK_NEXT=n'   # jiting fork 走新 USB 堆疊
+              [ "$SRC_PROF" = "jiting" ] || NEED_PWR_EARLY=1   # nRF54L already latches in test54l_board.c; nRF52 has no board-level latch (jiting: 錨點不同, v1 先跳過)
               ;;
           esac
           sed -i 's|SPI_DT_SPEC_GET(\([^,]*,[[:space:]]*SPI_OP\))|SPI_DT_SPEC_GET(\1, 0)|g' src/sensor/sensor.c || true
-          [ "$MAG" = "enabled" ]  && append 'CONFIG_SENSOR_USE_MAG=y'
-          [ "$MAG" = "disabled" ] && append 'CONFIG_SENSOR_USE_MAG=n'
+          if [ "$SRC_PROF" = "jiting" ]; then
+            echo "jiting: skip SENSOR_USE_MAG (fork uses driver whitelist instead)"
+            [ "$MAG" = "enabled" ] && echo "WARN: magnetometer with jiting source not wired up yet" >&2
+          else
+            [ "$MAG" = "enabled" ]  && append 'CONFIG_SENSOR_USE_MAG=y'
+            [ "$MAG" = "disabled" ] && append 'CONFIG_SENSOR_USE_MAG=n'
+          fi
           if [ "$SLEEP" = "enabled" ]; then
-            append 'CONFIG_USE_IMU_WAKE_UP=y'; append 'CONFIG_USE_ACTIVE_TIMEOUT=y'
+            append 'CONFIG_USE_IMU_WAKE_UP=y'
+            [ "$SRC_PROF" = "jiting" ] || append 'CONFIG_USE_ACTIVE_TIMEOUT=y'
           elif [ "$SLEEP" = "disabled" ]; then
-            append 'CONFIG_USE_IMU_WAKE_UP=n'; append 'CONFIG_USE_ACTIVE_TIMEOUT=n'
-            append 'CONFIG_SENSOR_LP_TIMEOUT=300000'; append 'CONFIG_SENSOR_USE_LOW_POWER_2=n'
+            append 'CONFIG_USE_IMU_WAKE_UP=n'
+            if [ "$SRC_PROF" != "jiting" ]; then
+              # jiting fork: USE_ACTIVE_TIMEOUT を n にすると ACTIVE_TIMEOUT_DELAY が
+              # 未定義になり sensor.c がコンパイル不能 (fork 側の未ガード箇所)。
+              # fork ではデフォルト値のままにする
+              append 'CONFIG_USE_ACTIVE_TIMEOUT=n'
+              append 'CONFIG_SENSOR_LP_TIMEOUT=300000'; append 'CONFIG_SENSOR_USE_LOW_POWER_2=n'
+            fi
           fi
           CLK='${{ steps.cfg.outputs.clk_pin }}'
-          if [ -n "$CLK" ]; then append 'CONFIG_USE_SENSOR_CLOCK=y'; else append 'CONFIG_USE_SENSOR_CLOCK=n'; fi
+          if [ "$SRC_PROF" = "jiting" ]; then
+            echo "jiting: skip USE_SENSOR_CLOCK (fork auto-detects via DT clk_gpios)"
+          elif [ -n "$CLK" ]; then append 'CONFIG_USE_SENSOR_CLOCK=y'; else append 'CONFIG_USE_SENSOR_CLOCK=n'; fi
           TXP='${{ steps.cfg.outputs.tx_pin }}'
           if [ -n "$TXP" ]; then append 'CONFIG_LOG_BACKEND_UART_AUTOSTART=y'; fi   # no-USB boards: nothing else starts the UART log backend
           EXTRA='${{ steps.cfg.outputs.extra_actions }}'
@@ -186,7 +212,12 @@ jobs:
           LEDT='${{ steps.cfg.outputs.led_type }}'
           if [ "$LEDT" = "strip" ]; then append 'CONFIG_LED_STRIP=y'; append 'CONFIG_WS2812_STRIP_SPI=y'; fi
           if [ "$BAT" = "nimh" ]; then
-            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_nimh.py"
+            if [ "$SRC_PROF" = "jiting" ]; then
+              echo "jiting: no NiMH curve in fork -> disable battery mapping (avoids false 0% auto-shutdown)"
+              append 'CONFIG_BATTERY_NO_MAPPING=y'
+            else
+              python3 "$GITHUB_WORKSPACE/.github/scripts/patch_nimh.py"
+            fi
           elif [ "$BAT" = "none" ]; then
             append 'CONFIG_BATTERY_NO_MAPPING=y'
           elif [ "$BAT" = "liion" ]; then
@@ -195,6 +226,25 @@ jobs:
             esac
           fi
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_pwr.py"
+          if [ "$SRC_PROF" = "jiting" ]; then
+            # jiting fork: led.c が RGB カラー表を無条件参照 -> LED_RGB_COLOR 必須
+            # (fork のボードは全て WS2812 前提。TRI_COLOR だと COLOR_R/G/B 未定義でビルド不能)
+            append 'CONFIG_LED_RGB_COLOR=y'
+            # jiting fork: 無線/電池/ADC 相關 patch 全部不適用 (fork 已重寫該區塊)
+            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_console_jiting.py"
+            case "$BOARD" in
+              *nrf54l*)
+                # fork の OTA 適用エンジンは nRF52 専用 (NVMC) -> 54L 用にガード
+                python3 "$GITHUB_WORKSPACE/.github/scripts/patch_jiting_54l.py"
+                # esb_ota_flash.c が要求する chosen が test54l DT に無い -> 補う
+                printf '\n/ { chosen { zephyr,flash-controller = &rram_controller; }; };\n' >> "$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
+                printf '\n&wdt31 { status = "okay"; };\n' >> "$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
+                echo "jiting 54L: appended flash-controller chosen + wdt31 enable to custom overlay"
+                ;;
+            esac
+            tail -n 10 prj.conf
+            exit 0
+          fi
           if [ "${NEED_PWR_EARLY:-0}" = "1" ]; then
             python3 "$GITHUB_WORKSPACE/.github/scripts/patch_pwr_early.py"   # nRF52 only: latch power at PRE_KERNEL_1 via raw HAL (short-press boot)
           fi
