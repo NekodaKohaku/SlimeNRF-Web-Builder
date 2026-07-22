@@ -189,10 +189,17 @@ jobs:
             [ "$MAG" = "disabled" ] && append 'CONFIG_SENSOR_USE_MAG=n'
           fi
           if [ "$SLEEP" = "enabled" ]; then
-            append 'CONFIG_USE_IMU_WAKE_UP=y'; append 'CONFIG_USE_ACTIVE_TIMEOUT=y'
+            append 'CONFIG_USE_IMU_WAKE_UP=y'
+            [ "$SRC_PROF" = "jiting" ] || append 'CONFIG_USE_ACTIVE_TIMEOUT=y'
           elif [ "$SLEEP" = "disabled" ]; then
-            append 'CONFIG_USE_IMU_WAKE_UP=n'; append 'CONFIG_USE_ACTIVE_TIMEOUT=n'
-            append 'CONFIG_SENSOR_LP_TIMEOUT=300000'; append 'CONFIG_SENSOR_USE_LOW_POWER_2=n'
+            append 'CONFIG_USE_IMU_WAKE_UP=n'
+            if [ "$SRC_PROF" != "jiting" ]; then
+              # jiting fork: USE_ACTIVE_TIMEOUT を n にすると ACTIVE_TIMEOUT_DELAY が
+              # 未定義になり sensor.c がコンパイル不能 (fork 側の未ガード箇所)。
+              # fork ではデフォルト値のままにする
+              append 'CONFIG_USE_ACTIVE_TIMEOUT=n'
+              append 'CONFIG_SENSOR_LP_TIMEOUT=300000'; append 'CONFIG_SENSOR_USE_LOW_POWER_2=n'
+            fi
           fi
           CLK='${{ steps.cfg.outputs.clk_pin }}'
           if [ "$SRC_PROF" = "jiting" ]; then
@@ -222,6 +229,15 @@ jobs:
           if [ "$SRC_PROF" = "jiting" ]; then
             # jiting fork: 無線/電池/ADC 相關 patch 全部不適用 (fork 已重寫該區塊)
             python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_console_jiting.py"
+            case "$BOARD" in
+              *nrf54l*)
+                # fork の OTA 適用エンジンは nRF52 専用 (NVMC) -> 54L 用にガード
+                python3 "$GITHUB_WORKSPACE/.github/scripts/patch_jiting_54l_ota.py"
+                # esb_ota_flash.c が要求する chosen が test54l DT に無い -> 補う
+                printf '\n/ { chosen { zephyr,flash-controller = &rram_controller; }; };\n' >> "$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
+                echo "jiting 54L: appended zephyr,flash-controller chosen to custom overlay"
+                ;;
+            esac
             tail -n 10 prj.conf
             exit 0
           fi
