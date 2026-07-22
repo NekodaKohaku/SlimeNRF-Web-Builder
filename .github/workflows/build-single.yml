@@ -238,7 +238,8 @@ jobs:
                 python3 "$GITHUB_WORKSPACE/.github/scripts/patch_jiting_54l.py"
                 # esb_ota_flash.c が要求する chosen が test54l DT に無い -> 補う
                 printf '\n/ { chosen { zephyr,flash-controller = &rram_controller; }; };\n' >> "$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
-                echo "jiting 54L: appended zephyr,flash-controller chosen to custom overlay"
+                printf '\n&wdt31 { status = "okay"; };\n' >> "$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
+                echo "jiting 54L: appended flash-controller chosen + wdt31 enable to custom overlay"
                 ;;
             esac
             tail -n 10 prj.conf
