@@ -227,6 +227,9 @@ jobs:
           fi
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_pwr.py"
           if [ "$SRC_PROF" = "jiting" ]; then
+            # jiting fork: led.c が RGB カラー表を無条件参照 -> LED_RGB_COLOR 必須
+            # (fork のボードは全て WS2812 前提。TRI_COLOR だと COLOR_R/G/B 未定義でビルド不能)
+            append 'CONFIG_LED_RGB_COLOR=y'
             # jiting fork: 無線/電池/ADC 相關 patch 全部不適用 (fork 已重寫該區塊)
             python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_console_jiting.py"
             case "$BOARD" in
