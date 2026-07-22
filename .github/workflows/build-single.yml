@@ -195,7 +195,9 @@ jobs:
             append 'CONFIG_SENSOR_LP_TIMEOUT=300000'; append 'CONFIG_SENSOR_USE_LOW_POWER_2=n'
           fi
           CLK='${{ steps.cfg.outputs.clk_pin }}'
-          if [ -n "$CLK" ]; then append 'CONFIG_USE_SENSOR_CLOCK=y'; else append 'CONFIG_USE_SENSOR_CLOCK=n'; fi
+          if [ "$SRC_PROF" = "jiting" ]; then
+            echo "jiting: skip USE_SENSOR_CLOCK (fork auto-detects via DT clk_gpios)"
+          elif [ -n "$CLK" ]; then append 'CONFIG_USE_SENSOR_CLOCK=y'; else append 'CONFIG_USE_SENSOR_CLOCK=n'; fi
           TXP='${{ steps.cfg.outputs.tx_pin }}'
           if [ -n "$TXP" ]; then append 'CONFIG_LOG_BACKEND_UART_AUTOSTART=y'; fi   # no-USB boards: nothing else starts the UART log backend
           EXTRA='${{ steps.cfg.outputs.extra_actions }}'
@@ -204,7 +206,8 @@ jobs:
           if [ "$LEDT" = "strip" ]; then append 'CONFIG_LED_STRIP=y'; append 'CONFIG_WS2812_STRIP_SPI=y'; fi
           if [ "$BAT" = "nimh" ]; then
             if [ "$SRC_PROF" = "jiting" ]; then
-              echo "jiting: skip patch_nimh (fork restructured battery code)"
+              echo "jiting: no NiMH curve in fork -> disable battery mapping (avoids false 0% auto-shutdown)"
+              append 'CONFIG_BATTERY_NO_MAPPING=y'
             else
               python3 "$GITHUB_WORKSPACE/.github/scripts/patch_nimh.py"
             fi
