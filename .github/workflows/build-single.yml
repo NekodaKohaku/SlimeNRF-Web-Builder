@@ -181,8 +181,13 @@ jobs:
               ;;
           esac
           sed -i 's|SPI_DT_SPEC_GET(\([^,]*,[[:space:]]*SPI_OP\))|SPI_DT_SPEC_GET(\1, 0)|g' src/sensor/sensor.c || true
-          [ "$MAG" = "enabled" ]  && append 'CONFIG_SENSOR_USE_MAG=y'
-          [ "$MAG" = "disabled" ] && append 'CONFIG_SENSOR_USE_MAG=n'
+          if [ "$SRC_PROF" = "jiting" ]; then
+            echo "jiting: skip SENSOR_USE_MAG (fork uses driver whitelist instead)"
+            [ "$MAG" = "enabled" ] && echo "WARN: magnetometer with jiting source not wired up yet" >&2
+          else
+            [ "$MAG" = "enabled" ]  && append 'CONFIG_SENSOR_USE_MAG=y'
+            [ "$MAG" = "disabled" ] && append 'CONFIG_SENSOR_USE_MAG=n'
+          fi
           if [ "$SLEEP" = "enabled" ]; then
             append 'CONFIG_USE_IMU_WAKE_UP=y'; append 'CONFIG_USE_ACTIVE_TIMEOUT=y'
           elif [ "$SLEEP" = "disabled" ]; then
