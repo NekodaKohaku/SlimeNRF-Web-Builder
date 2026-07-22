@@ -61,6 +61,10 @@
     <div class="grid">
       <div><label for="type" data-i18n="type"></label><select id="type"><option value="tracker"></option><option value="receiver"></option></select></div>
       <div><label for="mod" data-i18n="module"></label><select id="mod"></select></div>
+      <div><label for="fwsrc"><span data-i18n="fwSource"></span><span class="help" data-help="helpFwSource">?</span></label><select id="fwsrc">
+        <option value="official" data-i18n="fwSrcOfficial"></option>
+        <option value="jiting" data-i18n="fwSrcJiting"></option>
+      </select></div>
     </div>
 
     <div id="trackerOpts">
@@ -278,6 +282,7 @@ async function init() {
   ["adcR1","adcR2"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
   document.getElementById("type").addEventListener("change", () => { markDirty(); switchType(document.getElementById("type").value); });
   document.getElementById("mod").addEventListener("change", () => { markDirty(); onChange(); });
+  document.getElementById("fwsrc").addEventListener("change", updateFlash);
   buildLangButtons();
   document.getElementById("exportBtn").addEventListener("click", exportConfig);
   document.getElementById("importBtn").addEventListener("click", () => document.getElementById("importFile").click());
@@ -609,9 +614,10 @@ function updateFlash() {
   const boot = sel.querySelector('option[value="bootloader"]');
   const swd = sel.querySelector('option[value="swd"]');
   const mcub = sel.querySelector('option[value="mcuboot"]');
-  boot.disabled = !(isRecv || hasUsb);
+  const jiting = document.getElementById("fwsrc").value === "jiting";
+  boot.disabled = !(isRecv || hasUsb) || jiting;
   swd.disabled = isRecv;
-  if (mcub) mcub.disabled = isRecv;
+  if (mcub) mcub.disabled = isRecv || jiting;
   const cur = sel.querySelector('option[value="' + sel.value + '"]');
   if (!cur || cur.disabled) sel.value = isRecv ? "bootloader" : (hasUsb ? (mod.flash_default || "swd") : "swd");
 }
@@ -632,6 +638,18 @@ function updateMagConn() {
   if (!cur || cur.disabled) sel.value = "none";
 }
 
+/* 韌體來源プロファイル: null = モジュール定義 (mcus.json) をそのまま使う */
+const FW_SOURCES = {
+  official: null,
+  jiting: {
+    repository_url: "https://github.com/jitingcn/SlimeVR-Tracker-nRF.git",
+    repository_revision: "dev",
+    sdk_url: "https://github.com/jitingcn/sdk-nrf.git",
+    sdk_revision: "v3.2-branch"
+  }
+};
+function fwSource() { return document.getElementById("fwsrc").value; }
+
 function collectConfig() {
   const mod = currentModule();
   const type = document.getElementById("type").value;
@@ -651,10 +669,11 @@ function collectConfig() {
     type: isRecv ? "receiver" : "tracker",
     base_board: mod.base_board,
     board_target,
-    repository_url: src.repository_url,
-    repository_revision: src.repository_revision,
-    sdk_url: mod.sdk_url,
-    sdk_revision: mod.sdk_revision,
+    source: fwSource(),
+    repository_url: (FW_SOURCES[fwSource()] || src).repository_url || src.repository_url,
+    repository_revision: (FW_SOURCES[fwSource()] || src).repository_revision || src.repository_revision,
+    sdk_url: (FW_SOURCES[fwSource()] || mod).sdk_url || mod.sdk_url,
+    sdk_revision: (FW_SOURCES[fwSource()] || mod).sdk_revision || mod.sdk_revision,
     zephyr_sdk_version: mod.zephyr_sdk_version,
     flash_method: fm,
     fileformat: fm === "bootloader" ? "uf2" : fm === "mcuboot" ? "mcuboot" : "hex",

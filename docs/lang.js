@@ -2,6 +2,8 @@ const I18N = {
   zh: {
     _name: "中文",
     title:"SlimeNRF 固件產生器", subtitle:"選模組、指定每支腳接什麼，按下產生就會編出專屬固件。",
+    fwSource:"韌體來源", fwSrcOfficial:"官方 (SlimeVR)", fwSrcJiting:"社群版 (jitingcn)",
+    helpFwSource:"官方：SlimeVR 官方原始碼。社群版：jitingcn 維護的硬分叉，含更完整的磁力計支援、改良的融合參數、更多校準功能等（燒錄方式目前僅支援直接 SWD，MCUboot 支援開發中）。",
     module:"模組", type:"類型", typeTracker:"Tracker（追蹤器）", typeReceiver:"Dongle（接收器）",
     imu:"IMU 感測器", imuAuto:"自動偵測", mag:"磁力計", magNone:"無", bus:"匯流排",
     magConn:"磁力計", magConnNone:"無", magConnAux:"接在 IMU 上（aux）", magConnI2cShared:"跟 IMU 同一條 I2C", magConnI2c:"獨立 I2C", magConnSpi:"與 IMU 同一條 SPI",
@@ -40,6 +42,8 @@ const I18N = {
   en: {
     _name: "EN",
     title:"SlimeNRF Firmware Builder", subtitle:"Pick a module, map each pin, then build to get custom firmware.",
+    fwSource:"Firmware source", fwSrcOfficial:"Official (SlimeVR)", fwSrcJiting:"Community (jitingcn)",
+    helpFwSource:"Official: upstream SlimeVR firmware. Community: the jitingcn hard-fork with better magnetometer support, tuned fusion, extra calibration features etc. (currently Direct SWD only; MCUboot support in progress).",
     module:"Module", type:"Type", typeTracker:"Tracker", typeReceiver:"Dongle (Receiver)",
     imu:"IMU sensor", imuAuto:"Auto-detect", mag:"Magnetometer", magNone:"None", bus:"Bus",
     magConn:"Magnetometer", magConnNone:"None", magConnAux:"On the IMU (aux)", magConnI2cShared:"Same I2C as IMU", magConnI2c:"Separate I2C", magConnSpi:"Same SPI as IMU",
@@ -78,6 +82,8 @@ const I18N = {
   ja: {
     _name: "日本語",
     title:"SlimeNRF ファームウェアビルダー", subtitle:"モジュールを選び各ピンを割り当て、ビルドを押すと専用ファームができます。",
+    fwSource:"ファームウェア系統", fwSrcOfficial:"公式 (SlimeVR)", fwSrcJiting:"コミュニティ版 (jitingcn)",
+    helpFwSource:"公式：SlimeVR 上流ファームウェア。コミュニティ版：jitingcn 氏のハードフォーク。磁気センサー対応強化、フュージョン調整、追加キャリブレーション等（現在は直接 SWD のみ、MCUboot 対応は開発中）。",
     module:"モジュール", type:"種類", typeTracker:"トラッカー", typeReceiver:"ドングル（レシーバー）",
     imu:"IMU センサー", imuAuto:"自動検出", mag:"磁気センサー", magNone:"なし", bus:"バス",
     magConn:"磁気センサー", magConnNone:"なし", magConnAux:"IMU に接続（aux）", magConnI2cShared:"IMU と同じ I2C", magConnI2c:"独立 I2C", magConnSpi:"IMU と同じ SPI",
