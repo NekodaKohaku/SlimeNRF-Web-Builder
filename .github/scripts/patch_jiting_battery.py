@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 # jiting fork の電池まわり修正。usage: patch_jiting_battery.py [battery_option]
 #
-# 1) battery.c input_positive (常時): fork は io-channels の生 AIN 番号を
-#    そのまま input_positive に渡すが、SAADC の AIN0 エンコードは 1 始まり
-#    (公式は 1 + channel)。fork 自社ボードは channel 12 (VDDHDIV5) の特殊
-#    分岐しか通らないため未発覚。AIN 分圧ボードでは setup 失敗/誤ピン読み
-#    -> power_thread "Failed to read battery voltage: -2" の原因。
+# 1) 54L gain 表 + acquisition time 修正 (下記)。fork の input_positive
+#    (0 基底) は NCS 3.2+ では正しい。触らない。
 #
 # 2) battery_option == "nimh" のとき、公式 patch_nimh.py と同じ三点セット:
 #    - battery.c levels[] を NiMH 曲線に置換
@@ -23,21 +20,9 @@ NL = "\r\n" if "\r\n" in s else "\n"
 if MARK in s:
     print("patch_jiting_battery: already applied"); sys.exit(0)
 
-old = ("\t\tif (iocp->channel == 12) {\n"
-       "\t\t\taccp->input_positive = NRF_SAADC_VDDHDIV5;\n"
-       "\t\t} else {\n"
-       "\t\t\taccp->input_positive = iocp->channel;\n"
-       "\t\t}\n").replace("\n", NL)
-new = ("\t\tif (iocp->channel == 12) {\n"
-       "\t\t\taccp->input_positive = NRF_SAADC_VDDHDIV5;\n"
-       "\t\t} else {\n"
-       "\t\t\t/* " + MARK + ": io-channels holds the raw AIN index; the SAADC\n"
-       "\t\t\t * driver expects NRF_SAADC_AIN0(=1)-based values (official: 1 + ch). */\n"
-       "\t\t\taccp->input_positive = 1 + iocp->channel;\n"
-       "\t\t}\n").replace("\n", NL)
-if old not in s:
-    sys.exit("patch_jiting_battery: FAILED, input_positive anchor not found in battery.c")
-s = s.replace(old, new, 1)
+# ---- 1) (撤回) input_positive は fork の 0 基底が正しい ----
+# NCS 3.2+ の dt-bindings は NRF_SAADC_AIN0 = 0 (実機 zephyr commit 9673eec75908 で確認)。
+# 公式 main の "1 + channel" の方が off-by-one バグ (公式自身のコメントにも記載あり)。
 
 # ---- 1b) 54L gain table (upstream-shared bug): nRF52 のみの 1/6,1/5,1/3 を選ぶと
 #      54L の SAADC (gain 1/4,1/2,1,2,4 / ref 0.9V) で adc_channel_setup が -22。
@@ -74,6 +59,17 @@ newg = ("#if defined(CONFIG_SOC_SERIES_NRF54LX)\n"
 if oldg not in s:
     sys.exit("patch_jiting_battery: FAILED, gain table anchor not found in battery.c")
 s = s.replace(oldg, newg, 1)
+
+# ---- 1c) acquisition time 3us -> 40us: 高源阻抗の電池監視 (直列 1M 等) では
+#      3us でサンプルコンデンサが充電しきれず、レール付近の偽値が出る。
+#      40us は nRF52 の正規 enum 値でもあり 54L でも tacq 上限内。
+olda = "\t\t.acquisition_time = ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 3),\n".replace("\n", NL)
+newa = ("\t\t/* " + MARK + ": 40us (was 3us) - required for high source impedance\n"
+        "\t\t * battery sense (e.g. 1M series). Nordic spec: <=800k needs 40us. */\n"
+        "\t\t.acquisition_time = ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 40),\n").replace("\n", NL)
+if olda not in s:
+    sys.exit("patch_jiting_battery: FAILED, acquisition_time anchor not found in battery.c")
+s = s.replace(olda, newa, 1)
 
 # ---- 2) NiMH curve (levels[] replace, same as official patch_nimh.py) ----
 if bat_opt == "nimh":
