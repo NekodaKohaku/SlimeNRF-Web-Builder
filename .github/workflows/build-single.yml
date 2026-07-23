@@ -213,7 +213,8 @@ jobs:
           if [ "$LEDT" = "strip" ]; then append 'CONFIG_LED_STRIP=y'; append 'CONFIG_WS2812_STRIP_SPI=y'; fi
           if [ "$BAT" = "nimh" ]; then
             if [ "$SRC_PROF" = "jiting" ]; then
-              echo "jiting: no NiMH curve in fork -> disable battery mapping (avoids false 0% auto-shutdown)"
+              # NiMH 曲線は patch_jiting_battery.py が battery.c に直接移植する。
+              # NO_MAPPING は Kconfig choice を満たすだけ (置換後 levels[] は無条件になる)
               append 'CONFIG_BATTERY_NO_MAPPING=y'
             else
               python3 "$GITHUB_WORKSPACE/.github/scripts/patch_nimh.py"
@@ -230,6 +231,10 @@ jobs:
             # jiting fork: prj.conf は LOG_BACKEND_UART_AUTOSTART=n (USB CDC 挿入で起動する設計)。
             # USB 無しモジュールでは誰も backend を起こさない -> UART ログが一切出ない。自動起動に戻す。
             append 'CONFIG_LOG_BACKEND_UART_AUTOSTART=y'
+            # fork は CONFIG_ADC_LOG_LEVEL_OFF=y で電池 setup エラーを黙殺する。後勝ちで INF に戻す
+            append 'CONFIG_ADC_LOG_LEVEL_INF=y'
+            # 電池修正: input_positive 1+AIN (fork bug) + nimh なら公式 NiMH 三点セット移植
+            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_jiting_battery.py" "$BAT"
             # jiting fork: led.c が RGB カラー表を無条件参照 -> LED_RGB_COLOR 必須
             # (fork のボードは全て WS2812 前提。TRI_COLOR だと COLOR_R/G/B 未定義でビルド不能)
             append 'CONFIG_LED_RGB_COLOR=y'
