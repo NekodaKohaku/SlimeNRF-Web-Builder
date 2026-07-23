@@ -227,6 +227,9 @@ jobs:
           fi
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_pwr.py"
           if [ "$SRC_PROF" = "jiting" ]; then
+            # jiting fork: prj.conf は LOG_BACKEND_UART_AUTOSTART=n (USB CDC 挿入で起動する設計)。
+            # USB 無しモジュールでは誰も backend を起こさない -> UART ログが一切出ない。自動起動に戻す。
+            append 'CONFIG_LOG_BACKEND_UART_AUTOSTART=y'
             # jiting fork: led.c が RGB カラー表を無条件参照 -> LED_RGB_COLOR 必須
             # (fork のボードは全て WS2812 前提。TRI_COLOR だと COLOR_R/G/B 未定義でビルド不能)
             append 'CONFIG_LED_RGB_COLOR=y'
