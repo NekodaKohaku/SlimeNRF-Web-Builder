@@ -615,7 +615,7 @@ function updateFlash() {
   const swd = sel.querySelector('option[value="swd"]');
   const mcub = sel.querySelector('option[value="mcuboot"]');
   const jiting = document.getElementById("fwsrc").value === "jiting";
-  boot.disabled = !(isRecv || hasUsb) || jiting;
+  boot.disabled = !(isRecv || hasUsb) || (jiting && !isRecv);
   swd.disabled = isRecv;
   if (mcub) mcub.disabled = isRecv || jiting;
   const cur = sel.querySelector('option[value="' + sel.value + '"]');
@@ -643,6 +643,7 @@ const FW_SOURCES = {
   official: null,
   jiting: {
     repository_url: "https://github.com/jitingcn/SlimeVR-Tracker-nRF.git",
+    receiver_repository_url: "https://github.com/jitingcn/SlimeVR-Tracker-nRF-Receiver.git",
     repository_revision: "dev",
     sdk_url: "https://github.com/jitingcn/sdk-nrf.git",
     sdk_revision: "v3.2-branch"
@@ -670,7 +671,7 @@ function collectConfig() {
     base_board: mod.base_board,
     board_target,
     source: fwSource(),
-    repository_url: (FW_SOURCES[fwSource()] || src).repository_url || src.repository_url,
+    repository_url: ((FW_SOURCES[fwSource()] || {})[isRecv ? "receiver_repository_url" : "repository_url"]) || src.repository_url,
     repository_revision: (FW_SOURCES[fwSource()] || src).repository_revision || src.repository_revision,
     sdk_url: (FW_SOURCES[fwSource()] || mod).sdk_url || mod.sdk_url,
     sdk_revision: (FW_SOURCES[fwSource()] || mod).sdk_revision || mod.sdk_revision,
