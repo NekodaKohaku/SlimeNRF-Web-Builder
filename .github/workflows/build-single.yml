@@ -227,14 +227,6 @@ jobs:
           fi
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_pwr.py"
           if [ "$SRC_PROF" = "jiting" ]; then
-            if [ "${BOARD#*nrf54l}" = "$BOARD" ]; then
-              # jiting の socs/ は SoC 名キー (fork の sysbuild.cmake の fallback 前提)。
-              # --no-sysbuild の素の Zephyr は <qualifiers> 名 (nrf52840_spi 等) しか
-              # 探さない -> retained_mem 未定義でビルド失敗。qualifiers 名 shim を追加。
-              printf '#include "nrf52840.overlay"\n' > socs/nrf52840_spi.overlay
-              printf '#include "nrf52840.overlay"\n' > socs/nrf52840_i2c.overlay
-              echo "jiting 52840: added socs qualifier shims (nrf52840_spi/_i2c -> nrf52840.overlay)"
-            fi
             # jiting fork: prj.conf は LOG_BACKEND_UART_AUTOSTART=n (USB CDC 挿入で起動する設計)。
             # USB 無しモジュールでは誰も backend を起こさない -> UART ログが一切出ない。自動起動に戻す。
             append 'CONFIG_LOG_BACKEND_UART_AUTOSTART=y'
