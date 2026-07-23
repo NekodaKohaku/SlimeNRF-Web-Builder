@@ -39,6 +39,42 @@ if old not in s:
     sys.exit("patch_jiting_battery: FAILED, input_positive anchor not found in battery.c")
 s = s.replace(old, new, 1)
 
+# ---- 1b) 54L gain table (upstream-shared bug): nRF52 のみの 1/6,1/5,1/3 を選ぶと
+#      54L の SAADC (gain 1/4,1/2,1,2,4 / ref 0.9V) で adc_channel_setup が -22。
+oldg = ("\tif (max_adc_voltage < 0.6f)\n"
+        "\t\tbattery_adc_gain = ADC_GAIN_1;\n"
+        "\telse if (max_adc_voltage < 1.2f)\n"
+        "\t\tbattery_adc_gain = ADC_GAIN_1_2;\n"
+        "\telse if (max_adc_voltage < 1.8f)\n"
+        "\t\tbattery_adc_gain = ADC_GAIN_1_3;\n"
+        "\telse if (max_adc_voltage < 2.4f)\n"
+        "\t\tbattery_adc_gain = ADC_GAIN_1_4;\n"
+        "\telse if (max_adc_voltage < 3.0f)\n"
+        "\t\tbattery_adc_gain = ADC_GAIN_1_5;\n").replace("\n", NL)
+newg = ("#if defined(CONFIG_SOC_SERIES_NRF54LX)\n"
+        "\t/* " + MARK + ": 54L SAADC has only 1/4,1/2,1,2,4 gains, internal ref 0.9V.\n"
+        "\t * Default 1/4 -> 3.6V range (same span as nRF52 1/6 @ 0.6V ref). */\n"
+        "\tbattery_adc_gain = ADC_GAIN_1_4;\n"
+        "\tif (max_adc_voltage < 0.9f)\n"
+        "\t\tbattery_adc_gain = ADC_GAIN_1;\n"
+        "\telse if (max_adc_voltage < 1.8f)\n"
+        "\t\tbattery_adc_gain = ADC_GAIN_1_2;\n"
+        "#else\n"
+        "\tif (max_adc_voltage < 0.6f)\n"
+        "\t\tbattery_adc_gain = ADC_GAIN_1;\n"
+        "\telse if (max_adc_voltage < 1.2f)\n"
+        "\t\tbattery_adc_gain = ADC_GAIN_1_2;\n"
+        "\telse if (max_adc_voltage < 1.8f)\n"
+        "\t\tbattery_adc_gain = ADC_GAIN_1_3;\n"
+        "\telse if (max_adc_voltage < 2.4f)\n"
+        "\t\tbattery_adc_gain = ADC_GAIN_1_4;\n"
+        "\telse if (max_adc_voltage < 3.0f)\n"
+        "\t\tbattery_adc_gain = ADC_GAIN_1_5;\n"
+        "#endif\n").replace("\n", NL)
+if oldg not in s:
+    sys.exit("patch_jiting_battery: FAILED, gain table anchor not found in battery.c")
+s = s.replace(oldg, newg, 1)
+
 # ---- 2) NiMH curve (levels[] replace, same as official patch_nimh.py) ----
 if bat_opt == "nimh":
     nimh = ("static const struct battery_level_point levels[] = {\n"

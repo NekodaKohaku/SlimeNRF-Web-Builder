@@ -166,11 +166,10 @@ jobs:
           case "$BOARD" in
             *nrf54l*)
               append 'CONFIG_MAIN_STACK_SIZE=2048'   # nRF54L M33+FPU+TrustZone needs more than upstream 512 (upstream: "crashing on nrf54l at 512")
-              if [ "$SRC_PROF" = "jiting" ]; then
-                echo "jiting: keep fork's own test54l board.c"
-              else
-                cp "$GITHUB_WORKSPACE/.github/scripts/test54l_board.c" boards/nordic/test54l/board.c && echo "test54l board.c -> reads DT vcc/gnd-gpios"
-              fi
+              # jiting も同じ差し替え: fork の board.c は P1.07/P1.08 ハードコード
+              # (fork 自社ボード専用) -> ユーザーボードでは IMU が無電源になる。
+              # 差し替え版は DT vcc/gnd-gpios 読み + NFC パッド解放 + EARLY 電源自锁。
+              cp "$GITHUB_WORKSPACE/.github/scripts/test54l_board.c" boards/nordic/test54l/board.c && echo "test54l board.c -> reads DT vcc/gnd-gpios"
               ;;
             *)
               # nRF52 (has_usb=false modules): disable USB so USB_EXISTS is false and the
