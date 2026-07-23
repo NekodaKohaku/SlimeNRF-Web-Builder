@@ -276,7 +276,13 @@ jobs:
         run: |
           set -euo pipefail
           cd zephyr-workspace/SlimeVR-Tracker-nRF
-          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_recvtimerstub.py"   # NCS 3.2: stub timer.c (drops nrfx TIMER1 dep; TDMA unused)
+          SRC_PROF='${{ steps.cfg.outputs.source }}'
+          if [ "$SRC_PROF" = "jiting" ]; then
+            # jiting receiver: TDMA が TIMER を実際に使う -> timer.c stub 化は厳禁
+            echo "jiting receiver: keep fork timer.c (TDMA active)"
+          else
+            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_recvtimerstub.py"   # NCS 3.2: stub timer.c (drops nrfx TIMER1 dep; TDMA unused)
+          fi
           tail -n 5 prj.conf
 
       - name: Enable MCUboot UART DFU
