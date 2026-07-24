@@ -362,7 +362,7 @@ print("== appended retention Kconfigs to prj.conf ==")
 # USB_DEVICE_* は削除のみ (この用途の無 USB モジュールでは workflow が
 # アプリ側に CONFIG_USB_DEVICE_STACK=n を追記済みのため)。
 import glob
-_APP_ONLY = re.compile(r"^\s*CONFIG_(BATTERY_|SENSOR_)")
+_APP_ONLY = re.compile(r"^\s*CONFIG_(BATTERY_|SENSOR_|SLIMEVR_)")   # SLIMEVR_: jiting app Kconfig symbols
 _USB = re.compile(r"^\s*CONFIG_USB_DEVICE")
 for dc in glob.glob("boards/*/*/*defconfig"):
     lines = open(dc, encoding="utf-8").read().splitlines()
