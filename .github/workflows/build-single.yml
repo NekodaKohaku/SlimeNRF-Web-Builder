@@ -245,6 +245,8 @@ jobs:
             python3 "$GITHUB_WORKSPACE/.github/scripts/patch_jiting_battery.py" "$BAT"
             # 単押しリブート廃止 (現行公式に整合、誤押し -> 再同期問題の連鎖を断つ)
             python3 "$GITHUB_WORKSPACE/.github/scripts/patch_jiting_button.py"
+            # sysbuild overlay 順序修正 (socs が user overlay を上書きしないように; mcuboot 必須)
+            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_jiting_sysbuild.py"
             # jiting fork: led.c が RGB カラー表を無条件参照 -> LED_RGB_COLOR 必須
             # (fork のボードは全て WS2812 前提。TRI_COLOR だと COLOR_R/G/B 未定義でビルド不能)
             append 'CONFIG_LED_RGB_COLOR=y'
