@@ -617,7 +617,7 @@ function updateFlash() {
   const jiting = document.getElementById("fwsrc").value === "jiting";
   boot.disabled = !(isRecv || hasUsb) || (jiting && !isRecv);
   swd.disabled = isRecv;
-  if (mcub) mcub.disabled = isRecv || jiting;
+  if (mcub) mcub.disabled = isRecv;
   const cur = sel.querySelector('option[value="' + sel.value + '"]');
   if (!cur || cur.disabled) sel.value = isRecv ? "bootloader" : (hasUsb ? (mod.flash_default || "swd") : "swd");
 }
