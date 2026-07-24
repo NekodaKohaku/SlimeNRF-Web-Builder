@@ -149,3 +149,94 @@ if changed3 >= 3:
 else:
     print(f"patch_jiting_54l: FAILED, watchdog.c only {changed3}/3 hunks", file=sys.stderr)
     sys.exit(1)
+
+# 4) TDMA 時基修正: プロトコルの "server ticks" は 32768Hz (nRF52 RTC kernel tick)
+#    前提だが、nRF54L の GRTC kernel tick は 31250Hz (-4.86%)。ローカル tick を
+#    そのまま server tick 領域に混ぜると、スロット位相が ~80ms 毎にフレーム全周を
+#    掃引し、複数トラッカー同時運用で他機のスロットを踏み潰す
+#    (単機ではスロット=フレームなので無症状)。
+#    ローカル tick を 32768Hz 領域へ正規化し、スリープだけ逆変換する。
+f4 = "src/connection/esb.c"
+s4 = open(f4, encoding="utf-8", newline="").read()
+NL4 = "\r\n" if "\r\n" in s4 else "\n"
+changed4 = 0
+
+def repl4(old, new, cnt=1):
+    global s4, changed4
+    o = old.replace("\n", NL4); n = new.replace("\n", NL4)
+    if s4.count(o) >= cnt:
+        s4 = s4.replace(o, n, cnt); changed4 += cnt; return True
+    return False
+
+# 4a) helper を NRF54L include ブロックの直後に挿入
+repl4(
+"#if defined(NRF54L15_XXAA)\n#include <hal/nrf_clock.h>\n#endif /* defined(NRF54L15_XXAA) */\n",
+"#if defined(NRF54L15_XXAA)\n#include <hal/nrf_clock.h>\n#endif /* defined(NRF54L15_XXAA) */\n"
+"\n/* " + MARK + ": TDMA/time-sync protocol ticks are 32768 Hz (nRF52 RTC kernel\n"
+" * tick). nRF54L GRTC kernel tick is 31250 Hz; normalize local ticks into the\n"
+" * 32768 Hz protocol domain (identity on nRF52). */\n"
+"static inline uint32_t slimenrf_proto_ticks32(void)\n"
+"{\n"
+"#if CONFIG_SYS_CLOCK_TICKS_PER_SEC == 32768\n"
+"\treturn sys_clock_tick_get_32();\n"
+"#else\n"
+"\treturn (uint32_t)((uint64_t)sys_clock_tick_get_32() * 32768ULL / CONFIG_SYS_CLOCK_TICKS_PER_SEC);\n"
+"#endif\n"
+"}\n")
+
+# 4b) local tick 取得 3 箇所を helper に置換 (同一行 2 箇所 + ping_history 1 箇所)
+repl4("uint32_t local_now = sys_clock_tick_get_32();",
+      "uint32_t local_now = slimenrf_proto_ticks32(); /* " + MARK + " */", 2)
+repl4("ping_history[ping_history_idx].ping_ticks = sys_clock_tick_get_32();",
+      "ping_history[ping_history_idx].ping_ticks = slimenrf_proto_ticks32(); /* " + MARK + " */")
+
+# 4c) us 変換: protocol ticks はローカル tick レートと無関係
+repl4("\treturn k_ticks_to_us_near64(ticks);\n",
+      "\treturn ticks * 1000000ULL / 32768ULL; /* " + MARK + ": protocol ticks are 32768Hz */\n")
+
+if changed4 == 5:
+    open(f4, "w", encoding="utf-8", newline="").write(s4)
+    print(f"patch_jiting_54l: esb.c tick-domain {changed4}/5 OK")
+else:
+    print(f"patch_jiting_54l: FAILED, esb.c tick-domain only {changed4}/5 hunks", file=sys.stderr)
+    sys.exit(1)
+
+# 4d) tdma.c: スリープ量は protocol ticks -> ローカル tick へ逆変換
+f5 = "src/connection/tdma.c"
+s5 = open(f5, encoding="utf-8", newline="").read()
+NL5 = "\r\n" if "\r\n" in s5 else "\n"
+o5 = "\t\tk_sleep(K_TICKS(ticks_to_target));\n".replace("\n", NL5)
+n5 = ("\t\t/* " + MARK + ": ticks_to_target is in 32768Hz protocol ticks; K_TICKS\n"
+      "\t\t * wants local kernel ticks (31250Hz on nRF54L). Convert. */\n"
+      "\t\tk_sleep(K_TICKS((uint64_t)ticks_to_target * CONFIG_SYS_CLOCK_TICKS_PER_SEC / 32768ULL));\n").replace("\n", NL5)
+if o5 not in s5:
+    print("patch_jiting_54l: FAILED, tdma.c sleep anchor not found", file=sys.stderr)
+    sys.exit(1)
+s5 = s5.replace(o5, n5, 1)
+open(f5, "w", encoding="utf-8", newline="").write(s5)
+print("patch_jiting_54l: tdma.c sleep conversion OK")
+
+# 5) clocks_start: HF クロック完了待ちが 10 回 x 100us = 最大 1ms しかない。
+#    54L の HFXO+PLL 冷起動は 1ms を超え得る -> -11 で諦めた後も radio を
+#    起動してしまい、IRQ 内で usage fault (unaligned/wild pointer)。
+#    リトライ上限を 1000 回 (~100ms) に引き上げる。
+f6 = "src/connection/esb.c"
+s6 = open(f6, encoding="utf-8", newline="").read()
+NL6 = "\r\n" if "\r\n" in s6 else "\n"
+o6 = ("\t\tif (err && ++fetch_attempts > 10) {\n"
+      "\t\t\tLOG_WRN_ONCE(\"Unable to fetch Clock request result: %d\", err);\n"
+      "\t\t\treturn err;\n"
+      "\t\t}\n").replace("\n", NL6)
+n6 = ("\t\t/* " + MARK + ": 10 attempts x 100us = 1ms max, but nRF54L HFXO+PLL\n"
+      "\t\t * cold start can exceed that; bailing early lets the radio run\n"
+      "\t\t * without a stable clock -> usage fault in IRQ. Allow ~100ms. */\n"
+      "\t\tif (err && ++fetch_attempts > 1000) {\n"
+      "\t\t\tLOG_ERR(\"Clock request did not complete: %d\", err);\n"
+      "\t\t\treturn err;\n"
+      "\t\t}\n").replace("\n", NL6)
+if o6 not in s6:
+    print("patch_jiting_54l: FAILED, clocks_start retry anchor not found", file=sys.stderr)
+    sys.exit(1)
+s6 = s6.replace(o6, n6, 1)
+open(f6, "w", encoding="utf-8", newline="").write(s6)
+print("patch_jiting_54l: clocks_start retry window OK (1ms -> 100ms)")
