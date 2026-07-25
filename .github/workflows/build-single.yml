@@ -261,6 +261,18 @@ jobs:
                 printf '\n&wdt31 { status = "okay"; };\n' >> "$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
                 echo "jiting 54L: appended flash-controller chosen + wdt31 enable to custom overlay"
                 ;;
+              *nrf52840*)
+                # jiting fork は新 USB スタック (CONFIG_USB_DEVICE_STACK_NEXT=y)。
+                # 既存の CONFIG_USB_DEVICE_STACK=n は旧スタック用の別シンボルで
+                # NEXT スタックには効かず、console.c が USB CDC 経路 (DTR 待ち)
+                # に入って UART console/log が完全沈黙する (実測: MS88SF2)。
+                # この builder の対象は UART console のモジュールのみなので、
+                # NEXT スタックごと無効化し DT の usbd ノードも止める
+                # (console.c の USB_EXISTS 判定が DT status を見るため)。
+                append 'CONFIG_USB_DEVICE_STACK_NEXT=n'
+                printf '\n&usbd { status = "disabled"; };\n' >> "$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
+                echo "jiting 52840: USB NEXT stack disabled + usbd node off (pure UART console)"
+                ;;
             esac
             tail -n 10 prj.conf
             exit 0
@@ -308,8 +320,9 @@ jobs:
           set -euo pipefail
           cd zephyr-workspace/SlimeVR-Tracker-nRF
           if [ "${{ steps.cfg.outputs.source }}" = "jiting" ]; then
-            # jiting console は指令表構造 + fork 版 esb_ota 無効化を含む
             python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_dfu_jiting.py"
+            # ESB OTA -> mcuboot 二槽バックエンド (slot1 受信 + overwrite-only)
+            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esb_ota_mcuboot.py"
           else
             python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_dfu.py"
           fi
