@@ -1,0 +1,236 @@
+#!/usr/bin/env python3
+# 一時診断 (TEMP): 54L で SPI IMU が mcuboot ビルドのみ死ぬ問題の現場検証。
+# src/system/zz_diag54l.c を生成 (CMake が src/*.c を GLOB するので自動でコンパイル)。
+# 起動時に P1.01-P1.06 の PIN_CNF (CTRLSEL 含む) と SPIM20 の PSEL/ENABLE を printk。
+# 期待値: PSEL SCK=0x24 MOSI=0x23 MISO=0x22 (port1<<5|pin, bit31=0=connected)
+import os, sys
+
+f = "src/system/zz_diag54l.c"
+if os.path.exists(f):
+    print("patch_jiting_diag54l: already present"); sys.exit(0)
+
+open(f, "w", newline="\n").write(r'''/* SLIMENRF TEMP DIAG: dump pad/SPIM state at boot (remove after debugging) */
+#include <zephyr/kernel.h>
+#include <zephyr/init.h>
+#include <zephyr/sys/printk.h>
+#include <hal/nrf_gpio.h>
+#include <hal/nrf_spim.h>
+#include <zephyr/drivers/spi.h>
+
+#if defined(CONFIG_SOC_SERIES_NRF54LX)
+static int zz_diag54l(void)
+{
+	printk("=== DIAG54L pad/SPIM dump ===\n");
+	for (int pin = 1; pin <= 6; pin++) {
+		printk("P1.%02d PIN_CNF=0x%08X\n", pin,
+		       (unsigned int)NRF_P1->PIN_CNF[pin]);
+	}
+#if defined(NRF_SPIM20)
+	printk("SPIM20 ENABLE=%u PSEL SCK=0x%08X MOSI=0x%08X MISO=0x%08X\n",
+	       (unsigned int)NRF_SPIM20->ENABLE,
+	       (unsigned int)NRF_SPIM20->PSEL.SCK,
+	       (unsigned int)NRF_SPIM20->PSEL.MOSI,
+	       (unsigned int)NRF_SPIM20->PSEL.MISO);
+#else
+	printk("SPIM20 symbol not defined\n");
+#endif
+	printk("P1 OUT=0x%08X IN=0x%08X DIR=0x%08X\n",
+	       (unsigned int)NRF_P1->OUT, (unsigned int)NRF_P1->IN,
+	       (unsigned int)NRF_P1->DIR);
+	/* raw GPIO wiggle test: CS (P1.05) toggle, read back via IN */
+	nrf_gpio_cfg_output(NRF_GPIO_PIN_MAP(1, 5));
+	nrf_gpio_pin_set(NRF_GPIO_PIN_MAP(1, 5));
+	uint32_t in_hi = NRF_P1->IN;
+	nrf_gpio_pin_clear(NRF_GPIO_PIN_MAP(1, 5));
+	uint32_t in_lo = NRF_P1->IN;
+	nrf_gpio_pin_set(NRF_GPIO_PIN_MAP(1, 5));
+	printk("CS wiggle: IN(hi)=0x%08X IN(lo)=0x%08X (bit5 should change)\n",
+	       (unsigned int)in_hi, (unsigned int)in_lo);
+#if defined(NRF_GPIO_HAS_RETENTION_SETCLEAR) && NRF_GPIO_HAS_RETENTION_SETCLEAR
+	/* SET/CLR style: reading RETAINSET returns the current retain mask */
+	printk("P1 RETAIN=0x%08X\n", (unsigned int)NRF_P1->RETAINSET);
+#endif
+	/* clear retain on SPI pins just in case (chainload may leave pads latched) */
+#if defined(NRF_GPIO_HAS_RETENTION_SETCLEAR) && NRF_GPIO_HAS_RETENTION_SETCLEAR
+	for (int p = 2; p <= 6; p++) {
+		nrf_gpio_pin_retain_disable(NRF_GPIO_PIN_MAP(1, p));
+	}
+	printk("P1.02-06 retain cleared; P1 RETAIN now=0x%08X\n",
+	       (unsigned int)NRF_P1->RETAINSET);
+#endif
+	/* bit-bang SPI mode0: read LSM6DSV WHO_AM_I (0x0F). expect 0x70 */
+	{
+		const uint32_t cs = NRF_GPIO_PIN_MAP(1, 5), sck = NRF_GPIO_PIN_MAP(1, 4);
+		const uint32_t mosi = NRF_GPIO_PIN_MAP(1, 3), miso = NRF_GPIO_PIN_MAP(1, 2);
+		nrf_gpio_cfg_output(cs); nrf_gpio_pin_set(cs);
+		nrf_gpio_cfg_output(sck); nrf_gpio_pin_clear(sck);
+		nrf_gpio_cfg_output(mosi);
+		nrf_gpio_cfg_input(miso, NRF_GPIO_PIN_NOPULL);
+		k_busy_wait(10);
+		nrf_gpio_pin_clear(cs);
+		k_busy_wait(5);
+		uint8_t tx = 0x8F, rx = 0;
+		for (int b = 7; b >= 0; b--) {
+			(tx & (1 << b)) ? nrf_gpio_pin_set(mosi) : nrf_gpio_pin_clear(mosi);
+			k_busy_wait(2);
+			nrf_gpio_pin_set(sck); k_busy_wait(2);
+			nrf_gpio_pin_clear(sck);
+		}
+		for (int b = 7; b >= 0; b--) {
+			nrf_gpio_pin_set(sck); k_busy_wait(2);
+			rx |= (uint8_t)(nrf_gpio_pin_read(miso) << b);
+			nrf_gpio_pin_clear(sck); k_busy_wait(2);
+		}
+		nrf_gpio_pin_set(cs);
+		printk("BITBANG WHO_AM_I=0x%02X (expect 0x70)\n", rx);
+	}
+	/* raw-register SPIM20 transaction (bypass zephyr driver):
+	 * restore pinctrl-style pad config, then WHO_AM_I via EasyDMA */
+#if defined(NRF_SPIM20)
+	{
+		static uint8_t txb[3] = {0x8F, 0x00, 0x00};
+		static uint8_t rxb[3];
+		const uint32_t cs = NRF_GPIO_PIN_MAP(1, 5);
+		/* pads back to SPIM-style config (as pinctrl leaves them) */
+		nrf_gpio_cfg(NRF_GPIO_PIN_MAP(1, 4), NRF_GPIO_PIN_DIR_OUTPUT,
+			     NRF_GPIO_PIN_INPUT_CONNECT, NRF_GPIO_PIN_NOPULL,
+			     NRF_GPIO_PIN_S0S1, NRF_GPIO_PIN_NOSENSE); /* SCK */
+		nrf_gpio_cfg(NRF_GPIO_PIN_MAP(1, 3), NRF_GPIO_PIN_DIR_OUTPUT,
+			     NRF_GPIO_PIN_INPUT_DISCONNECT, NRF_GPIO_PIN_NOPULL,
+			     NRF_GPIO_PIN_S0S1, NRF_GPIO_PIN_NOSENSE); /* MOSI */
+		nrf_gpio_cfg(NRF_GPIO_PIN_MAP(1, 2), NRF_GPIO_PIN_DIR_INPUT,
+			     NRF_GPIO_PIN_INPUT_CONNECT, NRF_GPIO_PIN_NOPULL,
+			     NRF_GPIO_PIN_S0S1, NRF_GPIO_PIN_NOSENSE); /* MISO */
+		nrf_spim_pins_set(NRF_SPIM20, NRF_GPIO_PIN_MAP(1, 4),
+				  NRF_GPIO_PIN_MAP(1, 3), NRF_GPIO_PIN_MAP(1, 2));
+		nrf_spim_configure(NRF_SPIM20, NRF_SPIM_MODE_0,
+				   NRF_SPIM_BIT_ORDER_MSB_FIRST);
+#if defined(NRF_SPIM_HAS_PRESCALER) && NRF_SPIM_HAS_PRESCALER
+		nrf_spim_prescaler_set(NRF_SPIM20, 16); /* slow + safe */
+#else
+		nrf_spim_frequency_set(NRF_SPIM20, NRF_SPIM_FREQ_1M);
+#endif
+		nrf_spim_tx_buffer_set(NRF_SPIM20, txb, 3);
+		nrf_spim_rx_buffer_set(NRF_SPIM20, rxb, 3);
+		nrf_spim_event_clear(NRF_SPIM20, NRF_SPIM_EVENT_END);
+		nrf_spim_enable(NRF_SPIM20);
+		nrf_gpio_pin_clear(cs);
+		k_busy_wait(5);
+		nrf_spim_task_trigger(NRF_SPIM20, NRF_SPIM_TASK_START);
+		int tmo = 10000;
+		while (!nrf_spim_event_check(NRF_SPIM20, NRF_SPIM_EVENT_END) && --tmo) {
+			k_busy_wait(1);
+		}
+		nrf_gpio_pin_set(cs);
+		printk("RAW SPIM20: END=%d tmo_left=%d RX=%02X %02X %02X (WHO expect [1]=0x70)\n",
+		       (int)nrf_spim_event_check(NRF_SPIM20, NRF_SPIM_EVENT_END), tmo,
+		       rxb[0], rxb[1], rxb[2]);
+		nrf_spim_disable(NRF_SPIM20);
+	}
+#endif
+	/* zephyr-driver-level transaction (same path the sensor scan uses).
+	 * RX pre-filled with 0xAA sentinel:
+	 *   result 0x70  -> driver fine (problem is elsewhere/timing)
+	 *   result 0xAA  -> driver never wrote the buffer (silent skip)
+	 *   result 0x00  -> transfer ran but data lost (rx path broken) */
+#if DT_NODE_EXISTS(DT_NODELABEL(imu_spi))
+	{
+		static const struct device *spi_dev =
+			DEVICE_DT_GET(DT_BUS(DT_NODELABEL(imu_spi)));
+		static struct spi_config scfg;
+		static uint8_t dtx[3] = {0x8F, 0x00, 0x00};
+		static uint8_t drx[3] = {0xAA, 0xAA, 0xAA};
+		scfg.frequency = 1000000;
+		scfg.operation = SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB;
+		scfg.cs.gpio.port = DEVICE_DT_GET(DT_GPIO_CTLR_BY_IDX(DT_BUS(DT_NODELABEL(imu_spi)), cs_gpios, 0));
+		scfg.cs.gpio.pin = DT_GPIO_PIN_BY_IDX(DT_BUS(DT_NODELABEL(imu_spi)), cs_gpios, 0);
+		scfg.cs.gpio.dt_flags = DT_GPIO_FLAGS_BY_IDX(DT_BUS(DT_NODELABEL(imu_spi)), cs_gpios, 0);
+		scfg.cs.delay = 2;
+		struct spi_buf txb2 = {.buf = dtx, .len = 3};
+		struct spi_buf rxb2 = {.buf = drx, .len = 3};
+		struct spi_buf_set txs = {.buffers = &txb2, .count = 1};
+		struct spi_buf_set rxs = {.buffers = &rxb2, .count = 1};
+		int drdy = device_is_ready(spi_dev);
+		int rc = drdy ? spi_transceive(spi_dev, &scfg, &txs, &rxs) : -99;
+		printk("DRV SPI m0/1M: ready=%d rc=%d RX=%02X %02X %02X\n",
+		       drdy, rc, drx[0], drx[1], drx[2]);
+		/* T1: jiting exact spec - mode3, 8MHz, tx1/rx3 */
+		static struct spi_config scfg3;
+		scfg3 = scfg;
+		scfg3.operation = SPI_OP_MODE_MASTER | SPI_MODE_CPOL | SPI_MODE_CPHA |
+				  SPI_WORD_SET(8) | SPI_TRANSFER_MSB;
+		scfg3.frequency = 8000000;
+		uint8_t reg1 = 0x8F;
+		struct spi_buf t1tx = {.buf = &reg1, .len = 1};
+		struct spi_buf_set t1txs = {.buffers = &t1tx, .count = 1};
+		drx[0] = drx[1] = drx[2] = 0xAA;
+		rc = spi_transceive(spi_dev, &scfg3, &t1txs, &rxs);
+		printk("DRV SPI m3/8M(tx1): rc=%d RX=%02X %02X %02X\n", rc, drx[0], drx[1], drx[2]);
+		/* T2: mode3 1MHz */
+		static struct spi_config scfg4;
+		scfg4 = scfg3;
+		scfg4.frequency = 1000000;
+		drx[0] = drx[1] = drx[2] = 0xAA;
+		rc = spi_transceive(spi_dev, &scfg4, &t1txs, &rxs);
+		printk("DRV SPI m3/1M(tx1): rc=%d RX=%02X %02X %02X\n", rc, drx[0], drx[1], drx[2]);
+		/* T3: mode0 8MHz */
+		static struct spi_config scfg5;
+		scfg5 = scfg;
+		scfg5.frequency = 8000000;
+		drx[0] = drx[1] = drx[2] = 0xAA;
+		rc = spi_transceive(spi_dev, &scfg5, &txs, &rxs);
+		printk("DRV SPI m0/8M: rc=%d RX=%02X %02X %02X\n", rc, drx[0], drx[1], drx[2]);
+	}
+#endif
+	return 0;
+}
+SYS_INIT(zz_diag54l, APPLICATION, 90);
+
+/* second dump AFTER sensor scan window (~5s) */
+static void zz_diag54l_late(struct k_work *w)
+{
+	ARG_UNUSED(w);
+	printk("=== DIAG54L late dump ===\n");
+	printk("P1 OUT=0x%08X IN=0x%08X DIR=0x%08X\n",
+	       (unsigned int)NRF_P1->OUT, (unsigned int)NRF_P1->IN,
+	       (unsigned int)NRF_P1->DIR);
+#if defined(NRF_SPIM20)
+	printk("SPIM20 ENABLE=%u\n", (unsigned int)NRF_SPIM20->ENABLE);
+#endif
+}
+static K_WORK_DELAYABLE_DEFINE(zz_diag_work, zz_diag54l_late);
+static int zz_diag54l_sched(void)
+{
+	k_work_schedule(&zz_diag_work, K_SECONDS(5));
+	return 0;
+}
+SYS_INIT(zz_diag54l_sched, APPLICATION, 99);
+#endif
+''')
+print("patch_jiting_diag54l: created src/system/zz_diag54l.c (TEMP)")
+
+# ---- 追加: scan_spi.c に spec ダンプを差し込む (TEMP) ----
+f2 = "src/sensor/scan_spi.c"
+s2 = open(f2, encoding="utf-8", newline="").read()
+NL2 = "\r\n" if "\r\n" in s2 else "\n"
+MARK2 = "SLIMENRF_SCAN_SPEC_DUMP"
+if MARK2 not in s2:
+    o2 = "\t\t\t\tint err = spi_transceive_dt(bus, &tx, &rx);".replace("\n", NL2)
+    n2 = ("\t\t\t\t/* " + MARK2 + " (TEMP) */" + NL2 +
+          "\t\t\t\tprintk(\"SCAN SPEC: bus=%p rdy=%d freq=%u op=0x%04x cs.port=%p cs.pin=%u cs.flg=0x%x\\n\"," + NL2 +
+          "\t\t\t\t       bus->bus, bus->bus ? device_is_ready(bus->bus) : -1," + NL2 +
+          "\t\t\t\t       (unsigned)bus->config.frequency, (unsigned)bus->config.operation," + NL2 +
+          "\t\t\t\t       bus->config.cs.gpio.port, (unsigned)bus->config.cs.gpio.pin," + NL2 +
+          "\t\t\t\t       (unsigned)bus->config.cs.gpio.dt_flags);" + NL2 +
+          "\t\t\t\tint err = spi_transceive_dt(bus, &tx, &rx);")
+    if o2 not in s2:
+        print("patch_jiting_diag54l: FAILED, scan_spi.c anchor not found", file=sys.stderr)
+        sys.exit(1)
+    s2 = s2.replace(o2, n2, 1)
+    if "#include <zephyr/sys/printk.h>" not in s2:
+        s2 = s2.replace("#include <zephyr/drivers/spi.h>",
+                        "#include <zephyr/drivers/spi.h>" + NL2 + "#include <zephyr/sys/printk.h>", 1)
+    open(f2, "w", encoding="utf-8", newline="").write(s2)
+    print("patch_jiting_diag54l: scan_spi.c spec dump inserted (TEMP)")
+else:
+    print("patch_jiting_diag54l: scan_spi.c already instrumented")
