@@ -361,10 +361,29 @@ print("== appended retention Kconfigs to prj.conf ==")
 # -> それらを defconfig から prj.conf (アプリ専用) へ移動する。
 # USB_DEVICE_* は削除のみ (この用途の無 USB モジュールでは workflow が
 # アプリ側に CONFIG_USB_DEVICE_STACK=n を追記済みのため)。
+#
+# !! ターゲットボードの defconfig だけを対象にする !!
+# 以前は boards/*/*/*defconfig 全部を掃いていたため、無関係なボードの
+# defconfig (例: jiting の promicro_uf2_smspi にある
+# CONFIG_SENSOR_IMU_DRIVERS_MINIMAL=y + CONFIG_SENSOR_DRV_ICM45686=y の
+# ドライバ白名单) まで prj.conf へ注入され、test54l ビルドで LSM6DSV
+# ドライバがコンパイルされず "No IMU detected" になる実害を確認。
+# Kconfig が読むのはターゲットボードの defconfig のみなので、
+# それ以外を動かす必要はそもそも無い。
 import glob
 _APP_ONLY = re.compile(r"^\s*CONFIG_(BATTERY_|SENSOR_|SLIMEVR_)")   # SLIMEVR_: jiting app Kconfig symbols
 _USB = re.compile(r"^\s*CONFIG_USB_DEVICE")
-for dc in glob.glob("boards/*/*/*defconfig"):
+_seg_b = board.split("/")
+_board_dir = _seg_b[0]
+# defconfig 命名の揺れに対応: <board>_defconfig / <board>_<全 qualifiers>_defconfig /
+# <board>_<variant>_defconfig (soc 省略型, 例 promicro_uf2_smspi_defconfig)
+_dc_names = {_board_dir + "_defconfig", "_".join(_seg_b) + "_defconfig"}
+if len(_seg_b) >= 3:
+    _dc_names.add(_board_dir + "_" + _seg_b[-1] + "_defconfig")
+for dc in glob.glob(f"boards/*/{_board_dir}/*defconfig"):
+    if os.path.basename(dc) not in _dc_names:
+        print(f"== {dc}: not the target board defconfig, skipped ==")
+        continue
     lines = open(dc, encoding="utf-8").read().splitlines()
     keep, moved, dropped = [], [], []
     for ln in lines:
