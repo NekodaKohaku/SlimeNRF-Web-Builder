@@ -46,7 +46,19 @@ BLOCK = r"""
  * サンプル自身が無効化している) を raw レジスタ書き込みで置き換える。
  * 起動していないインスタンスへの RR 書き込みは無視されるだけで無害。 */
 #if defined(CONFIG_SOC_FAMILY_NORDIC_NRF) || defined(CONFIG_SOC_FAMILY_NRF)
+/* mcuboot イメージの include パスに MDK が直接入っていないことがある。
+ * nrfx ルート (-I .../hal/nordic/nrfx) は常に入っているので mdk/ 経由でも
+ * 探す。どちらも見つからなければ何もしない (既定マクロのまま)。 */
+#if defined(__has_include)
+#if __has_include(<nrf.h>)
 #include <nrf.h>
+#define SLIMENRF_WDT_HAVE_MDK 1
+#elif __has_include(<mdk/nrf.h>)
+#include <mdk/nrf.h>
+#define SLIMENRF_WDT_HAVE_MDK 1
+#endif
+#endif
+#if defined(SLIMENRF_WDT_HAVE_MDK)
 #define SLIMENRF_WDT_FEED_INST(inst)                     \
     do {                                                 \
         for (unsigned int zzi = 0; zzi < 8; zzi++) {     \
@@ -77,6 +89,7 @@ BLOCK = r"""
 #undef MCUBOOT_WATCHDOG_FEED
 #define MCUBOOT_WATCHDOG_FEED() SLIMENRF_WDT_FEED_INST(NRF_WDT)
 #endif
+#endif /* SLIMENRF_WDT_HAVE_MDK */
 #endif /* Nordic */
 
 """
