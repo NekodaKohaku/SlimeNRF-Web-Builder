@@ -256,6 +256,7 @@ jobs:
               *nrf54l*)
                 # fork の OTA 適用エンジンは nRF52 専用 (NVMC) -> 54L 用にガード
                 python3 "$GITHUB_WORKSPACE/.github/scripts/patch_jiting_54l.py"
+                python3 "$GITHUB_WORKSPACE/.github/scripts/patch_jiting_diag54l.py"   # TEMP 診斷 (IMU/mcuboot 問題解決後移除)
                 # esb_ota_flash.c が要求する chosen が test54l DT に無い -> 補う
                 printf '\n/ { chosen { zephyr,flash-controller = &rram_controller; }; };\n' >> "$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
                 printf '\n&wdt31 { status = "okay"; };\n' >> "$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
@@ -357,6 +358,37 @@ jobs:
           UPD="$BDIR/SlimeVR-Tracker-nRF/zephyr/zephyr.signed.bin"
           [ -f "$UPD" ] || UPD="$(find $BDIR -name zephyr.signed.bin | head -1)"
           cp "$UPD" "out/${NAME}.update.bin"
+          # 54L: UICR/PERIPHCONF (nfct-pins-as-gpios 等) は署名/merge 経路で失われる。
+          # app の未署名 zephyr.hex から 0x00FF0000 以降 (UICR) のレコードを抽出して
+          # first_flash.hex に結合する (無ければ no-op; 52840 は GPREGRET 方式で不要)。
+          APPHEX="$(find $BDIR -path '*SlimeVR-Tracker-nRF/zephyr/zephyr.hex' | grep -v _sysbuild | head -1)"
+          if [ -n "$APPHEX" ]; then python3 - "$APPHEX" "out/${NAME}.first_flash.hex" <<'PYUICR'
+          import sys
+          src, dst = sys.argv[1], sys.argv[2]
+          uicr, base, keep = [], 0, False
+          for line in open(src):
+              line = line.strip()
+              if not line.startswith(":"): continue
+              t = int(line[7:9], 16)
+              if t == 4:
+                  base = int(line[9:13], 16) << 16
+                  keep = base >= 0x00FF0000
+                  if keep: uicr.append(line)
+              elif t == 0 and keep:
+                  uicr.append(line)
+          if not uicr:
+              print("UICR merge: no UICR records in app hex (skip)"); sys.exit(0)
+          out = [l.strip() for l in open(dst) if l.strip()]
+          eof = out.pop()  # :00000001FF
+          assert eof.startswith(":00000001"), eof
+          already = any(l.startswith(":0200000400FF") for l in out)
+          if already:
+              print("UICR merge: first_flash.hex already has UICR (skip)"); sys.exit(0)
+          out += uicr + [eof]
+          open(dst, "w").write("\n".join(out) + "\n")
+          print(f"UICR merge: appended {len(uicr)} records (0x00FF0000+) to first_flash.hex")
+          PYUICR
+          fi
           PYML="$(find $BDIR -name 'partitions*.yml' 2>/dev/null | head -1)"
           [ -z "$PYML" ] && PYML="$(ls SlimeVR-Tracker-nRF/pm_static/pm_static_*.yml 2>/dev/null | head -1)"
           [ -n "$PYML" ] && cp "$PYML" "out/${NAME}.partitions.yml" || true
