@@ -44,8 +44,9 @@ static int zz_diag54l(void)
 	nrf_gpio_pin_set(NRF_GPIO_PIN_MAP(1, 5));
 	printk("CS wiggle: IN(hi)=0x%08X IN(lo)=0x%08X (bit5 should change)\n",
 	       (unsigned int)in_hi, (unsigned int)in_lo);
-#if defined(GPIO_RETAIN_ResetValue) || defined(NRF_GPIO_HAS_RETENTION_SETCLEAR)
-	printk("P1 RETAIN=0x%08X\n", (unsigned int)NRF_P1->RETAIN);
+#if defined(NRF_GPIO_HAS_RETENTION_SETCLEAR) && NRF_GPIO_HAS_RETENTION_SETCLEAR
+	/* SET/CLR style: reading RETAINSET returns the current retain mask */
+	printk("P1 RETAIN=0x%08X\n", (unsigned int)NRF_P1->RETAINSET);
 #endif
 	/* clear retain on SPI pins just in case (chainload may leave pads latched) */
 #if defined(NRF_GPIO_HAS_RETENTION_SETCLEAR) && NRF_GPIO_HAS_RETENTION_SETCLEAR
@@ -53,7 +54,7 @@ static int zz_diag54l(void)
 		nrf_gpio_pin_retain_disable(NRF_GPIO_PIN_MAP(1, p));
 	}
 	printk("P1.02-06 retain cleared; P1 RETAIN now=0x%08X\n",
-	       (unsigned int)NRF_P1->RETAIN);
+	       (unsigned int)NRF_P1->RETAINSET);
 #endif
 	/* bit-bang SPI mode0: read LSM6DSV WHO_AM_I (0x0F). expect 0x70 */
 	{
@@ -94,9 +95,7 @@ static void zz_diag54l_late(struct k_work *w)
 	       (unsigned int)NRF_P1->OUT, (unsigned int)NRF_P1->IN,
 	       (unsigned int)NRF_P1->DIR);
 #if defined(NRF_SPIM20)
-	printk("SPIM20 ENABLE=%u FREQ=0x%08X\n",
-	       (unsigned int)NRF_SPIM20->ENABLE,
-	       (unsigned int)NRF_SPIM20->FREQUENCY);
+	printk("SPIM20 ENABLE=%u\n", (unsigned int)NRF_SPIM20->ENABLE);
 #endif
 }
 static K_WORK_DELAYABLE_DEFINE(zz_diag_work, zz_diag54l_late);
