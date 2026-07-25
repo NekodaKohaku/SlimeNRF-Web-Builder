@@ -42,5 +42,17 @@ s = s.replace(SOCS_LOOP_END,
     "  list(APPEND ${DEFAULT_IMAGE}_EXTRA_DTC_OVERLAY_FILE ${EXTRA_DTC_OVERLAY_FILE})" + NL +
     "endif()" + NL, 1)
 
+# ---- 2) pm_static 探索の uf2 ゲート解除 ----
+# fork は pm_static 探索を "uf2" ボード限定にしたが、公式は全ボード無条件。
+# これにより test54l 等で凍結レイアウト (pm_static_*.yml) が無視され、
+# Partition Manager が動的配置 -> update.bin のアドレス安定性が壊れる
+# (実測: 動的 app@0xC000 vs 凍結 app@0x10800)。公式と同じ無条件探索に戻す。
+GATE = ('if((DEFINED SB_CONFIG_BOARD AND SB_CONFIG_BOARD MATCHES "uf2") OR '
+        '(DEFINED SB_CONFIG_BOARD_QUALIFIERS AND SB_CONFIG_BOARD_QUALIFIERS MATCHES "uf2"))')
+if GATE not in s:
+    sys.exit("patch_jiting_sysbuild: FAILED, pm_static uf2 gate anchor not found")
+s = s.replace(GATE, "if(1) # " + MARK + ": pm_static hunt for ALL boards (upstream-official behavior; was uf2-gated)", 1)
+
 open(f, "w", encoding="utf-8", newline="").write(s)
 print("patch_jiting_sysbuild: overlay order fixed (socs first, user overlays last)")
+print("patch_jiting_sysbuild: pm_static hunt un-gated (all boards)")
