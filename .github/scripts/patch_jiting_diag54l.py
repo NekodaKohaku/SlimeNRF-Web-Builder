@@ -14,6 +14,7 @@ open(f, "w", newline="\n").write(r'''/* SLIMENRF TEMP DIAG: dump pad/SPIM state 
 #include <zephyr/init.h>
 #include <zephyr/sys/printk.h>
 #include <hal/nrf_gpio.h>
+#include <hal/nrf_spim.h>
 
 #if defined(CONFIG_SOC_SERIES_NRF54LX)
 static int zz_diag54l(void)
@@ -99,29 +100,31 @@ static int zz_diag54l(void)
 		nrf_gpio_cfg(NRF_GPIO_PIN_MAP(1, 2), NRF_GPIO_PIN_DIR_INPUT,
 			     NRF_GPIO_PIN_INPUT_CONNECT, NRF_GPIO_PIN_NOPULL,
 			     NRF_GPIO_PIN_S0S1, NRF_GPIO_PIN_NOSENSE); /* MISO */
-		NRF_SPIM20->PSEL.SCK = NRF_GPIO_PIN_MAP(1, 4);
-		NRF_SPIM20->PSEL.MOSI = NRF_GPIO_PIN_MAP(1, 3);
-		NRF_SPIM20->PSEL.MISO = NRF_GPIO_PIN_MAP(1, 2);
-		NRF_SPIM20->CONFIG = 0; /* mode 0, MSB first */
-		NRF_SPIM20->PRESCALER = 16; /* slow + safe */
-		NRF_SPIM20->TXD.PTR = (uint32_t)txb;
-		NRF_SPIM20->TXD.MAXCNT = 3;
-		NRF_SPIM20->RXD.PTR = (uint32_t)rxb;
-		NRF_SPIM20->RXD.MAXCNT = 3;
-		NRF_SPIM20->EVENTS_END = 0;
-		NRF_SPIM20->ENABLE = 7;
+		nrf_spim_pins_set(NRF_SPIM20, NRF_GPIO_PIN_MAP(1, 4),
+				  NRF_GPIO_PIN_MAP(1, 3), NRF_GPIO_PIN_MAP(1, 2));
+		nrf_spim_configure(NRF_SPIM20, NRF_SPIM_MODE_0,
+				   NRF_SPIM_BIT_ORDER_MSB_FIRST);
+#if defined(NRF_SPIM_HAS_PRESCALER) && NRF_SPIM_HAS_PRESCALER
+		nrf_spim_prescaler_set(NRF_SPIM20, 16); /* slow + safe */
+#else
+		nrf_spim_frequency_set(NRF_SPIM20, NRF_SPIM_FREQ_1M);
+#endif
+		nrf_spim_tx_buffer_set(NRF_SPIM20, txb, 3);
+		nrf_spim_rx_buffer_set(NRF_SPIM20, rxb, 3);
+		nrf_spim_event_clear(NRF_SPIM20, NRF_SPIM_EVENT_END);
+		nrf_spim_enable(NRF_SPIM20);
 		nrf_gpio_pin_clear(cs);
 		k_busy_wait(5);
-		NRF_SPIM20->TASKS_START = 1;
+		nrf_spim_task_trigger(NRF_SPIM20, NRF_SPIM_TASK_START);
 		int tmo = 10000;
-		while (!NRF_SPIM20->EVENTS_END && --tmo) {
+		while (!nrf_spim_event_check(NRF_SPIM20, NRF_SPIM_EVENT_END) && --tmo) {
 			k_busy_wait(1);
 		}
 		nrf_gpio_pin_set(cs);
-		printk("RAW SPIM20: END=%u tmo_left=%d RX=%02X %02X %02X (WHO expect [1]=0x70)\n",
-		       (unsigned int)NRF_SPIM20->EVENTS_END, tmo,
+		printk("RAW SPIM20: END=%d tmo_left=%d RX=%02X %02X %02X (WHO expect [1]=0x70)\n",
+		       (int)nrf_spim_event_check(NRF_SPIM20, NRF_SPIM_EVENT_END), tmo,
 		       rxb[0], rxb[1], rxb[2]);
-		NRF_SPIM20->ENABLE = 0;
+		nrf_spim_disable(NRF_SPIM20);
 	}
 #endif
 	return 0;
