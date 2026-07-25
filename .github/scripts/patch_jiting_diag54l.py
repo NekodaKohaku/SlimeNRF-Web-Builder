@@ -208,3 +208,29 @@ SYS_INIT(zz_diag54l_sched, APPLICATION, 99);
 #endif
 ''')
 print("patch_jiting_diag54l: created src/system/zz_diag54l.c (TEMP)")
+
+# ---- 追加: scan_spi.c に spec ダンプを差し込む (TEMP) ----
+f2 = "src/sensor/scan_spi.c"
+s2 = open(f2, encoding="utf-8", newline="").read()
+NL2 = "\r\n" if "\r\n" in s2 else "\n"
+MARK2 = "SLIMENRF_SCAN_SPEC_DUMP"
+if MARK2 not in s2:
+    o2 = "\t\t\t\tint err = spi_transceive_dt(bus, &tx, &rx);".replace("\n", NL2)
+    n2 = ("\t\t\t\t/* " + MARK2 + " (TEMP) */" + NL2 +
+          "\t\t\t\tprintk(\"SCAN SPEC: bus=%p rdy=%d freq=%u op=0x%04x cs.port=%p cs.pin=%u cs.flg=0x%x\\n\"," + NL2 +
+          "\t\t\t\t       bus->bus, bus->bus ? device_is_ready(bus->bus) : -1," + NL2 +
+          "\t\t\t\t       (unsigned)bus->config.frequency, (unsigned)bus->config.operation," + NL2 +
+          "\t\t\t\t       bus->config.cs.gpio.port, (unsigned)bus->config.cs.gpio.pin," + NL2 +
+          "\t\t\t\t       (unsigned)bus->config.cs.gpio.dt_flags);" + NL2 +
+          "\t\t\t\tint err = spi_transceive_dt(bus, &tx, &rx);")
+    if o2 not in s2:
+        print("patch_jiting_diag54l: FAILED, scan_spi.c anchor not found", file=sys.stderr)
+        sys.exit(1)
+    s2 = s2.replace(o2, n2, 1)
+    if "#include <zephyr/sys/printk.h>" not in s2:
+        s2 = s2.replace("#include <zephyr/drivers/spi.h>",
+                        "#include <zephyr/drivers/spi.h>" + NL2 + "#include <zephyr/sys/printk.h>", 1)
+    open(f2, "w", encoding="utf-8", newline="").write(s2)
+    print("patch_jiting_diag54l: scan_spi.c spec dump inserted (TEMP)")
+else:
+    print("patch_jiting_diag54l: scan_spi.c already instrumented")
