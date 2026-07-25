@@ -152,8 +152,34 @@ static int zz_diag54l(void)
 		struct spi_buf_set rxs = {.buffers = &rxb2, .count = 1};
 		int drdy = device_is_ready(spi_dev);
 		int rc = drdy ? spi_transceive(spi_dev, &scfg, &txs, &rxs) : -99;
-		printk("DRV SPI: ready=%d rc=%d RX=%02X %02X %02X (0x70=drv OK, 0xAA=untouched, 0x00=lost)\n",
+		printk("DRV SPI m0/1M: ready=%d rc=%d RX=%02X %02X %02X\n",
 		       drdy, rc, drx[0], drx[1], drx[2]);
+		/* T1: jiting exact spec - mode3, 8MHz, tx1/rx3 */
+		static struct spi_config scfg3;
+		scfg3 = scfg;
+		scfg3.operation = SPI_OP_MODE_MASTER | SPI_MODE_CPOL | SPI_MODE_CPHA |
+				  SPI_WORD_SET(8) | SPI_TRANSFER_MSB;
+		scfg3.frequency = 8000000;
+		uint8_t reg1 = 0x8F;
+		struct spi_buf t1tx = {.buf = &reg1, .len = 1};
+		struct spi_buf_set t1txs = {.buffers = &t1tx, .count = 1};
+		drx[0] = drx[1] = drx[2] = 0xAA;
+		rc = spi_transceive(spi_dev, &scfg3, &t1txs, &rxs);
+		printk("DRV SPI m3/8M(tx1): rc=%d RX=%02X %02X %02X\n", rc, drx[0], drx[1], drx[2]);
+		/* T2: mode3 1MHz */
+		static struct spi_config scfg4;
+		scfg4 = scfg3;
+		scfg4.frequency = 1000000;
+		drx[0] = drx[1] = drx[2] = 0xAA;
+		rc = spi_transceive(spi_dev, &scfg4, &t1txs, &rxs);
+		printk("DRV SPI m3/1M(tx1): rc=%d RX=%02X %02X %02X\n", rc, drx[0], drx[1], drx[2]);
+		/* T3: mode0 8MHz */
+		static struct spi_config scfg5;
+		scfg5 = scfg;
+		scfg5.frequency = 8000000;
+		drx[0] = drx[1] = drx[2] = 0xAA;
+		rc = spi_transceive(spi_dev, &scfg5, &txs, &rxs);
+		printk("DRV SPI m0/8M: rc=%d RX=%02X %02X %02X\n", rc, drx[0], drx[1], drx[2]);
 	}
 #endif
 	return 0;
