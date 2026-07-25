@@ -15,6 +15,7 @@ open(f, "w", newline="\n").write(r'''/* SLIMENRF TEMP DIAG: dump pad/SPIM state 
 #include <zephyr/sys/printk.h>
 #include <hal/nrf_gpio.h>
 #include <hal/nrf_spim.h>
+#include <zephyr/drivers/spi.h>
 
 #if defined(CONFIG_SOC_SERIES_NRF54LX)
 static int zz_diag54l(void)
@@ -125,6 +126,34 @@ static int zz_diag54l(void)
 		       (int)nrf_spim_event_check(NRF_SPIM20, NRF_SPIM_EVENT_END), tmo,
 		       rxb[0], rxb[1], rxb[2]);
 		nrf_spim_disable(NRF_SPIM20);
+	}
+#endif
+	/* zephyr-driver-level transaction (same path the sensor scan uses).
+	 * RX pre-filled with 0xAA sentinel:
+	 *   result 0x70  -> driver fine (problem is elsewhere/timing)
+	 *   result 0xAA  -> driver never wrote the buffer (silent skip)
+	 *   result 0x00  -> transfer ran but data lost (rx path broken) */
+#if DT_NODE_EXISTS(DT_NODELABEL(imu_spi))
+	{
+		static const struct device *spi_dev =
+			DEVICE_DT_GET(DT_BUS(DT_NODELABEL(imu_spi)));
+		static struct spi_config scfg;
+		static uint8_t dtx[3] = {0x8F, 0x00, 0x00};
+		static uint8_t drx[3] = {0xAA, 0xAA, 0xAA};
+		scfg.frequency = 1000000;
+		scfg.operation = SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB;
+		scfg.cs.gpio.port = DEVICE_DT_GET(DT_GPIO_CTLR_BY_IDX(DT_BUS(DT_NODELABEL(imu_spi)), cs_gpios, 0));
+		scfg.cs.gpio.pin = DT_GPIO_PIN_BY_IDX(DT_BUS(DT_NODELABEL(imu_spi)), cs_gpios, 0);
+		scfg.cs.gpio.dt_flags = DT_GPIO_FLAGS_BY_IDX(DT_BUS(DT_NODELABEL(imu_spi)), cs_gpios, 0);
+		scfg.cs.delay = 2;
+		struct spi_buf txb2 = {.buf = dtx, .len = 3};
+		struct spi_buf rxb2 = {.buf = drx, .len = 3};
+		struct spi_buf_set txs = {.buffers = &txb2, .count = 1};
+		struct spi_buf_set rxs = {.buffers = &rxb2, .count = 1};
+		int drdy = device_is_ready(spi_dev);
+		int rc = drdy ? spi_transceive(spi_dev, &scfg, &txs, &rxs) : -99;
+		printk("DRV SPI: ready=%d rc=%d RX=%02X %02X %02X (0x70=drv OK, 0xAA=untouched, 0x00=lost)\n",
+		       drdy, rc, drx[0], drx[1], drx[2]);
 	}
 #endif
 	return 0;
