@@ -82,6 +82,48 @@ static int zz_diag54l(void)
 		nrf_gpio_pin_set(cs);
 		printk("BITBANG WHO_AM_I=0x%02X (expect 0x70)\n", rx);
 	}
+	/* raw-register SPIM20 transaction (bypass zephyr driver):
+	 * restore pinctrl-style pad config, then WHO_AM_I via EasyDMA */
+#if defined(NRF_SPIM20)
+	{
+		static uint8_t txb[3] = {0x8F, 0x00, 0x00};
+		static uint8_t rxb[3];
+		const uint32_t cs = NRF_GPIO_PIN_MAP(1, 5);
+		/* pads back to SPIM-style config (as pinctrl leaves them) */
+		nrf_gpio_cfg(NRF_GPIO_PIN_MAP(1, 4), NRF_GPIO_PIN_DIR_OUTPUT,
+			     NRF_GPIO_PIN_INPUT_CONNECT, NRF_GPIO_PIN_NOPULL,
+			     NRF_GPIO_PIN_S0S1, NRF_GPIO_PIN_NOSENSE); /* SCK */
+		nrf_gpio_cfg(NRF_GPIO_PIN_MAP(1, 3), NRF_GPIO_PIN_DIR_OUTPUT,
+			     NRF_GPIO_PIN_INPUT_DISCONNECT, NRF_GPIO_PIN_NOPULL,
+			     NRF_GPIO_PIN_S0S1, NRF_GPIO_PIN_NOSENSE); /* MOSI */
+		nrf_gpio_cfg(NRF_GPIO_PIN_MAP(1, 2), NRF_GPIO_PIN_DIR_INPUT,
+			     NRF_GPIO_PIN_INPUT_CONNECT, NRF_GPIO_PIN_NOPULL,
+			     NRF_GPIO_PIN_S0S1, NRF_GPIO_PIN_NOSENSE); /* MISO */
+		NRF_SPIM20->PSEL.SCK = NRF_GPIO_PIN_MAP(1, 4);
+		NRF_SPIM20->PSEL.MOSI = NRF_GPIO_PIN_MAP(1, 3);
+		NRF_SPIM20->PSEL.MISO = NRF_GPIO_PIN_MAP(1, 2);
+		NRF_SPIM20->CONFIG = 0; /* mode 0, MSB first */
+		NRF_SPIM20->PRESCALER = 16; /* slow + safe */
+		NRF_SPIM20->TXD.PTR = (uint32_t)txb;
+		NRF_SPIM20->TXD.MAXCNT = 3;
+		NRF_SPIM20->RXD.PTR = (uint32_t)rxb;
+		NRF_SPIM20->RXD.MAXCNT = 3;
+		NRF_SPIM20->EVENTS_END = 0;
+		NRF_SPIM20->ENABLE = 7;
+		nrf_gpio_pin_clear(cs);
+		k_busy_wait(5);
+		NRF_SPIM20->TASKS_START = 1;
+		int tmo = 10000;
+		while (!NRF_SPIM20->EVENTS_END && --tmo) {
+			k_busy_wait(1);
+		}
+		nrf_gpio_pin_set(cs);
+		printk("RAW SPIM20: END=%u tmo_left=%d RX=%02X %02X %02X (WHO expect [1]=0x70)\n",
+		       (unsigned int)NRF_SPIM20->EVENTS_END, tmo,
+		       rxb[0], rxb[1], rxb[2]);
+		NRF_SPIM20->ENABLE = 0;
+	}
+#endif
 	return 0;
 }
 SYS_INIT(zz_diag54l, APPLICATION, 90);
