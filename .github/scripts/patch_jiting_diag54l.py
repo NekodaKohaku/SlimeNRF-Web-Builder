@@ -32,9 +32,80 @@ static int zz_diag54l(void)
 #else
 	printk("SPIM20 symbol not defined\n");
 #endif
+	printk("P1 OUT=0x%08X IN=0x%08X DIR=0x%08X\n",
+	       (unsigned int)NRF_P1->OUT, (unsigned int)NRF_P1->IN,
+	       (unsigned int)NRF_P1->DIR);
+	/* raw GPIO wiggle test: CS (P1.05) toggle, read back via IN */
+	nrf_gpio_cfg_output(NRF_GPIO_PIN_MAP(1, 5));
+	nrf_gpio_pin_set(NRF_GPIO_PIN_MAP(1, 5));
+	uint32_t in_hi = NRF_P1->IN;
+	nrf_gpio_pin_clear(NRF_GPIO_PIN_MAP(1, 5));
+	uint32_t in_lo = NRF_P1->IN;
+	nrf_gpio_pin_set(NRF_GPIO_PIN_MAP(1, 5));
+	printk("CS wiggle: IN(hi)=0x%08X IN(lo)=0x%08X (bit5 should change)\n",
+	       (unsigned int)in_hi, (unsigned int)in_lo);
+#if defined(GPIO_RETAIN_ResetValue) || defined(NRF_GPIO_HAS_RETENTION_SETCLEAR)
+	printk("P1 RETAIN=0x%08X\n", (unsigned int)NRF_P1->RETAIN);
+#endif
+	/* clear retain on SPI pins just in case (chainload may leave pads latched) */
+#if defined(NRF_GPIO_HAS_RETENTION_SETCLEAR) && NRF_GPIO_HAS_RETENTION_SETCLEAR
+	for (int p = 2; p <= 6; p++) {
+		nrf_gpio_pin_retain_disable(NRF_GPIO_PIN_MAP(1, p));
+	}
+	printk("P1.02-06 retain cleared; P1 RETAIN now=0x%08X\n",
+	       (unsigned int)NRF_P1->RETAIN);
+#endif
+	/* bit-bang SPI mode0: read LSM6DSV WHO_AM_I (0x0F). expect 0x70 */
+	{
+		const uint32_t cs = NRF_GPIO_PIN_MAP(1, 5), sck = NRF_GPIO_PIN_MAP(1, 4);
+		const uint32_t mosi = NRF_GPIO_PIN_MAP(1, 3), miso = NRF_GPIO_PIN_MAP(1, 2);
+		nrf_gpio_cfg_output(cs); nrf_gpio_pin_set(cs);
+		nrf_gpio_cfg_output(sck); nrf_gpio_pin_clear(sck);
+		nrf_gpio_cfg_output(mosi);
+		nrf_gpio_cfg_input(miso, NRF_GPIO_PIN_NOPULL);
+		k_busy_wait(10);
+		nrf_gpio_pin_clear(cs);
+		k_busy_wait(5);
+		uint8_t tx = 0x8F, rx = 0;
+		for (int b = 7; b >= 0; b--) {
+			(tx & (1 << b)) ? nrf_gpio_pin_set(mosi) : nrf_gpio_pin_clear(mosi);
+			k_busy_wait(2);
+			nrf_gpio_pin_set(sck); k_busy_wait(2);
+			nrf_gpio_pin_clear(sck);
+		}
+		for (int b = 7; b >= 0; b--) {
+			nrf_gpio_pin_set(sck); k_busy_wait(2);
+			rx |= (uint8_t)(nrf_gpio_pin_read(miso) << b);
+			nrf_gpio_pin_clear(sck); k_busy_wait(2);
+		}
+		nrf_gpio_pin_set(cs);
+		printk("BITBANG WHO_AM_I=0x%02X (expect 0x70)\n", rx);
+	}
 	return 0;
 }
 SYS_INIT(zz_diag54l, APPLICATION, 90);
+
+/* second dump AFTER sensor scan window (~5s) */
+static void zz_diag54l_late(struct k_work *w)
+{
+	ARG_UNUSED(w);
+	printk("=== DIAG54L late dump ===\n");
+	printk("P1 OUT=0x%08X IN=0x%08X DIR=0x%08X\n",
+	       (unsigned int)NRF_P1->OUT, (unsigned int)NRF_P1->IN,
+	       (unsigned int)NRF_P1->DIR);
+#if defined(NRF_SPIM20)
+	printk("SPIM20 ENABLE=%u FREQ=0x%08X\n",
+	       (unsigned int)NRF_SPIM20->ENABLE,
+	       (unsigned int)NRF_SPIM20->FREQUENCY);
+#endif
+}
+static K_WORK_DELAYABLE_DEFINE(zz_diag_work, zz_diag54l_late);
+static int zz_diag54l_sched(void)
+{
+	k_work_schedule(&zz_diag_work, K_SECONDS(5));
+	return 0;
+}
+SYS_INIT(zz_diag54l_sched, APPLICATION, 99);
 #endif
 ''')
 print("patch_jiting_diag54l: created src/system/zz_diag54l.c (TEMP)")
