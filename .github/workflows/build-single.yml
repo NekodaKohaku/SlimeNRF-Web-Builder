@@ -379,6 +379,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_pwr.py"   # mcuboot main.c に EARLY 電源自锁を追記 (短押し起動用)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_wdtfeed.py"   # recovery 中も app の WDT に確実に餌をやる (jiting は task_wdt が WDT31/WDT を起動する)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_ws2812.py"   # WS2812 は gpio では光らない -> io_led_set を led_strip API に差し替え
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_ws2812_nosched.py"   # ws2812 ドライバの k_usleep -> k_busy_wait (mcuboot は MULTITHREADING=n)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_btnoff.py"   # DFU 中も長押し 1 秒で電源オフ (電池を外さずに抜けられる)
           python3 "$GITHUB_WORKSPACE/.github/scripts/gen_mcuboot_files.py" \
             "$CONFIG_JSON" "${{ steps.overlay.outputs.overlay_path }}"
