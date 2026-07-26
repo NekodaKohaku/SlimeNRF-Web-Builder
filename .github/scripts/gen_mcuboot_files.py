@@ -54,14 +54,59 @@ def write(path, text):
     print(f"== {path} ==\n{text}")
 
 # ---------- sysbuild.conf (ルート) ----------
+# overwrite-only + 二槽構成:
+#   ESB OTA はアプリ動作中に slot1 (mcuboot_secondary) へ書き込み、
+#   再起動後 mcuboot が slot1 -> slot0 を単方向コピーする。
+#   コピー元 (slot1) は常に完全なので途中断電しても再コピーで復旧。
+#   UART serial recovery は従来どおり slot0 直書き (update.bin アドレス不変)。
 write("sysbuild.conf",
 """SB_CONFIG_BOOTLOADER_MCUBOOT=y
-SB_CONFIG_MCUBOOT_MODE_SINGLE_APP=y
+SB_CONFIG_MCUBOOT_MODE_OVERWRITE_ONLY=y
 # DIY: signing key 不要。イメージ整合性は SHA-256 hash のみで検証
 SB_CONFIG_BOOT_SIGNATURE_TYPE_NONE=y
 """)
 
 # ---------- sysbuild/mcuboot.conf ----------
+# LED が無い構成では INDICATION_LED を有効にしてはいけない:
+# mcuboot の io.c が led0 alias を要求し #error で止まる。
+_opts = cfg.get("options") or {}
+_led_pin = pins.get("led")
+_has_led = bool(_led_pin) and _led_pin != "none"
+_is_strip = _has_led and _opts.get("led_type") == "strip"
+# WS2812 のダミー SCK (nRF52 のみ必須)。workflow と同じ既定・同じ候補順。
+_led_sck = _opts.get("led_sck") or ""
+if _is_strip and not is54 and (not _led_sck or _led_sck == "none"):
+    _used = {v for v in pins.values() if isinstance(v, str)}
+    _led_sck = next((c for c in ("P1.04", "P1.03", "P1.05", "P1.02",
+                                 "P1.06", "P1.01", "P1.07") if c not in _used), "")
+if _led_sck == "none":
+    _led_sck = ""
+# WS2812 用 SPI インスタンス。nRF54L の SERIALxx は SPI/TWI/UART が
+# 同一ハードウェアを共有するため、DFU 用 UART と同じ番号は選べない
+# (BUILD_ASSERT "Only one of SPI22, ..., UARTE22 can be enabled" で落ちる)。
+# mcuboot イメージで有効なのは UART (DFU) と この SPI (LED) だけなので、
+# UART の番号だけ避ければよい。
+if is54:
+    _uart_num = uart[-2:]                       # "30" or "22"
+    _strip_spi = "spi" + next(n for n in ("22", "21", "23") if n != _uart_num)
+else:
+    _strip_spi = "spi2"
+
+if not _has_led:
+    _led_conf = ("# LED 無し構成: INDICATION_LED は led0 alias を要求するため無効\n"
+                 "CONFIG_MCUBOOT_INDICATION_LED=n\n")
+elif _is_strip:
+    # WS2812: gpio では光らないので mcuboot にも ws2812-spi ドライバを載せ、
+    # patch_mcuboot_ws2812.py が io_led_set を led_strip API に差し替える。
+    _led_conf = ("# WS2812 (addressable) DFU 表示: mcuboot 側にも ws2812-spi を載せる\n"
+                 "CONFIG_MCUBOOT_INDICATION_LED=y\n"
+                 "CONFIG_SPI=y\n"
+                 "CONFIG_LED_STRIP=y\n"
+                 "CONFIG_WS2812_STRIP_SPI=y\n")
+else:
+    _led_conf = ("# recovery 中は LED 点灯 (mcuboot-led0 alias は overlay で定義)\n"
+                 "CONFIG_MCUBOOT_INDICATION_LED=y\n")
+
 write("sysbuild/mcuboot.conf",
 """CONFIG_MCUBOOT_SERIAL=y
 CONFIG_BOOT_SERIAL_UART=y
@@ -87,9 +132,7 @@ CONFIG_BOOT_SERIAL_WAIT_FOR_DFU_TIMEOUT=500
 # INDICATION_LED (gpio-leds) 用
 CONFIG_GPIO=y
 
-# recovery 中は LED 点灯 (mcuboot-led0 alias は overlay で定義)
-CONFIG_MCUBOOT_INDICATION_LED=y
-
+""" + _led_conf + """
 # nRF54L15 では jump 直前の bootloader flash 保護 (fprotect) が失敗し
 # 起動が中断されるため無効化 (DIY・無署名構成では保護不要)
 CONFIG_FPROTECT=n
@@ -203,7 +246,12 @@ else:
 
 		slot0_partition: partition@c000 {{
 			label = "image-0";
-			reg = <0x0000c000 0x000e0000>;
+			reg = <0x0000c000 0x00070000>;
+		}};
+
+		slot1_partition: partition@7c000 {{
+			label = "image-1";
+			reg = <0x0007c000 0x00070000>;
 		}};
 
 		storage_partition: partition@ec000 {{
@@ -262,7 +310,12 @@ else:
 
 		slot0_partition: partition@c000 {
 			label = "image-0";
-			reg = <0x0000c000 0x000e0000>;
+			reg = <0x0000c000 0x00070000>;
+		};
+
+		slot1_partition: partition@7c000 {
+			label = "image-1";
+			reg = <0x0007c000 0x00070000>;
 		};
 
 		storage_partition: partition@ec000 {
@@ -292,12 +345,20 @@ else:
 # board.c (PRE_KERNEL_1 prio 40、遅い) や gpio-hog (ドライバ初期化、
 # mcuboot 側で確実にリンクされる保証がない) には依存しない。
 pwr = pins.get("pwr")
-if pwr:
+if pwr and pwr != "none":
     pp = parse_pin(pwr)
+    # btn-gpios: serial recovery 中の「長押し 1 秒で電源オフ」用
+    # (patch_mcuboot_btnoff.py が使う)。pwr-gpios と両方揃ったときだけ有効。
+    _sw0 = pins.get("sw0")
+    _btn_line = ""
+    if _sw0 and _sw0 != "none":
+        bp = parse_pin(_sw0)
+        _btn_line = (f"\n\t\tbtn-gpios = <&gpio{bp[0]} {bp[1]} "
+                     f"(GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;")
     mcuboot_overlay += f"""
 / {{
 	zephyr,user {{
-		pwr-gpios = <&gpio{pp[0]} {pp[1]} GPIO_ACTIVE_HIGH>;
+		pwr-gpios = <&gpio{pp[0]} {pp[1]} GPIO_ACTIVE_HIGH>;{_btn_line}
 	}};
 }};
 """
@@ -306,8 +367,9 @@ if pwr:
 # 診断モード: gpio-hog で GPIO 初期化直後に LED 点灯 -> 「MCUboot 生存」の可視信号。
 #             点灯したまま = mcuboot で停止 / 消灯・変化 = app が引き継いだ。
 # 通常モード: gpio-leds ノード + mcuboot-led0 alias -> recovery 中に LED 点灯 (DFU 表示)。
+# ("none" = LED 無し。gen_overlay.py と同じ扱いで、ここもスキップする)
 led = pins.get("led")
-if led:
+if led and led != "none":
     lp = parse_pin(led)
     lflag = "GPIO_ACTIVE_LOW" if (cfg.get("options") or {}).get("led_polarity") == "low" else "GPIO_ACTIVE_HIGH"
     if debug:
@@ -319,6 +381,46 @@ if led:
 		gpio-hog;
 		gpios = <{lp[1]} {lflag}>;
 		output-high;
+	}};
+}};
+"""
+    elif _is_strip:
+        # WS2812: gpio-leds では光らない (単線プロトコル)。mcuboot にも
+        # ws2812-spi ドライバを載せ、patch_mcuboot_ws2812.py が io_led_set を
+        # led_strip API へ差し替える。SPI ノードとダミー SCK は app 側と同じ
+        # 規則 (nRF52 の SPIM は SCK 未接続だと転送が完了しない)。
+        _sp = parse_pin(_led_sck) if _led_sck else None
+        _psels = f"<NRF_PSEL(SPIM_MOSI, {lp[0]}, {lp[1]})>"
+        if _sp:
+            _psels += f", <NRF_PSEL(SPIM_SCK, {_sp[0]}, {_sp[1]})>"
+        mcuboot_overlay += f"""
+&pinctrl {{
+	{_strip_spi}_mb_default: {_strip_spi}_mb_default {{ group1 {{ psels = {_psels}; }}; }};
+	{_strip_spi}_mb_sleep: {_strip_spi}_mb_sleep {{ group1 {{ psels = {_psels}; low-power-enable; }}; }};
+}};
+
+&{_strip_spi} {{
+	status = "okay";
+	pinctrl-0 = <&{_strip_spi}_mb_default>;
+	pinctrl-1 = <&{_strip_spi}_mb_sleep>;
+	pinctrl-names = "default", "sleep";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	mcuboot_strip: ws2812@0 {{
+		compatible = "worldsemi,ws2812-spi";
+		reg = <0>;
+		spi-max-frequency = <4000000>;
+		chain-length = <1>;
+		color-mapping = <LED_COLOR_ID_GREEN LED_COLOR_ID_RED LED_COLOR_ID_BLUE>;
+		spi-one-frame = <0x70>;
+		spi-zero-frame = <0x40>;
+	}};
+}};
+
+/ {{
+	aliases {{
+		led-strip = &mcuboot_strip;
 	}};
 }};
 """
@@ -339,6 +441,10 @@ if led:
 }};
 """
 
+if _is_strip and not debug:
+    # ws2812-spi ドライバに必要な include (LED_COLOR_ID_*)
+    mcuboot_overlay = "#include <zephyr/dt-bindings/led/led.h>\n\n" + mcuboot_overlay
+
 write("sysbuild/mcuboot.overlay", mcuboot_overlay)
 
 if custom_overlay and os.path.isfile(custom_overlay):
@@ -351,8 +457,11 @@ else:
 # ---------- アプリ prj.conf ----------
 with open("prj.conf", "a", encoding="utf-8", newline="\n") as f:
     f.write("\n\n# mcuboot UART DFU (bootmode_set)\n"
-            "CONFIG_RETAINED_MEM=y\nCONFIG_RETENTION=y\nCONFIG_RETENTION_BOOT_MODE=y\n")
-print("== appended retention Kconfigs to prj.conf ==")
+            "CONFIG_RETAINED_MEM=y\nCONFIG_RETENTION=y\nCONFIG_RETENTION_BOOT_MODE=y\n"
+            "\n# mcuboot dual-slot OTA: boot_request_upgrade (slot1 に upgrade magic を書く)\n"
+            "CONFIG_STREAM_FLASH=y\nCONFIG_IMG_MANAGER=y\nCONFIG_MCUBOOT_IMG_MANAGER=y\n"
+            "CONFIG_IMG_BLOCK_BUF_SIZE=4096\n")
+print("== appended retention + img-manager Kconfigs to prj.conf ==")
 
 # ---------- board defconfig の app 専用シンボルを退避 ----------
 # board defconfig は全イメージ共通で読まれるが、SlimeVR 専用の Kconfig
@@ -361,10 +470,29 @@ print("== appended retention Kconfigs to prj.conf ==")
 # -> それらを defconfig から prj.conf (アプリ専用) へ移動する。
 # USB_DEVICE_* は削除のみ (この用途の無 USB モジュールでは workflow が
 # アプリ側に CONFIG_USB_DEVICE_STACK=n を追記済みのため)。
+#
+# !! ターゲットボードの defconfig だけを対象にする !!
+# 以前は boards/*/*/*defconfig 全部を掃いていたため、無関係なボードの
+# defconfig (例: jiting の promicro_uf2_smspi にある
+# CONFIG_SENSOR_IMU_DRIVERS_MINIMAL=y + CONFIG_SENSOR_DRV_ICM45686=y の
+# ドライバ白名单) まで prj.conf へ注入され、test54l ビルドで LSM6DSV
+# ドライバがコンパイルされず "No IMU detected" になる実害を確認。
+# Kconfig が読むのはターゲットボードの defconfig のみなので、
+# それ以外を動かす必要はそもそも無い。
 import glob
-_APP_ONLY = re.compile(r"^\s*CONFIG_(BATTERY_|SENSOR_)")
+_APP_ONLY = re.compile(r"^\s*CONFIG_(BATTERY_|SENSOR_|SLIMEVR_)")   # SLIMEVR_: jiting app Kconfig symbols
 _USB = re.compile(r"^\s*CONFIG_USB_DEVICE")
-for dc in glob.glob("boards/*/*/*defconfig"):
+_seg_b = board.split("/")
+_board_dir = _seg_b[0]
+# defconfig 命名の揺れに対応: <board>_defconfig / <board>_<全 qualifiers>_defconfig /
+# <board>_<variant>_defconfig (soc 省略型, 例 promicro_uf2_smspi_defconfig)
+_dc_names = {_board_dir + "_defconfig", "_".join(_seg_b) + "_defconfig"}
+if len(_seg_b) >= 3:
+    _dc_names.add(_board_dir + "_" + _seg_b[-1] + "_defconfig")
+for dc in glob.glob(f"boards/*/{_board_dir}/*defconfig"):
+    if os.path.basename(dc) not in _dc_names:
+        print(f"== {dc}: not the target board defconfig, skipped ==")
+        continue
     lines = open(dc, encoding="utf-8").read().splitlines()
     keep, moved, dropped = [], [], []
     for ln in lines:
@@ -405,24 +533,29 @@ def pm_yaml(parts):
     return "\n".join(out) + "\n"
 
 if is54:
-    # nRF54L15: 1524 KB RRAM (0x0 - 0x17D000)
+    # nRF54L15: 1524 KB RRAM (0x0 - 0x17D000)。二槽 (各 0xA6000 = 664 KB):
+    #   slot0 (実行) 0x10000-0xB6000 / slot1 (OTA 受信) 0xB6000-0x15C000
+    #   slot0 のアドレスは旧単槽レイアウトと同一 -> update.bin 互換維持
     parts = [
         ("mcuboot",             0x0,      0x10000,  None),
         ("mcuboot_pad",         0x10000,  0x800,    None),
-        ("app",                 0x10800,  0x14B800, None),
-        ("mcuboot_primary",     0x10000,  0x14C000, ["mcuboot_pad", "app"]),
-        ("mcuboot_primary_app", 0x10800,  0x14B800, ["app"]),
+        ("app",                 0x10800,  0xA5800,  None),
+        ("mcuboot_primary",     0x10000,  0xA6000,  ["mcuboot_pad", "app"]),
+        ("mcuboot_primary_app", 0x10800,  0xA5800,  ["app"]),
+        ("mcuboot_secondary",   0xB6000,  0xA6000,  None),
         ("storage",             0x15C000, 0x9000,   None),
         ("EMPTY_0",             0x165000, 0x18000,  None),
     ]
 else:
-    # nRF52840: 1 MB flash
+    # nRF52840: 1 MB flash。二槽 (各 0x70000 = 448 KB):
+    #   slot0 0xC000-0x7C000 / slot1 0x7C000-0xEC000
     parts = [
         ("mcuboot",             0x0,      0xC000,   None),
         ("mcuboot_pad",         0xC000,   0x200,    None),
-        ("app",                 0xC200,   0xDFE00,  None),
-        ("mcuboot_primary",     0xC000,   0xE0000,  ["mcuboot_pad", "app"]),
-        ("mcuboot_primary_app", 0xC200,   0xDFE00,  ["app"]),
+        ("app",                 0xC200,   0x6FE00,  None),
+        ("mcuboot_primary",     0xC000,   0x70000,  ["mcuboot_pad", "app"]),
+        ("mcuboot_primary_app", 0xC200,   0x6FE00,  ["app"]),
+        ("mcuboot_secondary",   0x7C000,  0x70000,  None),
         ("storage",             0xEC000,  0x8000,   None),
         ("EMPTY_0",             0xF4000,  0xC000,   None),
     ]
@@ -432,9 +565,10 @@ else:
 seg = board.split("/")
 pm_name = "pm_static_" + "_".join(seg) + ".yml"
 pm_path = os.path.join("pm_static", pm_name)
+# 二槽レイアウトはこちらの生成表が正。repo 側に同名ファイルがあっても
+# (jiting は旧単槽の pm_static_test54l_*.yml を同梱している) 上書きする。
 if os.path.exists(pm_path):
-    print(f"== {pm_path} already exists in firmware repo, keeping it (frozen layout) ==")
-else:
-    write(pm_path, pm_yaml(parts))
+    print(f"== {pm_path} exists in firmware repo (old layout) -> OVERWRITING with dual-slot layout ==")
+write(pm_path, pm_yaml(parts))
 
 print("gen_mcuboot_files: done")
