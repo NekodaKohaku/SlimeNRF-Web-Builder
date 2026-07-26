@@ -69,12 +69,34 @@ SB_CONFIG_BOOT_SIGNATURE_TYPE_NONE=y
 # ---------- sysbuild/mcuboot.conf ----------
 # LED が無い構成では INDICATION_LED を有効にしてはいけない:
 # mcuboot の io.c が led0 alias を要求し #error で止まる。
+_opts = cfg.get("options") or {}
 _led_pin = pins.get("led")
 _has_led = bool(_led_pin) and _led_pin != "none"
-_led_conf = ("# recovery 中は LED 点灯 (mcuboot-led0 alias は overlay で定義)\n"
-             "CONFIG_MCUBOOT_INDICATION_LED=y\n") if _has_led else \
-            ("# LED 無し構成: INDICATION_LED は led0 alias を要求するため無効\n"
-             "CONFIG_MCUBOOT_INDICATION_LED=n\n")
+_is_strip = _has_led and _opts.get("led_type") == "strip"
+# WS2812 のダミー SCK (nRF52 のみ必須)。workflow と同じ既定・同じ候補順。
+_led_sck = _opts.get("led_sck") or ""
+if _is_strip and not is54 and (not _led_sck or _led_sck == "none"):
+    _used = {v for v in pins.values() if isinstance(v, str)}
+    _led_sck = next((c for c in ("P1.04", "P1.03", "P1.05", "P1.02",
+                                 "P1.06", "P1.01", "P1.07") if c not in _used), "")
+if _led_sck == "none":
+    _led_sck = ""
+_strip_spi = "spi22" if is54 else "spi2"
+
+if not _has_led:
+    _led_conf = ("# LED 無し構成: INDICATION_LED は led0 alias を要求するため無効\n"
+                 "CONFIG_MCUBOOT_INDICATION_LED=n\n")
+elif _is_strip:
+    # WS2812: gpio では光らないので mcuboot にも ws2812-spi ドライバを載せ、
+    # patch_mcuboot_ws2812.py が io_led_set を led_strip API に差し替える。
+    _led_conf = ("# WS2812 (addressable) DFU 表示: mcuboot 側にも ws2812-spi を載せる\n"
+                 "CONFIG_MCUBOOT_INDICATION_LED=y\n"
+                 "CONFIG_SPI=y\n"
+                 "CONFIG_LED_STRIP=y\n"
+                 "CONFIG_WS2812_STRIP_SPI=y\n")
+else:
+    _led_conf = ("# recovery 中は LED 点灯 (mcuboot-led0 alias は overlay で定義)\n"
+                 "CONFIG_MCUBOOT_INDICATION_LED=y\n")
 
 write("sysbuild/mcuboot.conf",
 """CONFIG_MCUBOOT_SERIAL=y
@@ -316,10 +338,18 @@ else:
 pwr = pins.get("pwr")
 if pwr and pwr != "none":
     pp = parse_pin(pwr)
+    # btn-gpios: serial recovery 中の「長押し 1 秒で電源オフ」用
+    # (patch_mcuboot_btnoff.py が使う)。pwr-gpios と両方揃ったときだけ有効。
+    _sw0 = pins.get("sw0")
+    _btn_line = ""
+    if _sw0 and _sw0 != "none":
+        bp = parse_pin(_sw0)
+        _btn_line = (f"\n\t\tbtn-gpios = <&gpio{bp[0]} {bp[1]} "
+                     f"(GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;")
     mcuboot_overlay += f"""
 / {{
 	zephyr,user {{
-		pwr-gpios = <&gpio{pp[0]} {pp[1]} GPIO_ACTIVE_HIGH>;
+		pwr-gpios = <&gpio{pp[0]} {pp[1]} GPIO_ACTIVE_HIGH>;{_btn_line}
 	}};
 }};
 """
@@ -345,6 +375,46 @@ if led and led != "none":
 	}};
 }};
 """
+    elif _is_strip:
+        # WS2812: gpio-leds では光らない (単線プロトコル)。mcuboot にも
+        # ws2812-spi ドライバを載せ、patch_mcuboot_ws2812.py が io_led_set を
+        # led_strip API へ差し替える。SPI ノードとダミー SCK は app 側と同じ
+        # 規則 (nRF52 の SPIM は SCK 未接続だと転送が完了しない)。
+        _sp = parse_pin(_led_sck) if _led_sck else None
+        _psels = f"<NRF_PSEL(SPIM_MOSI, {lp[0]}, {lp[1]})>"
+        if _sp:
+            _psels += f", <NRF_PSEL(SPIM_SCK, {_sp[0]}, {_sp[1]})>"
+        mcuboot_overlay += f"""
+&pinctrl {{
+	{_strip_spi}_mb_default: {_strip_spi}_mb_default {{ group1 {{ psels = {_psels}; }}; }};
+	{_strip_spi}_mb_sleep: {_strip_spi}_mb_sleep {{ group1 {{ psels = {_psels}; low-power-enable; }}; }};
+}};
+
+&{_strip_spi} {{
+	status = "okay";
+	pinctrl-0 = <&{_strip_spi}_mb_default>;
+	pinctrl-1 = <&{_strip_spi}_mb_sleep>;
+	pinctrl-names = "default", "sleep";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	mcuboot_strip: ws2812@0 {{
+		compatible = "worldsemi,ws2812-spi";
+		reg = <0>;
+		spi-max-frequency = <4000000>;
+		chain-length = <1>;
+		color-mapping = <LED_COLOR_ID_GREEN LED_COLOR_ID_RED LED_COLOR_ID_BLUE>;
+		spi-one-frame = <0x70>;
+		spi-zero-frame = <0x40>;
+	}};
+}};
+
+/ {{
+	aliases {{
+		led-strip = &mcuboot_strip;
+	}};
+}};
+"""
     else:
         mcuboot_overlay += f"""
 / {{
@@ -361,6 +431,10 @@ if led and led != "none":
 	}};
 }};
 """
+
+if _is_strip and not debug:
+    # ws2812-spi ドライバに必要な include (LED_COLOR_ID_*)
+    mcuboot_overlay = "#include <zephyr/dt-bindings/led/led.h>\n\n" + mcuboot_overlay
 
 write("sysbuild/mcuboot.overlay", mcuboot_overlay)
 
