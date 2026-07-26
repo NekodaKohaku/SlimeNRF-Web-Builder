@@ -67,6 +67,15 @@ SB_CONFIG_BOOT_SIGNATURE_TYPE_NONE=y
 """)
 
 # ---------- sysbuild/mcuboot.conf ----------
+# LED が無い構成では INDICATION_LED を有効にしてはいけない:
+# mcuboot の io.c が led0 alias を要求し #error で止まる。
+_led_pin = pins.get("led")
+_has_led = bool(_led_pin) and _led_pin != "none"
+_led_conf = ("# recovery 中は LED 点灯 (mcuboot-led0 alias は overlay で定義)\n"
+             "CONFIG_MCUBOOT_INDICATION_LED=y\n") if _has_led else \
+            ("# LED 無し構成: INDICATION_LED は led0 alias を要求するため無効\n"
+             "CONFIG_MCUBOOT_INDICATION_LED=n\n")
+
 write("sysbuild/mcuboot.conf",
 """CONFIG_MCUBOOT_SERIAL=y
 CONFIG_BOOT_SERIAL_UART=y
@@ -92,9 +101,7 @@ CONFIG_BOOT_SERIAL_WAIT_FOR_DFU_TIMEOUT=500
 # INDICATION_LED (gpio-leds) 用
 CONFIG_GPIO=y
 
-# recovery 中は LED 点灯 (mcuboot-led0 alias は overlay で定義)
-CONFIG_MCUBOOT_INDICATION_LED=y
-
+""" + _led_conf + """
 # nRF54L15 では jump 直前の bootloader flash 保護 (fprotect) が失敗し
 # 起動が中断されるため無効化 (DIY・無署名構成では保護不要)
 CONFIG_FPROTECT=n
