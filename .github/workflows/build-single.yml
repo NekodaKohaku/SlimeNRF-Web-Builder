@@ -252,6 +252,10 @@ jobs:
             append 'CONFIG_LED_RGB_COLOR=y'
             # jiting fork: 無線/電池/ADC 相關 patch 全部不適用 (fork 已重寫該區塊)
             python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_console_jiting.py"
+            # power_thread が uart0 を無条件 SUSPEND -> 無 USB では誰も RESUME しない
+            # -> UART 沈黙 (公式 52840 で実測済み・同一アンカー)。jiting も同じ power.c 系譜。
+            # 54L は uart30/22 なのでこのブロック自体が存在せず影響なし。
+            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_pm.py"
             case "$BOARD" in
               *nrf54l*)
                 # fork の OTA 適用エンジンは nRF52 専用 (NVMC) -> 54L 用にガード
