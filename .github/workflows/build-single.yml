@@ -220,6 +220,33 @@ jobs:
             echo "LED = none -> CONFIG_LED_STRIP=n"
           elif [ "$LEDT" = "strip" ]; then
             append 'CONFIG_LED_STRIP=y'; append 'CONFIG_WS2812_STRIP_SPI=y'
+            # WS2812 は単線 (MOSI のみ) だが、nRF52 の SPIM は SCK 未接続だと
+            # 転送が完了せず spi_context_wait_for_completion がタイムアウトする
+            # (実測: nRF52840/spi2 では LED 不点灯 + タイムアウト連発、
+            #  nRF54L/spi22 では同じ構成で正常)。Zephyr 公式の WS2812 サンプルも
+            #  nRF では必ず SCK を割り当てている。
+            # options.led_sck に「未接続の空きピン」を指定すると、そのピンを
+            # ダミー SCK として割り当てる (クロックが出るだけで誰も聞いていない)。
+            # 未指定なら従来どおり MOSI のみ (挙動不変)。
+            LEDSCK="$(echo "$CONFIG_JSON" | jq -r '.options.led_sck // ""')"
+            if [ -n "$LEDSCK" ] && [ "$LEDSCK" != "none" ]; then
+              MCU='${{ steps.cfg.outputs.mcu }}'
+              if [ "$MCU" = "nrf54l15" ]; then SPI_LED=spi22; else SPI_LED=spi2; fi
+              OVL="$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
+              LP="$(echo "$LEDP" | sed 's/^P//; s/\./ /')"
+              SP="$(echo "$LEDSCK" | sed 's/^P//; s/\./ /')"
+              LPORT="${LP% *}"; LPIN="${LP#* }"
+              SPORT="${SP% *}"; SPIN="${SP#* }"
+              G="<NRF_PSEL(SPIM_MOSI, $LPORT, $LPIN)>, <NRF_PSEL(SPIM_SCK, $SPORT, $SPIN)>"
+              {
+                printf '\n/* WS2812: dummy SCK (nRF52 SPIM needs SCK or END never fires) */\n'
+                printf '&pinctrl {\n'
+                printf '\t%s_default { group1 { psels = %s; }; };\n' "$SPI_LED" "$G"
+                printf '\t%s_sleep { group1 { psels = %s; low-power-enable; }; };\n' "$SPI_LED" "$G"
+                printf '};\n'
+              } >> "$OVL"
+              echo "WS2812: dummy SCK $LEDSCK added to $SPI_LED"
+            fi
           fi
           if [ "$BAT" = "nimh" ]; then
             if [ "$SRC_PROF" = "jiting" ]; then
