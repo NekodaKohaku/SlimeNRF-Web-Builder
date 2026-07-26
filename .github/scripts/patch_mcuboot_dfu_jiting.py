@@ -98,24 +98,7 @@ patch("src/system/system.c", [
      "\t\tbreak;\n"),
 ], "MCUBOOT_BOOTLOADER")
 
-# ---- esb_ota.c: 52840 の OTA 適用を MCUboot ビルドでは無効化 ----
-patch("src/system/esb_ota.c", [
-    ("#if CONFIG_SOC_NRF52840\n"
-     "#define OTA_FLASH_END        0xEE000 /* End of app partition (before NVS) */\n"
-     "#define OTA_USE_RAM_ENGINE   0\n"
-     "#define BOOTLOADER_SETTINGS_ADDR BOOTLOADER_SETTINGS_ADDR_52840\n"
-     "#define OTA_SUPPORTED        1\n",
-     "#if CONFIG_SOC_NRF52840 && !CONFIG_BOOTLOADER_MCUBOOT\n"
-     "#define OTA_FLASH_END        0xEE000 /* End of app partition (before NVS) */\n"
-     "#define OTA_USE_RAM_ENGINE   0\n"
-     "#define BOOTLOADER_SETTINGS_ADDR BOOTLOADER_SETTINGS_ADDR_52840\n"
-     "#define OTA_SUPPORTED        1\n"
-     "#elif CONFIG_SOC_NRF52840 /* SLIMENRF_MCUBOOT: adafruit-layout OTA map is invalid\n"
-     " * under MCUboot partitions; updates go via MCUboot UART DFU instead */\n"
-     "#define OTA_FLASH_END        (OTA_FLASH_BASE + 256 * 1024)\n"
-     "#define OTA_USE_RAM_ENGINE   0\n"
-     "#define BOOTLOADER_SETTINGS_ADDR 0\n"
-     "#define OTA_SUPPORTED        0\n"),
-], "SLIMENRF_MCUBOOT")
+# (esb_ota.c の MCUboot ゲートは patch_esb_ota_mcuboot.py に移管:
+#  以前の「mcuboot では OTA 無効化」から「二槽バックエンドで OTA 有効化」へ)
 
 print(f"patch_mcuboot_dfu_jiting: done ({total_files} files)")

@@ -54,9 +54,14 @@ def write(path, text):
     print(f"== {path} ==\n{text}")
 
 # ---------- sysbuild.conf (ルート) ----------
+# overwrite-only + 二槽構成:
+#   ESB OTA はアプリ動作中に slot1 (mcuboot_secondary) へ書き込み、
+#   再起動後 mcuboot が slot1 -> slot0 を単方向コピーする。
+#   コピー元 (slot1) は常に完全なので途中断電しても再コピーで復旧。
+#   UART serial recovery は従来どおり slot0 直書き (update.bin アドレス不変)。
 write("sysbuild.conf",
 """SB_CONFIG_BOOTLOADER_MCUBOOT=y
-SB_CONFIG_MCUBOOT_MODE_SINGLE_APP=y
+SB_CONFIG_MCUBOOT_MODE_OVERWRITE_ONLY=y
 # DIY: signing key 不要。イメージ整合性は SHA-256 hash のみで検証
 SB_CONFIG_BOOT_SIGNATURE_TYPE_NONE=y
 """)
@@ -203,7 +208,12 @@ else:
 
 		slot0_partition: partition@c000 {{
 			label = "image-0";
-			reg = <0x0000c000 0x000e0000>;
+			reg = <0x0000c000 0x00070000>;
+		}};
+
+		slot1_partition: partition@7c000 {{
+			label = "image-1";
+			reg = <0x0007c000 0x00070000>;
 		}};
 
 		storage_partition: partition@ec000 {{
@@ -262,7 +272,12 @@ else:
 
 		slot0_partition: partition@c000 {
 			label = "image-0";
-			reg = <0x0000c000 0x000e0000>;
+			reg = <0x0000c000 0x00070000>;
+		};
+
+		slot1_partition: partition@7c000 {
+			label = "image-1";
+			reg = <0x0007c000 0x00070000>;
 		};
 
 		storage_partition: partition@ec000 {
@@ -351,8 +366,11 @@ else:
 # ---------- アプリ prj.conf ----------
 with open("prj.conf", "a", encoding="utf-8", newline="\n") as f:
     f.write("\n\n# mcuboot UART DFU (bootmode_set)\n"
-            "CONFIG_RETAINED_MEM=y\nCONFIG_RETENTION=y\nCONFIG_RETENTION_BOOT_MODE=y\n")
-print("== appended retention Kconfigs to prj.conf ==")
+            "CONFIG_RETAINED_MEM=y\nCONFIG_RETENTION=y\nCONFIG_RETENTION_BOOT_MODE=y\n"
+            "\n# mcuboot dual-slot OTA: boot_request_upgrade (slot1 に upgrade magic を書く)\n"
+            "CONFIG_STREAM_FLASH=y\nCONFIG_IMG_MANAGER=y\nCONFIG_MCUBOOT_IMG_MANAGER=y\n"
+            "CONFIG_IMG_BLOCK_BUF_SIZE=4096\n")
+print("== appended retention + img-manager Kconfigs to prj.conf ==")
 
 # ---------- board defconfig の app 専用シンボルを退避 ----------
 # board defconfig は全イメージ共通で読まれるが、SlimeVR 専用の Kconfig
@@ -424,24 +442,29 @@ def pm_yaml(parts):
     return "\n".join(out) + "\n"
 
 if is54:
-    # nRF54L15: 1524 KB RRAM (0x0 - 0x17D000)
+    # nRF54L15: 1524 KB RRAM (0x0 - 0x17D000)。二槽 (各 0xA6000 = 664 KB):
+    #   slot0 (実行) 0x10000-0xB6000 / slot1 (OTA 受信) 0xB6000-0x15C000
+    #   slot0 のアドレスは旧単槽レイアウトと同一 -> update.bin 互換維持
     parts = [
         ("mcuboot",             0x0,      0x10000,  None),
         ("mcuboot_pad",         0x10000,  0x800,    None),
-        ("app",                 0x10800,  0x14B800, None),
-        ("mcuboot_primary",     0x10000,  0x14C000, ["mcuboot_pad", "app"]),
-        ("mcuboot_primary_app", 0x10800,  0x14B800, ["app"]),
+        ("app",                 0x10800,  0xA5800,  None),
+        ("mcuboot_primary",     0x10000,  0xA6000,  ["mcuboot_pad", "app"]),
+        ("mcuboot_primary_app", 0x10800,  0xA5800,  ["app"]),
+        ("mcuboot_secondary",   0xB6000,  0xA6000,  None),
         ("storage",             0x15C000, 0x9000,   None),
         ("EMPTY_0",             0x165000, 0x18000,  None),
     ]
 else:
-    # nRF52840: 1 MB flash
+    # nRF52840: 1 MB flash。二槽 (各 0x70000 = 448 KB):
+    #   slot0 0xC000-0x7C000 / slot1 0x7C000-0xEC000
     parts = [
         ("mcuboot",             0x0,      0xC000,   None),
         ("mcuboot_pad",         0xC000,   0x200,    None),
-        ("app",                 0xC200,   0xDFE00,  None),
-        ("mcuboot_primary",     0xC000,   0xE0000,  ["mcuboot_pad", "app"]),
-        ("mcuboot_primary_app", 0xC200,   0xDFE00,  ["app"]),
+        ("app",                 0xC200,   0x6FE00,  None),
+        ("mcuboot_primary",     0xC000,   0x70000,  ["mcuboot_pad", "app"]),
+        ("mcuboot_primary_app", 0xC200,   0x6FE00,  ["app"]),
+        ("mcuboot_secondary",   0x7C000,  0x70000,  None),
         ("storage",             0xEC000,  0x8000,   None),
         ("EMPTY_0",             0xF4000,  0xC000,   None),
     ]
@@ -451,9 +474,10 @@ else:
 seg = board.split("/")
 pm_name = "pm_static_" + "_".join(seg) + ".yml"
 pm_path = os.path.join("pm_static", pm_name)
+# 二槽レイアウトはこちらの生成表が正。repo 側に同名ファイルがあっても
+# (jiting は旧単槽の pm_static_test54l_*.yml を同梱している) 上書きする。
 if os.path.exists(pm_path):
-    print(f"== {pm_path} already exists in firmware repo, keeping it (frozen layout) ==")
-else:
-    write(pm_path, pm_yaml(parts))
+    print(f"== {pm_path} exists in firmware repo (old layout) -> OVERWRITING with dual-slot layout ==")
+write(pm_path, pm_yaml(parts))
 
 print("gen_mcuboot_files: done")
