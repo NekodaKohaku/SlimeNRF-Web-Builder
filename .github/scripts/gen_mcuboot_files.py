@@ -81,7 +81,16 @@ if _is_strip and not is54 and (not _led_sck or _led_sck == "none"):
                                  "P1.06", "P1.01", "P1.07") if c not in _used), "")
 if _led_sck == "none":
     _led_sck = ""
-_strip_spi = "spi22" if is54 else "spi2"
+# WS2812 用 SPI インスタンス。nRF54L の SERIALxx は SPI/TWI/UART が
+# 同一ハードウェアを共有するため、DFU 用 UART と同じ番号は選べない
+# (BUILD_ASSERT "Only one of SPI22, ..., UARTE22 can be enabled" で落ちる)。
+# mcuboot イメージで有効なのは UART (DFU) と この SPI (LED) だけなので、
+# UART の番号だけ避ければよい。
+if is54:
+    _uart_num = uart[-2:]                       # "30" or "22"
+    _strip_spi = "spi" + next(n for n in ("22", "21", "23") if n != _uart_num)
+else:
+    _strip_spi = "spi2"
 
 if not _has_led:
     _led_conf = ("# LED 無し構成: INDICATION_LED は led0 alias を要求するため無効\n"
