@@ -220,18 +220,26 @@ jobs:
             echo "LED = none -> CONFIG_LED_STRIP=n"
           elif [ "$LEDT" = "strip" ]; then
             append 'CONFIG_LED_STRIP=y'; append 'CONFIG_WS2812_STRIP_SPI=y'
-            # WS2812 は単線 (MOSI のみ) だが、nRF52 の SPIM は SCK 未接続だと
-            # 転送が完了せず spi_context_wait_for_completion がタイムアウトする
-            # (実測: nRF52840/spi2 では LED 不点灯 + タイムアウト連発、
-            #  nRF54L/spi22 では同じ構成で正常)。Zephyr 公式の WS2812 サンプルも
-            #  nRF では必ず SCK を割り当てている。
-            # options.led_sck に「未接続の空きピン」を指定すると、そのピンを
-            # ダミー SCK として割り当てる (クロックが出るだけで誰も聞いていない)。
-            # 未指定なら従来どおり MOSI のみ (挙動不変)。
+            # WS2812 は単線 (MOSI のみ) だが、nRF52 の SPIM は TWIM とリソースを
+            # 共有する実装 (SPIM3/nRF52840 と SPIM4/nRF5340 以外の全部) では
+            # SCK が実ピンに繋がっていないと転送が完了しない。これは Nordic 公認の
+            # ハード制限で、唯一の対処は「未使用ピンをダミー SCK に割り当てる」こと。
+            #   https://github.com/zephyrproject-rtos/zephyr/issues/57147
+            # 実測: nRF52840/spi2 は LED 不点灯 + タイムアウト連発 -> ダミー SCK で解決。
+            #       nRF54L の SPIM20/22 は TWIM 共有ではないため不要 (実機で正常動作)。
+            # 既定は P1.04 (nRF52840 モジュールは通常 P1.01-P1.07 を外部に出さない)。
+            # options.led_sck で明示指定可能 ("none" で無効化)。
+            MCU='${{ steps.cfg.outputs.mcu }}'
             LEDSCK="$(echo "$CONFIG_JSON" | jq -r '.options.led_sck // ""')"
-            if [ -n "$LEDSCK" ] && [ "$LEDSCK" != "none" ]; then
-              MCU='${{ steps.cfg.outputs.mcu }}'
-              if [ "$MCU" = "nrf54l15" ]; then SPI_LED=spi22; else SPI_LED=spi2; fi
+            if [ -z "$LEDSCK" ] && [ "$MCU" != "nrf54l15" ]; then
+              USED="$(echo "$CONFIG_JSON" | jq -r '[.pins[]? | select(type=="string")] | join(" ")')"
+              for CAND in P1.04 P1.03 P1.05 P1.02 P1.06 P1.01 P1.07; do
+                case " $USED " in *" $CAND "*) ;; *) LEDSCK="$CAND"; break;; esac
+              done
+              echo "WS2812: auto-selected dummy SCK $LEDSCK (nRF52 SPIM requires SCK)"
+            fi
+            if [ -n "$LEDSCK" ] && [ "$LEDSCK" != "none" ] && [ "$MCU" != "nrf54l15" ]; then
+              SPI_LED=spi2
               OVL="$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
               LP="$(echo "$LEDP" | sed 's/^P//; s/\./ /')"
               SP="$(echo "$LEDSCK" | sed 's/^P//; s/\./ /')"
