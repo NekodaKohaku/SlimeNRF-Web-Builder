@@ -63,6 +63,7 @@ void slimenrf_poll_power_button(void)
 {
 	static int64_t press_start;
 	static bool armed;
+	static bool seen_release;   /* 起動時の押しっぱなしを無視するため */
 
 	uint32_t btn = NRF_GPIO_PIN_MAP(
 		DT_PROP(DT_GPIO_CTLR(SLIMENRF_BTN_NODE, btn_gpios), port),
@@ -90,6 +91,14 @@ void slimenrf_poll_power_button(void)
 
 	if (!pressed) {
 		press_start = 0;
+		seen_release = true;   /* ここから先の長押しだけを受け付ける */
+		return;
+	}
+	if (!seen_release) {
+		/* 電源ボタンで起動した直後はボタンが押されたままなので、
+		 * それを長押しと誤判定して即シャットダウンしない。
+		 * (app 側もエッジ割り込みなので同じ挙動になる)
+		 * 一度離してから押し直せばシャットダウンできる。 */
 		return;
 	}
 	if (press_start == 0) {
