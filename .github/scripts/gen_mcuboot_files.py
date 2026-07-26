@@ -307,7 +307,7 @@ else:
 # board.c (PRE_KERNEL_1 prio 40、遅い) や gpio-hog (ドライバ初期化、
 # mcuboot 側で確実にリンクされる保証がない) には依存しない。
 pwr = pins.get("pwr")
-if pwr:
+if pwr and pwr != "none":
     pp = parse_pin(pwr)
     mcuboot_overlay += f"""
 / {{
@@ -321,8 +321,9 @@ if pwr:
 # 診断モード: gpio-hog で GPIO 初期化直後に LED 点灯 -> 「MCUboot 生存」の可視信号。
 #             点灯したまま = mcuboot で停止 / 消灯・変化 = app が引き継いだ。
 # 通常モード: gpio-leds ノード + mcuboot-led0 alias -> recovery 中に LED 点灯 (DFU 表示)。
+# ("none" = LED 無し。gen_overlay.py と同じ扱いで、ここもスキップする)
 led = pins.get("led")
-if led:
+if led and led != "none":
     lp = parse_pin(led)
     lflag = "GPIO_ACTIVE_LOW" if (cfg.get("options") or {}).get("led_polarity") == "low" else "GPIO_ACTIVE_HIGH"
     if debug:
