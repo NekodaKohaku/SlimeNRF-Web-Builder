@@ -210,6 +210,21 @@ jobs:
           if [ -n "$TXP" ]; then append 'CONFIG_LOG_BACKEND_UART_AUTOSTART=y'; fi   # no-USB boards: nothing else starts the UART log backend
           EXTRA='${{ steps.cfg.outputs.extra_actions }}'
           if [ "$EXTRA" = "enabled" ]; then append 'CONFIG_USER_EXTRA_ACTIONS=y'; elif [ "$EXTRA" = "disabled" ]; then append 'CONFIG_USER_EXTRA_ACTIONS=n'; fi
+          # IMU 実装向き。未指定なら base_board の defconfig 既定のまま (従来動作)。
+          # 既定値はボード任せで、同じ基板でも source によって違う
+          # (例: test54l は jiting=0 度 / 公式=未設定なので Kconfig 既定の 90 度)。
+          # 自作基板では IMU の実装向きに合わせて明示するのが望ましい。
+          IMUROT="$(echo "$CONFIG_JSON" | jq -r '.options.imu_rotation // ""')"
+          case "$IMUROT" in
+            0|90|180|270|0_flipped|90_flipped|180_flipped|270_flipped)
+              ROTSYM="CONFIG_SENSOR_ROTATION_$(echo "$IMUROT" | tr '[:lower:]' '[:upper:]')"
+              # choice なので他の候補を明示的に落とす必要はない (Kconfig が排他処理)
+              append "${ROTSYM}=y"
+              echo "IMU rotation: ${ROTSYM}=y"
+              ;;
+            ""|none) : ;;   # 指定なし = ボード既定
+            *) echo "::warning::unknown imu_rotation '$IMUROT', ignored" ;;
+          esac
           LEDT='${{ steps.cfg.outputs.led_type }}'
           LEDP="$(echo "$CONFIG_JSON" | jq -r '.pins.led // ""')"
           if [ -z "$LEDP" ] || [ "$LEDP" = "none" ]; then

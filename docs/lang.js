@@ -35,6 +35,7 @@ const I18N = {
     featVcc:"感測器電源", helpFeatVcc:"用一支 GPIO 直接供電給感測器，睡眠時可切斷省電。",
     featUart:"UART 日誌", helpFeatUart:"接外部序列晶片輸出 log（除錯用的主控台）。需 TX/RX 兩腳。",
     featPwr:"電源自鎖", helpFeatPwr:"用 GPIO 拉住 MOSFET 維持整板電源（配合實體自鎖開關電路）。",
+    imuRot:"IMU 方向", helpImuRot:"IMU 晶片相對於裝置的安裝角度。留空＝沿用基板預設值。裝置座標約定：平放正面朝上時，你的右手邊為 +X、朝上那面為 +Z；戴在身上站立時，裝置上方為 +Y。晶片貼在背面請選 flipped。設錯的症狀是轉動軸向對不上（例如左右轉身卻變成前後點頭），SlimeVR 的 mounting 校準無法修正軸向錯亂。",
     exportCfg:"匯出設定", importCfg:"匯入設定", importErr:"匯入失敗：檔案格式不正確。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED 通道1", pinLED1:"LED 通道2", pinLED2:"LED 通道3", pinLEDData:"LED Data", pinSW0:"按鈕 SW0", pinVCC:"感測器 VDD", pinGND:"感測器 GND", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"電源自鎖"
@@ -75,6 +76,7 @@ const I18N = {
     featVcc:"Sensor power", helpFeatVcc:"Power the sensor directly from a GPIO so it can be cut off during sleep to save power.",
     featUart:"UART log", helpFeatUart:"Output logs to an external serial chip (debug console). Needs TX/RX pins.",
     featPwr:"Power hold", helpFeatPwr:"Use a GPIO to latch a MOSFET and keep the whole board powered (with a self-latching switch circuit).",
+    imuRot:"IMU rotation", helpImuRot:"Mounting angle of the IMU chip relative to the device. Leave empty to keep the base board default. Device convention: lying flat face up, your right is +X and the up-facing side is +Z; worn upright, the top of the device is +Y. Choose a flipped option if the chip is on the back side. A wrong setting shows up as mismatched rotation axes (e.g. turning left/right reads as pitching), which SlimeVR's mounting calibration cannot fix.",
     exportCfg:"Export", importCfg:"Import", importErr:"Import failed: invalid file.",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED ch1", pinLED1:"LED ch2", pinLED2:"LED ch3", pinLEDData:"LED Data", pinSW0:"Button SW0", pinVCC:"Sensor VDD", pinGND:"Sensor GND", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"Power hold"
@@ -115,6 +117,7 @@ const I18N = {
     featVcc:"センサー電源", helpFeatVcc:"GPIO から直接センサーへ給電し、スリープ時に遮断して省電力。",
     featUart:"UART ログ", helpFeatUart:"外部シリアルチップへログ出力（デバッグ用コンソール）。TX/RX 2 ピン必要。",
     featPwr:"電源ラッチ", helpFeatPwr:"GPIO で MOSFET をラッチし基板全体の電源を維持（自己保持スイッチ回路）。",
+    imuRot:"IMU 実装向き", helpImuRot:"IMU チップのデバイスに対する取り付け角度。空欄ならベースボードの既定値のまま。デバイス座標系: 平置きで表を上にしたとき、自分から見て右が +X、上を向く面が +Z。身に着けて直立時はデバイス上方が +Y。チップが裏面実装なら flipped を選択。設定を誤ると回転軸が食い違い (左右に回すとピッチになる等)、SlimeVR の mounting キャリブレーションでは補正できない。",
     exportCfg:"エクスポート", importCfg:"インポート", importErr:"インポート失敗：ファイル形式が不正です。",
     pinSDA:"IMU SDA", pinSCL:"IMU SCL", pinSCK:"IMU SCK", pinMOSI:"IMU MOSI", pinMISO:"IMU MISO", pinCS:"IMU CS",
     pinINT:"IMU INT", pinCLK:"IMU CLK", pinLED:"LED ch1", pinLED1:"LED ch2", pinLED2:"LED ch3", pinLEDData:"LED Data", pinSW0:"ボタン SW0", pinVCC:"センサー VDD", pinGND:"センサー GND", pinTX:"UART TX", pinRX:"UART RX", pinPWR:"電源保持"
