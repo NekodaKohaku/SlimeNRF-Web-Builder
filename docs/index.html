@@ -105,6 +105,17 @@
         <div><label for="featClk"><span data-i18n="featClk"></span><span class="help" data-help="helpFeatClk">?</span></label><select id="featClk"><option value="disabled"></option><option value="enabled"></option></select></div>
         <div><label for="featUart"><span data-i18n="featUart"></span><span class="help" data-help="helpFeatUart">?</span></label><select id="featUart"><option value="disabled"></option><option value="enabled"></option></select></div>
         <div><label for="featPwr"><span data-i18n="featPwr"></span><span class="help" data-help="helpFeatPwr">?</span></label><select id="featPwr"><option value="disabled"></option><option value="enabled"></option></select></div>
+        <div id="wrapImurot"><label for="imurot"><span data-i18n="imuRot"></span><span class="help" data-help="helpImuRot">?</span></label><select id="imurot">
+          <option value=""></option>
+          <option value="0">0&deg;</option>
+          <option value="90">90&deg;</option>
+          <option value="180">180&deg;</option>
+          <option value="270">270&deg;</option>
+          <option value="0_flipped">0&deg; (flipped)</option>
+          <option value="90_flipped">90&deg; (flipped)</option>
+          <option value="180_flipped">180&deg; (flipped)</option>
+          <option value="270_flipped">270&deg; (flipped)</option>
+        </select></div>
       </div>
 
       <div class="sec" data-i18n="secPins"></div>
@@ -216,7 +227,7 @@ function parsePin(p) {
   return m ? { port: +m[1], pin: +m[2] } : null;
 }
 
-const SAVE_IDS = ["type","mod","bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featUart","featPwr","recvLedPol","adcR1","adcR2","recvLed"];
+const SAVE_IDS = ["type","mod","bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featUart","featPwr","recvLedPol","adcR1","adcR2","recvLed","imurot"];
 function collectState() {
   const st = { v: 1, ctrl: {}, pins: {} };
   SAVE_IDS.forEach(id => { const e = document.getElementById(id); if (e) st.ctrl[id] = e.value; });
@@ -693,7 +704,11 @@ function collectConfig() {
       adc_r2: parseInt(document.getElementById("adcR2").value || "0", 10) || 0,
       led_polarity: (isRecv ? document.getElementById("recvLedPol") : document.getElementById("ledpol")).value,
       led_channels: isRecv ? 1 : ledChannels(),
-      led_type: isRecv ? "single" : ledType()
+      led_type: isRecv ? "single" : ledType(),
+      // IMU 実装向き。空 = base_board の defconfig 既定に従う (従来動作)。
+      // 指定すると CONFIG_SENSOR_ROTATION_<値> を prj.conf に追記する。
+      ...((!isRecv && document.getElementById("imurot") && document.getElementById("imurot").value)
+          ? { imu_rotation: document.getElementById("imurot").value } : {})
     }
   };
 }
