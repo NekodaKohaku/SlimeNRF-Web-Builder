@@ -159,6 +159,10 @@ jobs:
           # そのレギュレータは無く、P0.13 は普通の GPIO なので外す。
           # 公式 / jiting 両方に適用 (該当行が無ければ素通り)。
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_promicro_p013.py"
+          # 同じく promicro 実機前提の残り: zephyr,user の vcc-gpios (P0.31) と
+          # 無条件 okay の i2c0 (P0.24/P0.22 を握ったまま PM に切断される)。
+          # config が実際に使っている場合は残す。
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_promicro_cleanup.py" "$CONFIG_JSON"
           # jiting fork: SWD 直燒 (hex) + MCUboot 對應。uf2 只給有 adafruit bootloader 的板 (本專案模組無 USB -> 不適用)
           if [ "$SRC_PROF" = "jiting" ] && [ "$FMT" = "uf2" ]; then
             echo "ERROR: jiting source supports hex (SWD) or mcuboot; uf2 not applicable" >&2
