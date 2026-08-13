@@ -352,6 +352,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_adcacq.py"   # SAADC acquisition time 3us is too short -> readings ~10% low (measured)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_console.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_pm.py"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_official_cspin.py"   # shutdown 時の CS 切り離しにポート番号が抜けている (54L15 では存在しないピン -> kernel panic -> 勝手に再起動)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_conntx.py"   # v48: connection_thread slept after EVERY packet -> capped TX at ~55/s; add missing continue
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esbclk.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_clkpolicy.py"   # nRF54L HF-clock policy, ONE place (clocks_stop) instead of 3 call-site ifdefs; replaces patch_esbhalt+patch_connclk
@@ -361,6 +362,8 @@ jobs:
 
       - name: Apply receiver options
         if: ${{ steps.cfg.outputs.type == 'receiver' }}
+        env:
+          CONFIG_JSON: ${{ github.event.inputs.config }}
         shell: bash
         run: |
           set -euo pipefail
@@ -373,6 +376,32 @@ jobs:
             python3 "$GITHUB_WORKSPACE/.github/scripts/patch_jiting_recv_rejoin.py"
           else
             python3 "$GITHUB_WORKSPACE/.github/scripts/patch_recvtimerstub.py"   # NCS 3.2: stub timer.c (drops nrfx TIMER1 dep; TDMA unused)
+          fi
+          # ---- レシーバーのボタン (sw0) ----
+          # gen_overlay.py の build_receiver は LED しか出力しないので、
+          # sw0 ノードと alias をここで追記する (ボード dts に既定の sw0 が
+          # あってもユーザー指定で上書きできる)。
+          RSW="$(echo "$CONFIG_JSON" | jq -r '.pins.sw0 // ""')"
+          if [ -n "$RSW" ] && [ "$RSW" != "none" ]; then
+            RP="$(echo "$RSW" | sed 's/^P//; s/\./ /')"
+            RPORT="${RP% *}"; RPIN="${RP#* }"
+            OVL="$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
+            {
+              printf '\n/* receiver button (sw0) */\n'
+              printf '/ {\n'
+              printf '\tbuttons {\n'
+              printf '\t\tcompatible = "gpio-keys";\n'
+              printf '\t\tbutton0: button_0 { gpios = <&gpio%s %s (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>; label = "sw0"; };\n' "$RPORT" "$RPIN"
+              printf '\t};\n'
+              printf '\taliases { sw0 = &button0; };\n'
+              printf '};\n'
+            } >> "$OVL"
+            echo "receiver: sw0 = $RSW"
+            if [ "$SRC_PROF" != "jiting" ]; then
+              # 公式レシーバーにはボタン処理そのものが無いので実装を追加する
+              # (jiting は button_thread を内蔵しているので不要)
+              python3 "$GITHUB_WORKSPACE/.github/scripts/patch_recv_button.py"
+            fi
           fi
           tail -n 5 prj.conf
 
