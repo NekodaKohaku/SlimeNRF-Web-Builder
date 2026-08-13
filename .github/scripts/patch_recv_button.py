@@ -104,6 +104,7 @@ static void recv_button_thread(void)
 	int64_t seq_last_press = 0;
 	int64_t hold_start = 0;
 	int64_t last_blink = 0;
+	int blinked_sec = 0;
 	bool led_on = false;
 	bool dfu_done = false;
 	bool seen_release = false;   /* ignore a button already held at boot */
@@ -119,6 +120,8 @@ static void recv_button_thread(void)
 		if (recv_press_time && !hold_start && seen_release) {
 			hold_start = recv_press_time;
 			dfu_done = false;
+			blinked_sec = 0;
+			printk("Button press started\n");
 			set_led(SYS_LED_PATTERN_ON, SYS_LED_PRIORITY_HIGHEST);
 			last_blink = k_uptime_get();
 			led_on = true;
@@ -134,6 +137,8 @@ static void recv_button_thread(void)
 				set_led(led_on ? SYS_LED_PATTERN_ON : SYS_LED_PATTERN_OFF,
 					SYS_LED_PRIORITY_HIGHEST);
 				last_blink = now;
+				blinked_sec++;
+				printk("Button held %ds\n", blinked_sec);
 			}
 #if RECV_DFU_EXISTS
 			if (held >= RECV_BTN_DFU_MS && !dfu_done) {
@@ -161,6 +166,8 @@ static void recv_button_thread(void)
 				seq_last_press = 0;
 			} else if (dur < RECV_BTN_CLEAR_MS) {
 				num_presses++;
+				printk("Button pressed %d time%s\n", num_presses,
+				       num_presses == 1 ? "" : "s");
 				seq_last_press = k_uptime_get();
 			} else {
 				num_presses = 0;
@@ -171,6 +178,8 @@ static void recv_button_thread(void)
 		/* --- multi-press sequence finished --- */
 		if (seq_last_press && k_uptime_get() - seq_last_press > RECV_BTN_SEQ_GAP_MS
 		    && num_presses > 0) {
+			printk("Button sequence completed: %d press%s\n", num_presses,
+			       num_presses == 1 ? "" : "es");
 			switch (num_presses) {
 			case 2:
 				printk("Button: exit pairing mode\n");
