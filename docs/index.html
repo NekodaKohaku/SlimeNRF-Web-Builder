@@ -143,6 +143,7 @@
       <div class="grid">
         <div><label for="recvLed"><span data-i18n="recvLedPin"></span><span class="help" data-help="helpRecvLed">?</span></label><select id="recvLed"></select></div>
         <div><label for="recvLedPol"><span data-i18n="ledPol"></span><span class="help" data-help="helpLedPol">?</span></label><select id="recvLedPol"><option value="high"></option><option value="low"></option></select></div>
+        <div><label for="recvSw0"><span data-i18n="recvSw0Pin"></span><span class="help" data-help="helpRecvSw0">?</span></label><select id="recvSw0"></select></div>
       </div>
     </div>
     <div id="unsupported" class="note" style="display:none;"></div>
@@ -227,7 +228,7 @@ function parsePin(p) {
   return m ? { port: +m[1], pin: +m[2] } : null;
 }
 
-const SAVE_IDS = ["type","mod","bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featUart","featPwr","recvLedPol","adcR1","adcR2","recvLed","imurot"];
+const SAVE_IDS = ["type","mod","bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featUart","featPwr","recvLedPol","adcR1","adcR2","recvLed","recvSw0","imurot"];
 function collectState() {
   const st = { v: 1, ctrl: {}, pins: {} };
   SAVE_IDS.forEach(id => { const e = document.getElementById(id); if (e) st.ctrl[id] = e.value; });
@@ -249,7 +250,7 @@ function applyState(st) {
   ["bus","imu","magconn","sleep","output","ledpol","ledch","extra","battery","adc","featLed","featSw0","featClk","featUart","featPwr","recvLedPol","adcR1","adcR2"].forEach(id => setVal(id, c[id]));
   onChange();
   Object.keys(st.pins || {}).forEach(k => setVal("pin_" + k, st.pins[k]));
-  ["recvLed"].forEach(id => setVal(id, c[id]));
+  ["recvLed","recvSw0"].forEach(id => setVal(id, c[id]));
   render();
 }
 function switchType(nt) {
@@ -287,7 +288,7 @@ async function init() {
   ]);
   MODULES = _mods.modules;
   MCUS = _mcus.mcus;
-  ["sleep","output","ledpol","extra","recvLed","recvLedPol"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
+  ["sleep","output","ledpol","extra","recvLed","recvLedPol","recvSw0"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
   ["bus","imu","magconn","battery","ledch","featLed","featSw0","featClk","featUart","featPwr"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); onChange(); }));
   document.getElementById("adc").addEventListener("change", () => { markDirty(); onChange(); });
   ["adcR1","adcR2"].forEach(id => document.getElementById(id).addEventListener("change", () => { markDirty(); render(); }));
@@ -453,6 +454,22 @@ function populateRecvLed() {
          if (d && [...sel.options].some(o => o.value === d)) sel.value = d; }
 }
 
+// レシーバーのボタン (sw0)。LED と同じ候補から選ぶ。既定は "—" (ボタン無し)。
+// 選ぶと 2 回押し=ペアリング解除 / 3 回押し=ペアリング開始 / 長押し 5s=全消去 /
+// 長押し 10s=DFU が有効になる (公式ファームにはビルド時に実装を追加)。
+function populateRecvSw0() {
+  const mod = currentModule();
+  const sel = document.getElementById("recvSw0");
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = "";
+  const off = document.createElement("option"); off.value = "none"; off.textContent = "—"; sel.appendChild(off);
+  const _nmS = pinNumMap(mod);
+  (mod.pins || []).slice().sort((a, b) => (parseInt(_nmS[a] || 9999, 10)) - (parseInt(_nmS[b] || 9999, 10)))
+    .forEach(p => { const o = document.createElement("option"); o.value = p; o.textContent = pinDisp(mod, p); sel.appendChild(o); });
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+}
+
 function updateAdc() {
   const ains = currentModule() ? analogPins(currentModule()) : [];
   const adcSel = document.getElementById("adc");
@@ -528,7 +545,7 @@ function onChange() {
   updateButton();
 
   if (supported) updateFlash();
-  if (supported && isRecv) populateRecvLed();
+  if (supported && isRecv) { populateRecvLed(); populateRecvSw0(); }
   if (supported && !isRecv) updateMagConn();
   if (supported && !isRecv) { updateLedCh(); updateFeatVis(); }
   if (supported && !isRecv) { updateAdc(); buildPins(); }
@@ -691,7 +708,10 @@ function collectConfig() {
     fileformat: fm === "bootloader" ? "uf2" : fm === "mcuboot" ? "mcuboot" : "hex",
     filename: parts.join("_"),
     bus, imu, mag_conn: mconn,
-    pins: isRecv ? (document.getElementById("recvLed").value ? { led: document.getElementById("recvLed").value } : {}) : collectPins(),
+    pins: isRecv ? (function(){ const o={};
+      const l=document.getElementById("recvLed").value; if (l) o.led=l;
+      const b=document.getElementById("recvSw0"); if (b && b.value && b.value!=="none") o.sw0=b.value;
+      return o; })() : collectPins(),
     options: {
       magnetometer: (!isRecv && mconn !== "none") ? "enabled" : "disabled",
       mag_conn: mconn,
