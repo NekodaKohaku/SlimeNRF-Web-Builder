@@ -362,6 +362,8 @@ jobs:
 
       - name: Apply receiver options
         if: ${{ steps.cfg.outputs.type == 'receiver' }}
+        env:
+          CONFIG_JSON: ${{ github.event.inputs.config }}
         shell: bash
         run: |
           set -euo pipefail
@@ -374,6 +376,32 @@ jobs:
             python3 "$GITHUB_WORKSPACE/.github/scripts/patch_jiting_recv_rejoin.py"
           else
             python3 "$GITHUB_WORKSPACE/.github/scripts/patch_recvtimerstub.py"   # NCS 3.2: stub timer.c (drops nrfx TIMER1 dep; TDMA unused)
+          fi
+          # ---- レシーバーのボタン (sw0) ----
+          # gen_overlay.py の build_receiver は LED しか出力しないので、
+          # sw0 ノードと alias をここで追記する (ボード dts に既定の sw0 が
+          # あってもユーザー指定で上書きできる)。
+          RSW="$(echo "$CONFIG_JSON" | jq -r '.pins.sw0 // ""')"
+          if [ -n "$RSW" ] && [ "$RSW" != "none" ]; then
+            RP="$(echo "$RSW" | sed 's/^P//; s/\./ /')"
+            RPORT="${RP% *}"; RPIN="${RP#* }"
+            OVL="$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
+            {
+              printf '\n/* receiver button (sw0) */\n'
+              printf '/ {\n'
+              printf '\tbuttons {\n'
+              printf '\t\tcompatible = "gpio-keys";\n'
+              printf '\t\tbutton0: button_0 { gpios = <&gpio%s %s (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>; label = "sw0"; };\n' "$RPORT" "$RPIN"
+              printf '\t};\n'
+              printf '\taliases { sw0 = &button0; };\n'
+              printf '};\n'
+            } >> "$OVL"
+            echo "receiver: sw0 = $RSW"
+            if [ "$SRC_PROF" != "jiting" ]; then
+              # 公式レシーバーにはボタン処理そのものが無いので実装を追加する
+              # (jiting は button_thread を内蔵しているので不要)
+              python3 "$GITHUB_WORKSPACE/.github/scripts/patch_recv_button.py"
+            fi
           fi
           tail -n 5 prj.conf
 
