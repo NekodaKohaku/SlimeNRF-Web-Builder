@@ -154,6 +154,11 @@ jobs:
           FMT='${{ steps.cfg.outputs.fileformat }}'
           BOARD='${{ steps.cfg.outputs.board_target }}'
           SRC_PROF='${{ steps.cfg.outputs.source }}'
+          # promicro_uf2 の board.c は P0.13 に無条件でプルを掛ける
+          # (実機 promicro の外部 3V3 レギュレータ EN 前提)。対象モジュールに
+          # そのレギュレータは無く、P0.13 は普通の GPIO なので外す。
+          # 公式 / jiting 両方に適用 (該当行が無ければ素通り)。
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_promicro_p013.py"
           # jiting fork: SWD 直燒 (hex) + MCUboot 對應。uf2 只給有 adafruit bootloader 的板 (本專案模組無 USB -> 不適用)
           if [ "$SRC_PROF" = "jiting" ] && [ "$FMT" = "uf2" ]; then
             echo "ERROR: jiting source supports hex (SWD) or mcuboot; uf2 not applicable" >&2
