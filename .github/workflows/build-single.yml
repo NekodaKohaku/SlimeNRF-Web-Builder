@@ -49,7 +49,6 @@ jobs:
             echo "sdk_revision=$(get '.sdk_revision')"
             echo "zephyr_sdk_version=$(get '.zephyr_sdk_version')"
             echo "fileformat=$(get '.fileformat')"
-          echo "source=$(get '.source // "official"')"
             echo "filename=$(get '.filename')"
             echo "magnetometer=$(get '.options.magnetometer // "unset"')"
             echo "sleep=$(get '.options.sleep // "unset"')"
@@ -153,21 +152,14 @@ jobs:
           BAT='${{ steps.cfg.outputs.battery }}'
           FMT='${{ steps.cfg.outputs.fileformat }}'
           BOARD='${{ steps.cfg.outputs.board_target }}'
-          SRC_PROF='${{ steps.cfg.outputs.source }}'
           # promicro_uf2 の board.c は P0.13 に無条件でプルを掛ける
           # (実機 promicro の外部 3V3 レギュレータ EN 前提)。対象モジュールに
           # そのレギュレータは無く、P0.13 は普通の GPIO なので外す。
-          # 公式 / jiting 両方に適用 (該当行が無ければ素通り)。
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_promicro_p013.py"
           # 同じく promicro 実機前提の残り: zephyr,user の vcc-gpios (P0.31) と
           # 無条件 okay の i2c0 (P0.24/P0.22 を握ったまま PM に切断される)。
           # config が実際に使っている場合は残す。
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_promicro_cleanup.py" "$CONFIG_JSON"
-          # jiting fork: SWD 直燒 (hex) + MCUboot 對應。uf2 只給有 adafruit bootloader 的板 (本專案模組無 USB -> 不適用)
-          if [ "$SRC_PROF" = "jiting" ] && [ "$FMT" = "uf2" ]; then
-            echo "ERROR: jiting source supports hex (SWD) or mcuboot; uf2 not applicable" >&2
-            exit 1
-          fi
           append 'CONFIG_VOLTAGE_DIVIDER=n'   # redundant Zephyr voltage sensor: the firmware reads the ADC itself. Its init returns -ENOTSUP on NCS 3.2 (both nRF52 and nRF54L) -> 'voltage_init: setup: -134'
           if [ "$FMT" = "hex" ]; then
             # SWD 直燒、無 bootloader:code-partition 由 overlay 定在 0x0,確保用 DT 分割
@@ -177,8 +169,6 @@ jobs:
           case "$BOARD" in
             *nrf54l*)
               append 'CONFIG_MAIN_STACK_SIZE=2048'   # nRF54L M33+FPU+TrustZone needs more than upstream 512 (upstream: "crashing on nrf54l at 512")
-              # jiting も同じ差し替え: fork の board.c は P1.07/P1.08 ハードコード
-              # (fork 自社ボード専用) -> ユーザーボードでは IMU が無電源になる。
               # 差し替え版は DT vcc/gnd-gpios 読み + NFC パッド解放 + EARLY 電源自锁。
               cp "$GITHUB_WORKSPACE/.github/scripts/test54l_board.c" boards/nordic/test54l/board.c && echo "test54l board.c -> reads DT vcc/gnd-gpios"
               ;;
@@ -186,42 +176,28 @@ jobs:
               # nRF52 (has_usb=false modules): disable USB so USB_EXISTS is false and the
               # SlimeNRF console is not USB-insertion-gated -> it auto-starts over UART/RTT.
               append 'CONFIG_USB_DEVICE_STACK=n'
-              [ "$SRC_PROF" = "jiting" ] && append 'CONFIG_USB_DEVICE_STACK_NEXT=n'   # jiting fork 走新 USB 堆疊
-              [ "$SRC_PROF" = "jiting" ] || NEED_PWR_EARLY=1   # nRF54L already latches in test54l_board.c; nRF52 has no board-level latch (jiting: 錨點不同, v1 先跳過)
+              NEED_PWR_EARLY=1   # nRF54L already latches in test54l_board.c; nRF52 has no board-level latch
               ;;
           esac
           sed -i 's|SPI_DT_SPEC_GET(\([^,]*,[[:space:]]*SPI_OP\))|SPI_DT_SPEC_GET(\1, 0)|g' src/sensor/sensor.c || true
-          if [ "$SRC_PROF" = "jiting" ]; then
-            echo "jiting: skip SENSOR_USE_MAG (fork uses driver whitelist instead)"
-            [ "$MAG" = "enabled" ] && echo "WARN: magnetometer with jiting source not wired up yet" >&2
-          else
-            [ "$MAG" = "enabled" ]  && append 'CONFIG_SENSOR_USE_MAG=y'
-            [ "$MAG" = "disabled" ] && append 'CONFIG_SENSOR_USE_MAG=n'
-          fi
+          if [ "$MAG" = "enabled" ]; then append 'CONFIG_SENSOR_USE_MAG=y'
+          elif [ "$MAG" = "disabled" ]; then append 'CONFIG_SENSOR_USE_MAG=n'; fi
           if [ "$SLEEP" = "enabled" ]; then
             append 'CONFIG_USE_IMU_WAKE_UP=y'
-            [ "$SRC_PROF" = "jiting" ] || append 'CONFIG_USE_ACTIVE_TIMEOUT=y'
+            append 'CONFIG_USE_ACTIVE_TIMEOUT=y'
           elif [ "$SLEEP" = "disabled" ]; then
             append 'CONFIG_USE_IMU_WAKE_UP=n'
-            if [ "$SRC_PROF" != "jiting" ]; then
-              # jiting fork: USE_ACTIVE_TIMEOUT を n にすると ACTIVE_TIMEOUT_DELAY が
-              # 未定義になり sensor.c がコンパイル不能 (fork 側の未ガード箇所)。
-              # fork ではデフォルト値のままにする
-              append 'CONFIG_USE_ACTIVE_TIMEOUT=n'
-              append 'CONFIG_SENSOR_LP_TIMEOUT=300000'; append 'CONFIG_SENSOR_USE_LOW_POWER_2=n'
-            fi
+            append 'CONFIG_USE_ACTIVE_TIMEOUT=n'
+            append 'CONFIG_SENSOR_LP_TIMEOUT=300000'; append 'CONFIG_SENSOR_USE_LOW_POWER_2=n'
           fi
           CLK='${{ steps.cfg.outputs.clk_pin }}'
-          if [ "$SRC_PROF" = "jiting" ]; then
-            echo "jiting: skip USE_SENSOR_CLOCK (fork auto-detects via DT clk_gpios)"
-          elif [ -n "$CLK" ]; then append 'CONFIG_USE_SENSOR_CLOCK=y'; else append 'CONFIG_USE_SENSOR_CLOCK=n'; fi
+          if [ -n "$CLK" ]; then append 'CONFIG_USE_SENSOR_CLOCK=y'; else append 'CONFIG_USE_SENSOR_CLOCK=n'; fi
           TXP='${{ steps.cfg.outputs.tx_pin }}'
           if [ -n "$TXP" ]; then append 'CONFIG_LOG_BACKEND_UART_AUTOSTART=y'; fi   # no-USB boards: nothing else starts the UART log backend
           EXTRA='${{ steps.cfg.outputs.extra_actions }}'
           if [ "$EXTRA" = "enabled" ]; then append 'CONFIG_USER_EXTRA_ACTIONS=y'; elif [ "$EXTRA" = "disabled" ]; then append 'CONFIG_USER_EXTRA_ACTIONS=n'; fi
           # IMU 実装向き。未指定なら base_board の defconfig 既定のまま (従来動作)。
-          # 既定値はボード任せで、同じ基板でも source によって違う
-          # (例: test54l は jiting=0 度 / 公式=未設定なので Kconfig 既定の 90 度)。
+          # 既定値はボード任せ (test54l は未設定なので Kconfig 既定の 90 度)。
           # 自作基板では IMU の実装向きに合わせて明示するのが望ましい。
           IMUROT="$(echo "$CONFIG_JSON" | jq -r '.options.imu_rotation // ""')"
           case "$IMUROT" in
@@ -281,13 +257,7 @@ jobs:
             fi
           fi
           if [ "$BAT" = "nimh" ]; then
-            if [ "$SRC_PROF" = "jiting" ]; then
-              # NiMH 曲線は patch_jiting_battery.py が battery.c に直接移植する。
-              # NO_MAPPING は Kconfig choice を満たすだけ (置換後 levels[] は無条件になる)
-              append 'CONFIG_BATTERY_NO_MAPPING=y'
-            else
-              python3 "$GITHUB_WORKSPACE/.github/scripts/patch_nimh.py"
-            fi
+            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_nimh.py"
           elif [ "$BAT" = "none" ]; then
             append 'CONFIG_BATTERY_NO_MAPPING=y'
           elif [ "$BAT" = "liion" ]; then
@@ -296,61 +266,6 @@ jobs:
             esac
           fi
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_pwr.py"
-          if [ "$SRC_PROF" = "jiting" ]; then
-            if [ "${BOARD#*nrf54l}" = "$BOARD" ]; then
-              # jiting の socs/ は SoC 名キー (fork の sysbuild.cmake の fallback 前提)。
-              # --no-sysbuild の素の Zephyr は <qualifiers> 名 (nrf52840_spi 等) しか
-              # 探さない -> retained_mem 未定義でビルド失敗。qualifiers 名 shim を追加。
-              printf '#include "nrf52840.overlay"\n' > socs/nrf52840_spi.overlay
-              printf '#include "nrf52840.overlay"\n' > socs/nrf52840_i2c.overlay
-              echo "jiting 52840: added socs qualifier shims (nrf52840_spi/_i2c -> nrf52840.overlay)"
-            fi
-            # jiting fork: prj.conf は LOG_BACKEND_UART_AUTOSTART=n (USB CDC 挿入で起動する設計)。
-            # USB 無しモジュールでは誰も backend を起こさない -> UART ログが一切出ない。自動起動に戻す。
-            append 'CONFIG_LOG_BACKEND_UART_AUTOSTART=y'
-            # fork は CONFIG_ADC_LOG_LEVEL_OFF=y で電池 setup エラーを黙殺する。
-            # WRN: setup 失敗は見える / battery_sample の 100ms 毎 INF スパムは出ない
-            append 'CONFIG_ADC_LOG_LEVEL_WRN=y'
-            # 電池修正: input_positive 1+AIN (fork bug) + nimh なら公式 NiMH 三点セット移植
-            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_jiting_battery.py" "$BAT"
-            # 単押しリブート廃止 (現行公式に整合、誤押し -> 再同期問題の連鎖を断つ)
-            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_jiting_button.py"
-            # sysbuild overlay 順序修正 (socs が user overlay を上書きしないように; mcuboot 必須)
-            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_jiting_sysbuild.py"
-            # jiting fork: led.c が RGB カラー表を無条件参照 -> LED_RGB_COLOR 必須
-            # (fork のボードは全て WS2812 前提。TRI_COLOR だと COLOR_R/G/B 未定義でビルド不能)
-            append 'CONFIG_LED_RGB_COLOR=y'
-            # jiting fork: 無線/電池/ADC 相關 patch 全部不適用 (fork 已重寫該區塊)
-            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_console_jiting.py"
-            # power_thread が uart0 を無条件 SUSPEND -> 無 USB では誰も RESUME しない
-            # -> UART 沈黙 (公式 52840 で実測済み・同一アンカー)。jiting も同じ power.c 系譜。
-            # 54L は uart30/22 なのでこのブロック自体が存在せず影響なし。
-            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_pm.py"
-            case "$BOARD" in
-              *nrf54l*)
-                # fork の OTA 適用エンジンは nRF52 専用 (NVMC) -> 54L 用にガード
-                python3 "$GITHUB_WORKSPACE/.github/scripts/patch_jiting_54l.py"
-                # esb_ota_flash.c が要求する chosen が test54l DT に無い -> 補う
-                printf '\n/ { chosen { zephyr,flash-controller = &rram_controller; }; };\n' >> "$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
-                printf '\n&wdt31 { status = "okay"; };\n' >> "$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
-                echo "jiting 54L: appended flash-controller chosen + wdt31 enable to custom overlay"
-                ;;
-              *nrf52840*)
-                # jiting fork は新 USB スタック (CONFIG_USB_DEVICE_STACK_NEXT=y)。
-                # 既存の CONFIG_USB_DEVICE_STACK=n は旧スタック用の別シンボルで
-                # NEXT スタックには効かず、console.c が USB CDC 経路 (DTR 待ち)
-                # に入って UART console/log が完全沈黙する (実測: MS88SF2)。
-                # この builder の対象は UART console のモジュールのみなので、
-                # NEXT スタックごと無効化し DT の usbd ノードも止める
-                # (console.c の USB_EXISTS 判定が DT status を見るため)。
-                append 'CONFIG_USB_DEVICE_STACK_NEXT=n'
-                printf '\n&usbd { status = "disabled"; };\n' >> "$GITHUB_WORKSPACE/zephyr-workspace/slimenrf_custom.overlay"
-                echo "jiting 52840: USB NEXT stack disabled + usbd node off (pure UART console)"
-                ;;
-            esac
-            tail -n 10 prj.conf
-            exit 0
-          fi
           if [ "${NEED_PWR_EARLY:-0}" = "1" ]; then
             python3 "$GITHUB_WORKSPACE/.github/scripts/patch_pwr_early.py"   # nRF52 only: latch power at PRE_KERNEL_1 via raw HAL (short-press boot)
           fi
@@ -377,15 +292,7 @@ jobs:
         run: |
           set -euo pipefail
           cd zephyr-workspace/SlimeVR-Tracker-nRF
-          SRC_PROF='${{ steps.cfg.outputs.source }}'
-          if [ "$SRC_PROF" = "jiting" ]; then
-            # jiting receiver: TDMA が TIMER を実際に使う -> timer.c stub 化は厳禁
-            echo "jiting receiver: keep fork timer.c (TDMA active)"
-            # 既知トラッカーの再同期を pairing mode なしで自動受理 (再起動後の FIFO 詰まり/妨害対策)
-            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_jiting_recv_rejoin.py"
-          else
-            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_recvtimerstub.py"   # NCS 3.2: stub timer.c (drops nrfx TIMER1 dep; TDMA unused)
-          fi
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_recvtimerstub.py"   # NCS 3.2: stub timer.c (drops nrfx TIMER1 dep; TDMA unused)
           # ---- レシーバーのボタン (sw0) ----
           # gen_overlay.py の build_receiver は LED しか出力しないので、
           # sw0 ノードと alias をここで追記する (ボード dts に既定の sw0 が
@@ -406,11 +313,8 @@ jobs:
               printf '};\n'
             } >> "$OVL"
             echo "receiver: sw0 = $RSW"
-            if [ "$SRC_PROF" != "jiting" ]; then
-              # 公式レシーバーにはボタン処理そのものが無いので実装を追加する
-              # (jiting は button_thread を内蔵しているので不要)
-              python3 "$GITHUB_WORKSPACE/.github/scripts/patch_recv_button.py"
-            fi
+            # 公式レシーバーにはボタン処理そのものが無いので実装を追加する
+            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_recv_button.py"
           fi
           tail -n 5 prj.conf
 
@@ -422,15 +326,9 @@ jobs:
         run: |
           set -euo pipefail
           cd zephyr-workspace/SlimeVR-Tracker-nRF
-          if [ "${{ steps.cfg.outputs.source }}" = "jiting" ]; then
-            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_dfu_jiting.py"
-            # ESB OTA -> mcuboot 二槽バックエンド (slot1 受信 + overwrite-only)
-            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_esb_ota_mcuboot.py"
-          else
-            python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_dfu.py"
-          fi
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_dfu.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_pwr.py"   # mcuboot main.c に EARLY 電源自锁を追記 (短押し起動用)
-          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_wdtfeed.py"   # recovery 中も app の WDT に確実に餌をやる (jiting は task_wdt が WDT31/WDT を起動する)
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_wdtfeed.py"   # recovery 中も app の WDT に確実に餌をやる
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_ws2812.py"   # WS2812 は gpio では光らない -> io_led_set を led_strip API に差し替え
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_ws2812_nosched.py"   # ws2812 ドライバの k_usleep -> k_busy_wait (mcuboot は MULTITHREADING=n)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_mcuboot_btnoff.py"   # DFU 中も長押し 1 秒で電源オフ (電池を外さずに抜けられる)
