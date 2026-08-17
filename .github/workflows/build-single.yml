@@ -273,6 +273,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_batt.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_adcgain.py"   # nRF54L SAADC has no 1/6 or 1/5 gain (min is 1/4); upstream picks 1/6 -> adc_channel_setup returns -EINVAL -> battery_ok=false
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_adc32.py"   # NCS 3.2: SAADC AIN encoding changed (NRF_SAADC_AIN0 == 0); the old +1 read the wrong pin
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_adcvdd.py"   # nRF54L has no VDDH domain -> io-channels 12 must read VDD, not VDDHDIV5 (must run after patch_adc32)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_adcacq.py"   # SAADC acquisition time 3us is too short -> readings ~10% low (measured)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_console.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_pm.py"
