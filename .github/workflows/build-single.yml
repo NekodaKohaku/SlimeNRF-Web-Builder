@@ -276,6 +276,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_adcvdd.py"   # nRF54L has no VDDH domain -> io-channels 12 must read VDD, not VDDHDIV5 (must run after patch_adc32)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_adcacq.py"   # SAADC acquisition time 3us is too short -> readings ~10% low (measured)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_console.py"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_rttpoll.py"   # RTT console idle loop slept 1us (< one tick) -> CPU never idled, +6.5mA when there is no UART/USB console
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_uart_pm.py"
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_official_cspin.py"   # shutdown 時の CS 切り離しにポート番号が抜けている (54L15 では存在しないピン -> kernel panic -> 勝手に再起動)
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_conntx.py"   # v48: connection_thread slept after EVERY packet -> capped TX at ~55/s; add missing continue
