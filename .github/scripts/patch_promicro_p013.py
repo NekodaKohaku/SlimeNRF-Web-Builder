@@ -29,8 +29,10 @@ if MARK in s:
     print("patch_promicro_p013: already applied"); sys.exit(0)
 
 # 公式版と jiting 版で 4 番目の引数が違う (PULLDOWN / EXTERNAL_3V3_REGULATOR_PULL)
+# 行末に \r を許容する: Windows で clone すると core.autocrlf により CRLF になり、
+# newline="" で読むと行末が "\r\n" のままなので [ \t]*$ では一致しない。
 pat = re.compile(
-    r"^[ \t]*nrf_gpio_cfg\(NRF_GPIO_PIN_MAP\(0,\s*13\)[^;]*;[ \t]*$",
+    r"^[ \t]*nrf_gpio_cfg\(NRF_GPIO_PIN_MAP\(0,\s*13\)[^;]*;[ \t\r]*$",
     re.M)
 m = pat.search(s)
 if not m:

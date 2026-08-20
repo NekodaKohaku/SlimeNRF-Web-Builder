@@ -43,7 +43,8 @@ changed = []
 # ---- 1) vcc-gpios ----
 _vcc = pins.get("vcc")
 if not (_vcc and _vcc != "none"):
-    m = re.search(r"^[ \t]*vcc-gpios\s*=\s*<[^>]*>;[ \t]*$", s, re.M)
+    # 行末の \r を許容 (Windows の CRLF チェックアウト対策)
+    m = re.search(r"^[ \t]*vcc-gpios\s*=\s*<[^>]*>;[ \t\r]*$", s, re.M)
     if m:
         s = s.replace(m.group(0),
                       "\t\t/* " + MARK + ": board default (P0.31 sensor power on real\n"
