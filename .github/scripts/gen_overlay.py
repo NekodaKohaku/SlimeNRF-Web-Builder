@@ -215,6 +215,11 @@ def build_nrf52(bus, pins, opts, ain):
         L.append("/ { aliases { /delete-property/ pwm-led0; }; /delete-node/ pwmleds; };")
     L.append('&uicr { gpio-as-nreset; };')  # NCS 3.2: CONFIG_GPIO_AS_PINRESET is deprecated/non-promptable, the reset pin is a UICR devicetree property now (mirrors nRF54L's nfct-pins-as-gpios)
     L += mag_device_nodes("nrf52", pins, mc)
+    # Releasing the pads in UICR is only half of it: the NFCT peripheral stays
+    # enabled and keeps its claim on P0.09/P0.10, so whatever the user assigned
+    # there works until something suspends the block. Upstream's nini_slimevr
+    # board does both; nothing here ever uses NFC, so always turn it off.
+    L.append('&nfct { status = "disabled"; };')
     L.append('&uicr { nfct-pins-as-gpios; };')  # free NFC pins P0.09/P0.10 as GPIO (nRF52 tracker only; Kconfig NFCT_PINS_AS_GPIOS removed in Zephyr 4.x)
     return L
 
