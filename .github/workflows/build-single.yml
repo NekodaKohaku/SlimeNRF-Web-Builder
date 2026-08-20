@@ -268,6 +268,7 @@ jobs:
             esac
           fi
           python3 "$GITHUB_WORKSPACE/.github/scripts/patch_pwr.py"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/patch_sysoff.py"   # System OFF left the IMU powered from GPIO (upstream TODO says ~50uA; measured 135uA)
           if [ "${NEED_PWR_EARLY:-0}" = "1" ]; then
             python3 "$GITHUB_WORKSPACE/.github/scripts/patch_pwr_early.py"   # nRF52 only: latch power at PRE_KERNEL_1 via raw HAL (short-press boot)
           fi
