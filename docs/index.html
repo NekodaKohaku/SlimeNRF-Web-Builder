@@ -81,7 +81,7 @@
 
       <div class="sec" data-i18n="secPower"></div>
       <div class="grid">
-        <div><label for="battery"><span data-i18n="battery"></span><span class="help" data-help="helpBattery">?</span></label><select id="battery"><option value="liion"></option><option value="nimh"></option><option value="none"></option></select></div>
+        <div><label for="battery"><span data-i18n="battery"></span><span class="help" data-help="helpBattery">?</span></label><select id="battery"><option value="liion"></option><option value="nimh"></option><option value="cr2032"></option><option value="none"></option></select></div>
         <div id="adcRow"><label for="adc"><span data-i18n="adc"></span><span class="help" data-help="helpADC">?</span></label><select id="adc"><option value="external"></option><option value="internal"></option></select></div>
       </div>
       <div id="adcFields" class="grid" style="margin-top:12px;">
@@ -204,7 +204,7 @@ function applyLang() {
   setOpt("magconn", "i2c_shared", x.magConnI2cShared); setOpt("magconn", "i2c", x.magConnI2c); setOpt("magconn", "spi", x.magConnSpi);
   setOpt("sleep", "enabled", x.enabled); setOpt("sleep", "disabled", x.disabled);
   setOpt("output", "bootloader", x.flashBoot); setOpt("output", "swd", x.flashSwd); setOpt("output", "mcuboot", x.flashMcuboot);
-  setOpt("battery", "liion", x.batteryLiion); setOpt("battery", "nimh", x.batteryNimh); setOpt("battery", "none", x.batteryNone);
+  setOpt("battery", "liion", x.batteryLiion); setOpt("battery", "nimh", x.batteryNimh); setOpt("battery", "cr2032", x.batteryCr2032); setOpt("battery", "none", x.batteryNone);
   setOpt("extra", "disabled", x.extraActOff); setOpt("extra", "enabled", x.extraActOn);
   setOpt("adc", "external", x.adcExternal); setOpt("adc", "internal", x.adcInternal);
   setOpt("ledpol", "high", x.ledPolHigh); setOpt("ledpol", "low", x.ledPolLow);
